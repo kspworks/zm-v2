@@ -17,7 +17,8 @@ import { z } from "zod";
 
 import { env } from "~/env";
 import { ticketIdentifier } from "~/server/auth/sign-in-ticket";
-import { authBaseUrl, isDev } from "~/server/config";
+import { verifySecondFactor } from "~/server/auth/two-factor";
+import { authBaseUrl, isDev, mailConfig } from "~/server/config";
 import { db } from "~/server/db";
 import * as schema from "~/server/db/schema";
 import { newId } from "~/server/lib/ids";
@@ -29,6 +30,8 @@ import {
 } from "~/server/lib/rate-limit";
 import { reportError } from "~/server/lib/report";
 import { DEV_OTP, generateTotp } from "~/server/lib/totp";
+import { passwordResetEmail } from "~/server/mail/templates";
+import { sendMail } from "~/server/mail/transport";
 
 export const SESSION_TTL_SECONDS = 14 * 24 * 60 * 60;
 
@@ -95,6 +98,61 @@ const zm = () =>
               throw new APIError("TOO_MANY_REQUESTS", {
                 code: "TOO_MANY_REQUESTS",
               });
+            }
+          }),
+        },
+        {
+          // "forgot password": 3 requests per hour per email
+          matcher: (ctx) => ctx.path === "/request-password-reset",
+          handler: createAuthMiddleware(async (ctx) => {
+            const email = String(ctx.body?.email ?? "");
+            const { allowed } = await hitRateLimit(
+              rateLimitKeys.resetRequest(email),
+              RATE_LIMITS.resetRequest,
+            );
+
+            if (!allowed) {
+              throw new APIError("TOO_MANY_REQUESTS", {
+                code: "TOO_MANY_REQUESTS",
+              });
+            }
+          }),
+        },
+        {
+          // a password reset never removes 2FA: it also needs a TOTP or a
+          // backup code, and submissions are limited per token
+          matcher: (ctx) => ctx.path === "/reset-password",
+          handler: createAuthMiddleware(async (ctx) => {
+            const token = String(ctx.body?.token ?? ctx.query?.token ?? "");
+            const code = String(ctx.body?.code ?? "");
+            const { allowed } = await hitRateLimit(
+              rateLimitKeys.resetSubmit(token),
+              RATE_LIMITS.resetSubmit,
+            );
+
+            if (!allowed) {
+              throw new APIError("TOO_MANY_REQUESTS", {
+                code: "TOO_MANY_REQUESTS",
+              });
+            }
+
+            const pending =
+              await ctx.context.internalAdapter.findVerificationValue(
+                `reset-password:${token}`,
+              );
+
+            if (!pending) {
+              throw new APIError("BAD_REQUEST", { code: "INVALID_TOKEN" });
+            }
+
+            const ok = await db.transaction((tx) =>
+              verifySecondFactor(tx, pending.value, code, {
+                allowBackupCode: true,
+              }),
+            );
+
+            if (!ok) {
+              throw new APIError("BAD_REQUEST", { code: "INVALID_CODE" });
             }
           }),
         },
@@ -190,6 +248,19 @@ export const auth = betterAuth({
     minPasswordLength: 6,
     maxPasswordLength: 128,
     revokeSessionsOnPasswordReset: true,
+    resetPasswordTokenExpiresIn: 60 * 60,
+    // without SMTP the "forgot password" link is hidden and this is a no-op;
+    // the answer is the same either way, so addresses can't be enumerated
+    sendResetPassword: async ({ user, url }) => {
+      if (!mailConfig()) {
+        return;
+      }
+
+      const locale =
+        (user as { locale?: string }).locale === "en" ? "en" : "uk";
+      const mail = await passwordResetEmail(locale, { name: user.name, url });
+      await sendMail({ to: user.email, ...mail });
+    },
   },
   rateLimit: {
     enabled: env.NODE_ENV !== "test",

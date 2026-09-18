@@ -583,5 +583,24 @@
     "passwordDone": "Your password is changed. Sign in with it and your authenticator.",
     "toLogin": "Go to sign in",
     "continue": "Go to ZM"
+  },
+  "mail": {
+    "insufficientFunds": {
+      "subject": "Insufficient funds for planned transactions",
+      "intro": "Tomorrow's planned transactions would take these accounts below zero:",
+      "date": "Date",
+      "account": "Account",
+      "plannedAmount": "Planned transactions amount",
+      "currentBalance": "Current account balance",
+      "amountShortage": "Amount shortage"
+    },
+    "passwordReset": {
+      "subject": "Reset your ZM password",
+      "greeting": "Hi {name},",
+      "body": "Someone asked to reset the password of your ZM account. The link works once and expires in an hour. You will also need your authenticator or a backup code.",
+      "button": "Choose a new password",
+      "ignore": "If it wasn't you, ignore this email: your password stays the same."
+    },
+    "footer": "ZM Notifications"
   }
 }

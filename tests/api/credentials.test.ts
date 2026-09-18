@@ -58,16 +58,14 @@ const withSession = (userId: string, sessionId: string) =>
   });
 
 const addSessions = (userId: string, ...ids: string[]) =>
-  db
-    .insert(sessions)
-    .values(
-      ids.map((id) => ({
-        id,
-        token: `token-${id}`,
-        userId,
-        expiresAt: new Date(Date.now() + 3600_000),
-      })),
-    );
+  db.insert(sessions).values(
+    ids.map((id) => ({
+      id,
+      token: `token-${id}`,
+      userId,
+      expiresAt: new Date(Date.now() + 3600_000),
+    })),
+  );
 
 describe("settings.changePassword", () => {
   it("needs the current password and a TOTP code, and keeps only this session", async () => {
