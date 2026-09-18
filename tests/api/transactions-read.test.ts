@@ -555,6 +555,40 @@ describe("filtered totals", () => {
 
     expect(totals.map((row) => row.currencyCode)).toEqual(["USD"]);
   });
+
+  it("sums submitted rows by default and planned rows with planned", async () => {
+    const user = await createUser();
+    const account = await makeAccount(user);
+    const c = callerFor(user);
+
+    await c.transactions.create(expense(account.id, 100));
+    await c.planned.create({
+      data: expense(account.id, 40),
+      schedule: { repeatType: "none" },
+    });
+    await c.planned.create({
+      data: {
+        kind: "income",
+        date: "2026-04-01",
+        amount: 250,
+        accountId: account.id,
+      },
+      schedule: { repeatType: "none" },
+    });
+
+    const [submitted] = await c.transactions.totals({ filter: noFilter });
+    const [planned] = await c.transactions.totals({
+      filter: noFilter,
+      planned: true,
+    });
+
+    expect(submitted).toMatchObject({
+      expenses: -100,
+      incomes: 0,
+      total: -100,
+    });
+    expect(planned).toMatchObject({ expenses: -40, incomes: 250, total: 210 });
+  });
 });
 
 describe("debt labels", () => {

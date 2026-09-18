@@ -474,13 +474,14 @@ export type CurrencyTotal = {
 
 /**
  * Expenses, incomes and total per currency over the WHOLE filtered set of
- * submitted rows. Transfers between two non-debt accounts net to zero and are
+ * submitted (or planned) rows. Transfers between two non-debt accounts net to zero and are
  * left out; for a debt pair the real-account leg is what counts.
  */
 export const filteredTotals = async (
   db: DbOrTx,
   userId: string,
   filter: Partial<TransactionFilter>,
+  planned: Planned = "submitted",
 ): Promise<CurrencyTotal[]> => {
   const rows = await db.execute<{
     currency_id: string;
@@ -498,7 +499,7 @@ export const filteredTotals = async (
           THEN l.amount ELSE p.amount END AS amount,
         CASE WHEN p.batch_id IS NOT NULL AND pa.type = 'debt'
           THEN la.currency_id ELSE pa.currency_id END AS currency_id
-      ${pairsFrom(userId, "submitted", filter, [
+      ${pairsFrom(userId, planned, filter, [
         sql`NOT (p.batch_id IS NOT NULL AND pa.type <> 'debt' AND la.type <> 'debt')`,
       ])}
     ) x

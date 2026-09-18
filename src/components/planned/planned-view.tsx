@@ -16,6 +16,7 @@ import {
 import { BalancesSidebar } from "~/components/transactions/balances-sidebar";
 import { FilterBar } from "~/components/transactions/filter-bar";
 import { LedgerLayout } from "~/components/transactions/ledger-layout";
+import { TotalsBar } from "~/components/transactions/totals-bar";
 import {
   type TransactionDialogState,
   TransactionFormDialog,
@@ -79,6 +80,8 @@ export function PlannedView() {
       }
     >
       <FilterBar state={state} setState={setState} reset={reset} />
+
+      {filtering ? <TotalsBar filter={filter} planned /> : null}
 
       {list.isPending ? (
         <div className="flex flex-col gap-2">

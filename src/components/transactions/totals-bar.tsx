@@ -14,10 +14,18 @@ import type { TransactionFilter } from "~/lib/validators/transactions";
 import { useTRPC } from "~/trpc/react";
 
 /** Server-side totals over the whole filtered set, shown while filtering */
-export function TotalsBar({ filter }: { filter: TransactionFilter }) {
+export function TotalsBar({
+  filter,
+  planned = false,
+}: {
+  filter: TransactionFilter;
+  planned?: boolean;
+}) {
   const t = useTranslations("transactions.totals");
   const trpc = useTRPC();
-  const totals = useQuery(trpc.transactions.totals.queryOptions({ filter }));
+  const totals = useQuery(
+    trpc.transactions.totals.queryOptions({ filter, planned }),
+  );
 
   if (!totals.data?.length) {
     return null;
