@@ -302,9 +302,6 @@ importers:
       '@types/node':
         specifier: ^24.13.5
         version: 24.13.5
-      '@types/nodemailer':
-        specifier: ^8.0.2
-        version: 8.0.2
       '@types/qrcode':
         specifier: ^1.5.6
         version: 1.5.6
@@ -3475,9 +3472,6 @@ packages:
 
   '@types/node@26.6.1':
     resolution: {integrity: sha512-VqGJBMCtdhqkBUCcBLvywI0NJ+KLuVzgNnlBUNFOQjqVxzo2lxLUNg1DSey8+u2u6ktswSAxg+s68QLzWHNOuA==}
-
-  '@types/nodemailer@8.0.2':
-    resolution: {integrity: sha512-c7M5ox8p0nEOfbJ2E9Qcmt8/QCu/VzsiAhzBiZbvky2PhKZDHpKB3sQHBM5MEZNkCfBOaS6S9//AGPRTNB7IaA==}
 
   '@types/qrcode@1.5.6':
     resolution: {integrity: sha512-te7NQcV2BOvdj2b1hCAHzAoMNuj65kNBMz0KBaxM6c3VGBOhU0dURQKOtH8CFNI/dsKkwlv32p26qYQTWoB5bw==}
@@ -8627,10 +8621,6 @@ snapshots:
   '@types/node@26.6.1':
     dependencies:
       undici-types: 8.9.0
-
-  '@types/nodemailer@8.0.2':
-    dependencies:
-      '@types/node': 26.6.1
 
   '@types/qrcode@1.5.6':
     dependencies:
