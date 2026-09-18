@@ -155,7 +155,7 @@ export const listCounterparties = async (db: DbOrTx, userId: string) => {
       name: counterparties.name,
       usage: sql<number>`(
         SELECT count(*) FROM ${transactions} t
-        WHERE t.counterparty_id = ${counterparties.id} AND t.deleted_at IS NULL
+        WHERE t.counterparty_id = "counterparties"."id" AND t.deleted_at IS NULL
       )`.mapWith(Number),
     })
     .from(counterparties)

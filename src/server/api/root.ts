@@ -5,6 +5,7 @@ import { healthRouter } from "~/server/api/routers/health";
 import { invitesRouter } from "~/server/api/routers/invites";
 import { meRouter } from "~/server/api/routers/me";
 import { sharingRouter } from "~/server/api/routers/sharing";
+import { transactionsRouter } from "~/server/api/routers/transactions";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 
 export const appRouter = createTRPCRouter({
@@ -15,6 +16,7 @@ export const appRouter = createTRPCRouter({
   invites: invitesRouter,
   me: meRouter,
   sharing: sharingRouter,
+  transactions: transactionsRouter,
 });
 
 export type AppRouter = typeof appRouter;

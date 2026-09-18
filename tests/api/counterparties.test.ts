@@ -174,6 +174,31 @@ describe("counterparties.merge", () => {
   });
 });
 
+describe("counterparties.list", () => {
+  it("counts each counterparty's live transactions", async () => {
+    const user = await createUser();
+    const account = await makeAccount(user);
+    const alex = await resolve(user.id, "Alex");
+    await resolve(user.id, "Olena");
+
+    for (const deletedAt of [null, null, new Date()]) {
+      await insertTransactionRow({
+        accountId: account.id,
+        amount: -1,
+        counterpartyId: alex,
+        deletedAt,
+        createdBy: user.id,
+      });
+    }
+
+    const rows = await callerFor(user).counterparties.list();
+    expect(rows.map((row) => [row.name, row.usage])).toEqual([
+      ["Alex", 2],
+      ["Olena", 0],
+    ]);
+  });
+});
+
 describe("counterparties.delete", () => {
   it("deletes an unused counterparty", async () => {
     const user = await createUser();

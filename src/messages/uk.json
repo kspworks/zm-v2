@@ -287,5 +287,163 @@
     "you": "ви",
     "revoke": "Забрати доступ",
     "added": "Надано доступ {email}"
+  },
+  "transactions": {
+    "title": "Транзакції",
+    "add": "Додати транзакцію",
+    "bulk": "Пакетне введення",
+    "adjust": "Коригування балансу",
+    "empty": "Транзакцій ще немає",
+    "emptyFiltered": "Нічого не знайдено за цими фільтрами",
+    "emptyHint": "Додайте першу транзакцію, щоб почати облік.",
+    "emptyNoAccounts": "Спочатку створіть рахунок.",
+    "orImport": "або імпортуйте CSV",
+    "overdueTitle": "Заплановані та прострочені",
+    "submitWithChanges": "Провести зі змінами",
+    "editSchedule": "Редагувати розклад",
+    "deleteTitle": "Видалити цю транзакцію?",
+    "deleteOnlyThis": "Лише цю",
+    "deleteAllPlanned": "Усі заплановані",
+    "deleteRecurringTitle": "Видалити заплановану транзакцію?",
+    "deleteRecurringDescription": "Видалити лише цей повтор чи цей і всі інші заплановані повтори розкладу? Уже проведені залишаться.",
+    "transfer": "Переказ",
+    "noCategory": "Без категорії",
+    "deletedCategory": "Видалена категорія",
+    "gave": "Видано",
+    "took": "Отримано",
+    "debt": {
+      "lent": "Позичено {amount}",
+      "borrowed": "Взято в борг {amount}",
+      "repaid": "Повернено борг {amount}",
+      "repaidToMe": "{name} повертає {amount}",
+      "lentTo": "Позичено {name}",
+      "borrowedFrom": "Взято в борг у {name}",
+      "repaidTo": "Повернено борг {name}",
+      "repaidMe": "{name} повертає борг",
+      "forecast": {
+        "lent": "Позичу {amount}",
+        "borrowed": "Візьму в борг {amount}",
+        "repaid": "Поверну борг {amount}",
+        "repaidToMe": "{name} поверне мені {amount}",
+        "lentTo": "Позичу {name}",
+        "borrowedFrom": "Позичу в {name}",
+        "repaidTo": "Поверну борг {name}",
+        "repaidMe": "{name} поверне мені"
+      },
+      "settled": "розраховано"
+    },
+    "relative": {
+      "today": "Сьогодні",
+      "yesterday": "Вчора",
+      "tomorrow": "Завтра",
+      "inDays": "через {days, plural, one {# день} few {# дні} many {# днів} other {# дня}}",
+      "daysAgo": "{days, plural, one {# день} few {# дні} many {# днів} other {# дня}} тому"
+    },
+    "totals": {
+      "expenses": "Витрати",
+      "incomes": "Доходи",
+      "total": "Разом",
+      "hint": "Ці результати не враховують переказів між вашими рахунками"
+    },
+    "toast": {
+      "created": "Збережено",
+      "negative": "Рахунок «{name}» має відʼємний баланс",
+      "deleted": "Видалено"
+    },
+    "loadMore": "Завантажити ще"
+  },
+  "filters": {
+    "title": "Фільтри",
+    "accounts": "Рахунки",
+    "categories": "Категорії",
+    "counterparties": "Контрагенти",
+    "dates": "Дати",
+    "from": "Від",
+    "to": "До",
+    "amount": "Сума",
+    "comment": "Коментар",
+    "reset": "Скинути",
+    "noCategory": "Без категорії",
+    "any": "Будь-які",
+    "selected": "Обрано: {count}",
+    "search": "Пошук…",
+    "apply": "Показати результати"
+  },
+  "sidebar": {
+    "title": "Баланси",
+    "available": "Доступно",
+    "myDebt": "Мій борг",
+    "oweMe": "Винні мені",
+    "accounts": "Рахунки",
+    "unknown": "Невідомо",
+    "none": "Тут поки нічого"
+  },
+  "form": {
+    "createTitle": "Нова транзакція",
+    "editTitle": "Редагувати транзакцію",
+    "submitTitle": "Провести транзакцію",
+    "kinds": {
+      "expense": "Витрата",
+      "income": "Дохід",
+      "transfer": "Переказ",
+      "debt": "Борг"
+    },
+    "date": "Дата",
+    "amount": "Сума",
+    "linkedAmount": "Отримана сума",
+    "category": "Категорія",
+    "account": "Рахунок",
+    "fromAccount": "З рахунку",
+    "toAccount": "На рахунок",
+    "counterparty": "Отримувач",
+    "debtCounterparty": "Хто",
+    "comment": "Коментар",
+    "direction": {
+      "gave": "Віддаю",
+      "took": "Отримую"
+    },
+    "pickCategory": "Оберіть категорію",
+    "noCategory": "Без категорії",
+    "searchCategory": "Пошук категорії…",
+    "searchCounterparty": "Імʼя…",
+    "createCounterparty": "Додати «{name}»",
+    "noCounterparty": "Ніхто",
+    "noAccounts": "У вас ще немає рахунків.",
+    "createAccount": "Створити рахунок",
+    "inactive": "{name} (неактивний)",
+    "balanceWith": {
+      "oweMe": "{name} винен вам {amount}",
+      "iOwe": "Ви винні {name} {amount}",
+      "settled": "Ви з {name} розраховані"
+    },
+    "preview": "Буде показано як: {label}",
+    "submitHint": "Ctrl+Enter — зберегти",
+    "repeat": "Повтор",
+    "repeatTypes": {
+      "none": "Не повторюється",
+      "daily": "Щодня",
+      "weekly": "Щотижня",
+      "monthly": "Щомісяця",
+      "yearly": "Щороку"
+    },
+    "interval": "Кожні",
+    "intervalUnit": {
+      "daily": "{count, plural, one {день} few {дні} many {днів} other {дня}}",
+      "weekly": "{count, plural, one {тиждень} few {тижні} many {тижнів} other {тижня}}",
+      "monthly": "{count, plural, one {місяць} few {місяці} many {місяців} other {місяця}}",
+      "yearly": "{count, plural, one {рік} few {роки} many {років} other {року}}"
+    },
+    "weekdays": "У дні",
+    "endDate": "Завершення",
+    "noEndDate": "Без дати завершення",
+    "weekdayNames": {
+      "1": "Пн",
+      "2": "Вт",
+      "3": "Ср",
+      "4": "Чт",
+      "5": "Пт",
+      "6": "Сб",
+      "7": "Нд"
+    }
   }
 }

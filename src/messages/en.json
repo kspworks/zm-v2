@@ -287,5 +287,163 @@
     "you": "you",
     "revoke": "Remove access",
     "added": "Shared with {email}"
+  },
+  "transactions": {
+    "title": "Transactions",
+    "add": "Add transaction",
+    "bulk": "Bulk entry",
+    "adjust": "Balance adjustment",
+    "empty": "No transactions yet",
+    "emptyFiltered": "Nothing matches these filters",
+    "emptyHint": "Add your first transaction to start tracking.",
+    "emptyNoAccounts": "Create an account first.",
+    "orImport": "or import CSV",
+    "overdueTitle": "Planned and overdue",
+    "submitWithChanges": "Submit with changes",
+    "editSchedule": "Edit schedule",
+    "deleteTitle": "Delete this transaction?",
+    "deleteOnlyThis": "Only this one",
+    "deleteAllPlanned": "All planned",
+    "deleteRecurringTitle": "Delete the planned transaction?",
+    "deleteRecurringDescription": "Delete only this occurrence, or this and every other planned occurrence of the schedule? Already submitted ones stay.",
+    "transfer": "Transfer",
+    "noCategory": "No category",
+    "deletedCategory": "Deleted category",
+    "gave": "Gave",
+    "took": "Took",
+    "debt": {
+      "lent": "I lent {amount}",
+      "borrowed": "I borrowed {amount}",
+      "repaid": "I repaid {amount}",
+      "repaidToMe": "{name} repaid me {amount}",
+      "lentTo": "I lent to {name}",
+      "borrowedFrom": "I borrowed from {name}",
+      "repaidTo": "I repaid {name}",
+      "repaidMe": "{name} repaid me",
+      "forecast": {
+        "lent": "I will lend {amount}",
+        "borrowed": "I will borrow {amount}",
+        "repaid": "I will repay {amount}",
+        "repaidToMe": "{name} will repay me {amount}",
+        "lentTo": "I will lend to {name}",
+        "borrowedFrom": "I will borrow from {name}",
+        "repaidTo": "I will repay {name}",
+        "repaidMe": "{name} will repay me"
+      },
+      "settled": "settled"
+    },
+    "relative": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "tomorrow": "Tomorrow",
+      "inDays": "in {days, plural, one {# day} other {# days}}",
+      "daysAgo": "{days, plural, one {# day} other {# days}} ago"
+    },
+    "totals": {
+      "expenses": "Expenses",
+      "incomes": "Incomes",
+      "total": "Total",
+      "hint": "These results do not include transfers between your own accounts"
+    },
+    "toast": {
+      "created": "Saved",
+      "negative": "Account \"{name}\" has negative balance",
+      "deleted": "Deleted"
+    },
+    "loadMore": "Load more"
+  },
+  "filters": {
+    "title": "Filters",
+    "accounts": "Accounts",
+    "categories": "Categories",
+    "counterparties": "Counterparties",
+    "dates": "Dates",
+    "from": "From",
+    "to": "To",
+    "amount": "Amount",
+    "comment": "Comment",
+    "reset": "Reset",
+    "noCategory": "No category",
+    "any": "Any",
+    "selected": "{count} selected",
+    "search": "Search…",
+    "apply": "Show results"
+  },
+  "sidebar": {
+    "title": "Balances",
+    "available": "Available",
+    "myDebt": "My debt",
+    "oweMe": "Owe to me",
+    "accounts": "Accounts",
+    "unknown": "Unknown",
+    "none": "Nothing here yet"
+  },
+  "form": {
+    "createTitle": "New transaction",
+    "editTitle": "Edit transaction",
+    "submitTitle": "Submit transaction",
+    "kinds": {
+      "expense": "Expense",
+      "income": "Income",
+      "transfer": "Transfer",
+      "debt": "Debt"
+    },
+    "date": "Date",
+    "amount": "Amount",
+    "linkedAmount": "Received amount",
+    "category": "Category",
+    "account": "Account",
+    "fromAccount": "From account",
+    "toAccount": "To account",
+    "counterparty": "Payee",
+    "debtCounterparty": "Who",
+    "comment": "Comment",
+    "direction": {
+      "gave": "I gave",
+      "took": "I took"
+    },
+    "pickCategory": "Pick a category",
+    "noCategory": "No category",
+    "searchCategory": "Search category…",
+    "searchCounterparty": "Name…",
+    "createCounterparty": "Add \"{name}\"",
+    "noCounterparty": "Nobody",
+    "noAccounts": "You have no accounts yet.",
+    "createAccount": "Create account",
+    "inactive": "{name} (inactive)",
+    "balanceWith": {
+      "oweMe": "{name} owes you {amount}",
+      "iOwe": "You owe {name} {amount}",
+      "settled": "You and {name} are settled"
+    },
+    "preview": "Will be shown as: {label}",
+    "submitHint": "Ctrl+Enter to save",
+    "repeat": "Repeat",
+    "repeatTypes": {
+      "none": "Doesn't repeat",
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "monthly": "Monthly",
+      "yearly": "Yearly"
+    },
+    "interval": "Every",
+    "intervalUnit": {
+      "daily": "{count, plural, one {day} other {days}}",
+      "weekly": "{count, plural, one {week} other {weeks}}",
+      "monthly": "{count, plural, one {month} other {months}}",
+      "yearly": "{count, plural, one {year} other {years}}"
+    },
+    "weekdays": "On",
+    "endDate": "Ends",
+    "noEndDate": "No ending date",
+    "weekdayNames": {
+      "1": "Mon",
+      "2": "Tue",
+      "3": "Wed",
+      "4": "Thu",
+      "5": "Fri",
+      "6": "Sat",
+      "7": "Sun"
+    }
   }
 }
