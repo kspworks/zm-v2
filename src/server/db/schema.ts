@@ -295,6 +295,8 @@ export const categories = pgTable(
     name: varchar({ length: 255 }).notNull(),
     isIncome: boolean().notNull().default(false),
     isExpense: boolean().notNull().default(true),
+    /** Set on categories seeded at registration, e.g. "adjustment" */
+    seedKey: text(),
     importId: text().references(() => imports.id, restrict),
     createdBy: text()
       .notNull()

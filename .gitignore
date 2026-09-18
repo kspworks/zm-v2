@@ -45,3 +45,6 @@ next-env.d.ts
 
 # self-hosted bundle
 /dist
+
+# local tooling
+/.claude/launch.json
