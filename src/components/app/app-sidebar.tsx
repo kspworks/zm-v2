@@ -42,10 +42,15 @@ export function AppSidebar({
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/transactions">
-                <Logo />
-                <span className="font-semibold">{t("common.appName")}</span>
+                <Logo className="shrink-0" />
+                <span className="font-semibold group-data-[collapsible=icon]:hidden">
+                  {t("common.appName")}
+                </span>
                 {isDevBuild ? (
-                  <Badge variant="outline" className="ml-auto">
+                  <Badge
+                    variant="outline"
+                    className="ml-auto group-data-[collapsible=icon]:hidden"
+                  >
                     {t("common.dev")}
                   </Badge>
                 ) : null}
