@@ -145,4 +145,16 @@
   html {
     @apply font-sans;
   }
+  /* Tailwind v4 preflight leaves buttons with the default cursor. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary,
+  select:not(:disabled),
+  label:has(> input:not(:disabled), > button:not(:disabled)),
+  [data-slot="field"]:has(
+      > :is([role="checkbox"], [role="switch"], [role="radio"]):not(:disabled)
+    )
+    [data-slot="field-label"] {
+    cursor: pointer;
+  }
 }
