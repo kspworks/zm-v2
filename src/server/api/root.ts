@@ -1,12 +1,20 @@
+import { accountsRouter } from "~/server/api/routers/accounts";
+import { categoriesRouter } from "~/server/api/routers/categories";
+import { counterpartiesRouter } from "~/server/api/routers/counterparties";
 import { healthRouter } from "~/server/api/routers/health";
 import { invitesRouter } from "~/server/api/routers/invites";
 import { meRouter } from "~/server/api/routers/me";
+import { sharingRouter } from "~/server/api/routers/sharing";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 
 export const appRouter = createTRPCRouter({
+  accounts: accountsRouter,
+  categories: categoriesRouter,
+  counterparties: counterpartiesRouter,
   health: healthRouter,
   invites: invitesRouter,
   me: meRouter,
+  sharing: sharingRouter,
 });
 
 export type AppRouter = typeof appRouter;

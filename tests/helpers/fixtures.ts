@@ -2,8 +2,17 @@ import { eq } from "drizzle-orm";
 
 import { enrolTwoFactor, hashPassword } from "~/server/auth/two-factor";
 import { db } from "~/server/db";
-import { authAccounts, currencies, users } from "~/server/db/schema";
+import {
+  accountMembers,
+  authAccounts,
+  categoryMembers,
+  currencies,
+  transactions,
+  users,
+} from "~/server/db/schema";
 import { generateTotpSecret } from "~/server/lib/totp";
+import { insertAccount } from "~/server/services/accounts";
+import { insertCategory } from "~/server/services/categories";
 
 let sequence = 0;
 
@@ -69,3 +78,102 @@ export const createUserWithCredentials = async (
 
 export const allCurrencies = () =>
   db.select().from(currencies).orderBy(currencies.code);
+
+// ---------------------------------------------------------------------------
+// accounts, categories, sharing, raw transactions
+// ---------------------------------------------------------------------------
+
+export const makeAccount = async (
+  user: { id: string },
+  overrides: Partial<{
+    name: string;
+    type: "cash" | "card" | "account" | "credit" | "deposit" | "debt";
+    currencyId: string;
+    initialBalance: number;
+    isActive: boolean;
+  }> = {},
+) => {
+  sequence += 1;
+
+  return db.transaction((tx) =>
+    insertAccount(tx, {
+      userId: user.id,
+      values: {
+        name: `Account ${sequence}`,
+        type: "card",
+        currencyId: CURRENCY.UAH,
+        initialBalance: 0,
+        isActive: true,
+        ...overrides,
+      },
+    }),
+  );
+};
+
+export const makeCategory = async (
+  user: { id: string },
+  overrides: Partial<{
+    name: string;
+    parentId: string | null;
+    isExpense: boolean;
+    isIncome: boolean;
+    seedKey: string | null;
+  }> = {},
+) => {
+  sequence += 1;
+
+  return db.transaction((tx) =>
+    insertCategory(tx, {
+      userId: user.id,
+      values: {
+        name: `Category ${sequence}`,
+        parentId: null,
+        isExpense: true,
+        isIncome: false,
+        ...overrides,
+      },
+    }),
+  );
+};
+
+/** Gives `user` a member row on an account or category directly */
+export const grant = async (
+  entity: "account" | "category",
+  id: string,
+  user: { id: string },
+  { canWrite = false, canRead = true } = {},
+) => {
+  if (entity === "account") {
+    await db
+      .insert(accountMembers)
+      .values({ accountId: id, userId: user.id, canRead, canWrite });
+  } else {
+    await db
+      .insert(categoryMembers)
+      .values({ categoryId: id, userId: user.id, canRead, canWrite });
+  }
+};
+
+/** A raw transaction row, bypassing the service rules (for read-side tests) */
+export const insertTransactionRow = async (
+  values: Partial<typeof transactions.$inferInsert> & {
+    accountId: string;
+    amount: number;
+    createdBy: string;
+  },
+) => {
+  const [row] = await db
+    .insert(transactions)
+    .values({
+      kind: values.amount < 0 ? "expense" : "income",
+      date: "2026-01-15",
+      ...values,
+    })
+    .returning();
+
+  if (!row) {
+    throw new Error("insertTransactionRow returned no row");
+  }
+
+  return row;
+};
