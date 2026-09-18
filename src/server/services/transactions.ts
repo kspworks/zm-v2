@@ -169,6 +169,8 @@ export type CreateOptions = {
   plannedHash?: string | null;
   importId?: string | null;
   createdAt?: Date;
+  /** Generated occurrences are audited through their schedule instead */
+  audit?: boolean;
 };
 
 /** Inserts prepared legs (a pair gets a fresh batchId) and audits them */
@@ -197,13 +199,15 @@ export const insertLegs = async (
 
   const ids = rows.map((row) => row.id);
 
-  await audit(tx, {
-    entityType: "transaction",
-    entityId: ids,
-    action: "create",
-    userId,
-    payload: { legs, ...options },
-  });
+  if (options.audit !== false) {
+    await audit(tx, {
+      entityType: "transaction",
+      entityId: ids,
+      action: "create",
+      userId,
+      payload: { legs, ...options },
+    });
+  }
 
   return { ids, batchId };
 };
@@ -280,7 +284,7 @@ const loadBatch = async (tx: DbOrTx, id: string) => {
  * Delete rights on existing rows: write access to every leg's account and,
  * where set, category.
  */
-const requireDeletable = async (
+export const requireDeletable = async (
   tx: DbOrTx,
   userId: string,
   rows: { accountId: string; categoryId: string | null }[],

@@ -40,6 +40,87 @@ const PROTECTED: [string, (caller: Caller) => Promise<unknown>][] = [
     (c) => c.counterparties.merge({ sourceId: "x", targetId: "y" }),
   ],
   ["counterparties.delete", (c) => c.counterparties.delete({ id: "x" })],
+  [
+    "transactions.list",
+    (c) =>
+      c.transactions.list({
+        filter: { accounts: [], categories: [], counterparties: [] },
+      }),
+  ],
+  [
+    "transactions.planned",
+    (c) =>
+      c.transactions.planned({
+        filter: { accounts: [], categories: [], counterparties: [] },
+      }),
+  ],
+  [
+    "transactions.overdue",
+    (c) =>
+      c.transactions.overdue({
+        filter: { accounts: [], categories: [], counterparties: [] },
+      }),
+  ],
+  [
+    "transactions.totals",
+    (c) =>
+      c.transactions.totals({
+        filter: { accounts: [], categories: [], counterparties: [] },
+      }),
+  ],
+  [
+    "transactions.create",
+    (c) =>
+      c.transactions.create({
+        kind: "expense",
+        date: "2026-01-01",
+        amount: 1,
+        accountId: "x",
+      }),
+  ],
+  [
+    "transactions.update",
+    (c) =>
+      c.transactions.update({
+        id: "x",
+        data: {
+          kind: "expense",
+          date: "2026-01-01",
+          amount: 1,
+          accountId: "x",
+        },
+      }),
+  ],
+  ["transactions.delete", (c) => c.transactions.delete({ id: "x" })],
+  [
+    "planned.create",
+    (c) =>
+      c.planned.create({
+        data: {
+          kind: "expense",
+          date: "2026-01-01",
+          amount: 1,
+          accountId: "x",
+        },
+        schedule: { repeatType: "none" },
+      }),
+  ],
+  ["planned.schedule", (c) => c.planned.schedule({ id: "x" })],
+  [
+    "planned.updateSchedule",
+    (c) =>
+      c.planned.updateSchedule({
+        scheduleId: "x",
+        data: {
+          kind: "expense",
+          date: "2026-01-01",
+          amount: 1,
+          accountId: "x",
+        },
+        schedule: { repeatType: "daily" },
+      }),
+  ],
+  ["planned.deleteAll", (c) => c.planned.deleteAll({ id: "x" })],
   ["sharing.list", (c) => c.sharing.list({ entity: "account", id: "x" })],
   [
     "sharing.add",

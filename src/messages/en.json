@@ -445,5 +445,11 @@
       "6": "Sat",
       "7": "Sun"
     }
+  },
+  "planned": {
+    "title": "Planned",
+    "add": "Plan a transaction",
+    "empty": "Nothing planned",
+    "emptyHint": "Plan a one-off payment, or a repeating one like rent or salary."
   }
 }

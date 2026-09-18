@@ -207,9 +207,11 @@ export type TransactionFormProps = {
   /** Extra fields rendered after the comment (the repeat section) */
   extraFields?: ReactNode;
   /** Blocks submitting while extra fields are invalid */
-  extraValid?: () => boolean;
+  extraValid?: (values: TransactionFormValues) => boolean;
   footer: (state: { pending: boolean; dirty: boolean }) => ReactNode;
   formId: string;
+  /** The date part of the success toast; schedules show a date range */
+  describeDate?: (date: string) => string;
 };
 
 export function TransactionForm({
@@ -224,6 +226,7 @@ export function TransactionForm({
   extraValid,
   footer,
   formId,
+  describeDate = formatDisplayDate,
 }: TransactionFormProps) {
   const t = useTranslations("form");
   const tt = useTranslations("transactions");
@@ -349,7 +352,7 @@ export function TransactionForm({
       : null;
 
   const submit = form.handleSubmit(async (values) => {
-    if (pending || (extraValid && !extraValid())) {
+    if (pending || (extraValid && !extraValid(values))) {
       return;
     }
 
@@ -364,7 +367,7 @@ export function TransactionForm({
       const signed = negativeSign ? -input.amount : input.amount;
       toast.success(
         [
-          formatDisplayDate(values.date),
+          describeDate(values.date),
           categoryLabel,
           values.comment.trim() || null,
           formatMoney(signed, account?.currencySign, { showPlus: true }),

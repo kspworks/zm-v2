@@ -4,6 +4,7 @@ import { counterpartiesRouter } from "~/server/api/routers/counterparties";
 import { healthRouter } from "~/server/api/routers/health";
 import { invitesRouter } from "~/server/api/routers/invites";
 import { meRouter } from "~/server/api/routers/me";
+import { plannedRouter } from "~/server/api/routers/planned";
 import { sharingRouter } from "~/server/api/routers/sharing";
 import { transactionsRouter } from "~/server/api/routers/transactions";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
@@ -15,6 +16,7 @@ export const appRouter = createTRPCRouter({
   health: healthRouter,
   invites: invitesRouter,
   me: meRouter,
+  planned: plannedRouter,
   sharing: sharingRouter,
   transactions: transactionsRouter,
 });
