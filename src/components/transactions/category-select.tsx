@@ -19,6 +19,7 @@ import {
   PopoverTrigger,
 } from "~/components/ui/popover";
 import type { CategoryOption } from "~/lib/category-options";
+import { lastInputWasPointer } from "~/lib/input-modality";
 import { matchesAnyLayout } from "~/lib/keyboard-layouts";
 import { cn } from "~/lib/utils";
 
@@ -87,12 +88,16 @@ export function CategorySelect({
 
   // Radix would return focus to the trigger mid-keypress (and an Enter
   // there re-opens the list), so focus manually on the next frame: the
-  // trigger itself, or its neighbour when the list was left with Tab
+  // trigger itself, or its neighbour when the list was left with Tab.
+  // After a pointer close focus stays put, so no focus ring is drawn
   const onCloseAutoFocus = (event: Event) => {
     event.preventDefault();
     const step = tabStep.current;
     tabStep.current = null;
     setSearch("");
+    if (lastInputWasPointer()) {
+      return;
+    }
 
     requestAnimationFrame(() =>
       step

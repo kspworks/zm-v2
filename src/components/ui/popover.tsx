@@ -3,6 +3,7 @@
 import * as React from "react"
 import { cn } from "cn"
 import { Popover as PopoverPrimitive } from "radix-ui"
+import { pointerAwareCloseAutoFocus } from "~/lib/input-modality"
 
 function Popover({
   ...props
@@ -20,12 +21,14 @@ function PopoverContent({
   className,
   align = "center",
   sideOffset = 4,
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Content>) {
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content
         data-slot="popover-content"
+        onCloseAutoFocus={pointerAwareCloseAutoFocus(onCloseAutoFocus)}
         align={align}
         sideOffset={sideOffset}
         className={cn(
