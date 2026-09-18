@@ -1,0 +1,50 @@
+name: zm
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      # CHANGE THIS: the example password is public (it is in the repository).
+      # Keep it in sync with DATABASE_URL in .env.docker.
+      POSTGRES_USER: "zm"
+      POSTGRES_PASSWORD: "change-me-this-password-is-public"
+      POSTGRES_DB: "zm"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zm -d zm"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  # Runs to completion before the app starts, so the schema is never behind
+  # the code; a failure here stops the deploy instead of surfacing later.
+  migrator:
+    restart: "no"
+    build:
+      context: .
+      target: migrator
+    env_file: .env.docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  next-app:
+    restart: unless-stopped
+    build:
+      context: .
+      target: runner
+      args:
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+    env_file: .env.docker
+    ports:
+      - "3333:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
+
+volumes:
+  postgres_data:

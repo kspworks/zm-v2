@@ -1,15 +1,4 @@
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  inArray,
-  isNull,
-  ne,
-  or,
-  type SQL,
-  sql,
-} from "drizzle-orm";
+import { and, asc, desc, eq, isNull, ne, or, type SQL, sql } from "drizzle-orm";
 
 import type { AccountInput } from "~/lib/validators/accounts";
 import type { DbOrTx } from "~/server/db";
@@ -153,12 +142,6 @@ const present = (userId: string) => (row: AccountRow) => ({
 /** The Accounts page and selects: every readable non-debt account */
 export const listAccounts = async (db: DbOrTx, userId: string) =>
   (await readableAccounts(db, userId, ne(accounts.type, "debt"))).map(
-    present(userId),
-  );
-
-/** Readable debt accounts (the user's own and ones shared with them) */
-export const listDebtAccounts = async (db: DbOrTx, userId: string) =>
-  (await readableAccounts(db, userId, eq(accounts.type, "debt"))).map(
     present(userId),
   );
 
@@ -404,21 +387,4 @@ export const getOrCreateDebtAccount = async (
   });
 
   return account.id;
-};
-
-/** Ids of accounts of type debt among the given ones */
-export const debtAccountIds = async (
-  db: DbOrTx,
-  ids: string[],
-): Promise<Set<string>> => {
-  if (ids.length === 0) {
-    return new Set();
-  }
-
-  const rows = await db
-    .select({ id: accounts.id })
-    .from(accounts)
-    .where(and(inArray(accounts.id, ids), eq(accounts.type, "debt")));
-
-  return new Set(rows.map((row) => row.id));
 };

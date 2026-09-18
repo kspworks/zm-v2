@@ -1,0 +1,84 @@
+# == variables defined in CI env ==
+# PROD_BUILD_PATH        the checkout on the server that builds
+# PROD_OUT_PATH          where the standalone bundle is served from
+# SSH_CONNECT            user@host
+# SSH_PRIVATE_KEY_BASE64
+
+image: alpine:3.21
+
+before_script:
+  - 'which ssh-agent || ( apk add --update openssh-client git )'
+  - eval $(ssh-agent -s)
+  - ssh-add <(echo "$SSH_PRIVATE_KEY_BASE64" | base64 -d)
+  - mkdir -p ~/.ssh
+  - chmod 700 ~/.ssh
+  - '[[ -f /.dockerenv ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
+
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      variables:
+        BUILD_PATH: $PROD_BUILD_PATH
+        OUT_PATH: $PROD_OUT_PATH
+      when: always
+    # so the test stage runs before dev is merged into main
+    - if: >-
+        $CI_PIPELINE_SOURCE == "merge_request_event" &&
+        $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == "dev" &&
+        $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+      when: always
+    - when: never
+
+stages:
+  - test
+  - deploy
+
+test:
+  stage: test
+  image: node:24
+  # the global before_script is deploy-only and needs an ssh key this job has
+  # no business holding
+  before_script: []
+  rules:
+    - if: >-
+        $CI_PIPELINE_SOURCE == "merge_request_event" &&
+        $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == "dev" &&
+        $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+      when: on_success
+    - when: never
+  services:
+    - name: postgres:15-alpine
+      alias: postgres
+  variables:
+    POSTGRES_USER: "zm"
+    POSTGRES_PASSWORD: "zm"
+    POSTGRES_DB: "zm_test"
+    TEST_DB_AUTOSTART: "0"
+    DATABASE_URL: "postgresql://zm:zm@postgres:5432/zm_test?idle_timeout=2"
+    COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+    NEXT_TELEMETRY_DISABLED: "1"
+  script:
+    - corepack enable
+    - pnpm install --frozen-lockfile
+    - pnpm exec biome ci --colors=off .
+    - pnpm run typecheck
+    - pnpm run test
+    - pnpm run test:tz
+    - SKIP_ENV_VALIDATION=1 pnpm run build
+
+self-hosted:
+  stage: deploy
+  environment:
+    name: production
+  rules:
+    - if: ($CI_COMMIT_BRANCH == "main") && $BUILD_PATH && $OUT_PATH && $SSH_CONNECT
+      when: on_success
+    - when: never
+  # Four steps so a failure names itself. Migrations run after the build (a
+  # failed build must not leave the schema ahead of the code) and before the
+  # swap; the smoke check loads the bundle before it reaches OUT_PATH.
+  script:
+    - ssh $SSH_CONNECT "cd $BUILD_PATH && git pull && pnpm i --frozen-lockfile --silent && pnpm run build:selfhosted"
+    - ssh $SSH_CONNECT "cd $BUILD_PATH && ./smoke-standalone.sh"
+    - ssh $SSH_CONNECT "cd $BUILD_PATH && pnpm run db:migrate"
+    - ssh $SSH_CONNECT "rm -rf $OUT_PATH && mkdir -p $OUT_PATH && cp -r $BUILD_PATH/dist/. $OUT_PATH && cp $BUILD_PATH/.env $OUT_PATH/.env && cd $OUT_PATH && pm2 restart ../ecosystem.config.cjs"

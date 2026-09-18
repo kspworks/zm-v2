@@ -23,8 +23,6 @@ export const counterpartyRefSchema = z
   })
   .refine((ref) => !!ref.id || !!ref.name, { error: "is_nonempty" });
 
-export type CounterpartyRef = z.infer<typeof counterpartyRefSchema>;
-
 const shared = {
   date: calendarDateSchema,
   amount: magnitudeSchema,
@@ -54,8 +52,6 @@ export const transferInputSchema = z.object({
 });
 
 export const DEBT_DIRECTIONS = ["gave", "took"] as const;
-
-export type DebtDirection = (typeof DEBT_DIRECTIONS)[number];
 
 export const debtInputSchema = z.object({
   kind: z.literal("debt"),

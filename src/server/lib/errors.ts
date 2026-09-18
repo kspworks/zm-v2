@@ -17,7 +17,6 @@ export const appError = (
   cause?: unknown,
 ): TRPCError => new TRPCError({ code, message: key, cause });
 
-export const badRequest = (key: ErrorKey) => appError("BAD_REQUEST", key);
 export const forbidden = (key: ErrorKey = "forbidden") =>
   appError("FORBIDDEN", key);
 export const notFound = () => appError("NOT_FOUND", "not_found");

@@ -5,8 +5,8 @@ name: CI
 on:
   pull_request:
 
-# Dependabot-triggered runs get a read-only token and no access to "secrets.*"
-# anyway, so state the floor explicitly
+# Dependabot-triggered runs get a read-only token and no access to
+# "secrets.*" anyway, so state the floor explicitly
 permissions:
   contents: read
 
@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  gate:
     runs-on: ubuntu-latest
 
     services:
@@ -51,12 +51,43 @@ jobs:
           node-version-file: ".nvmrc"
           cache: "pnpm"
 
-      - run: pnpm install --frozen-lockfile
+      - name: Install
+        run: pnpm install --frozen-lockfile
 
-      - run: pnpm exec biome ci --colors=off .
+      - name: Lint
+        run: pnpm exec biome ci --colors=off .
 
-      - run: pnpm run typecheck
+      - name: Dead code
+        run: pnpm run knip
 
-      - run: pnpm run test
+      - name: Typecheck
+        run: pnpm run typecheck
 
-      - run: pnpm run test:tz
+      - name: Tests
+        run: pnpm run test
+
+      - name: Date tests in a non-UTC zone
+        run: pnpm run test:tz
+
+      - name: Migrations apply to an empty database and match the schema
+        run: |
+          psql "postgresql://zm:zm@localhost:5432/zm_test" -c "CREATE DATABASE zm_empty"
+          DATABASE_URL="postgresql://zm:zm@localhost:5432/zm_empty" pnpm run db:migrate
+          DATABASE_URL="postgresql://zm:zm@localhost:5432/zm_empty" pnpm exec drizzle-kit check
+          # generating against the committed snapshot must find nothing new
+          DATABASE_URL="x" pnpm exec drizzle-kit generate --name ci-drift-check
+          git diff --exit-code --stat -- drizzle
+          test -z "$(git status --porcelain -- drizzle)"
+
+      - name: Build and smoke-test the standalone bundle
+        env:
+          SKIP_ENV_VALIDATION: "1"
+        run: |
+          pnpm run build:selfhosted
+          cat > .env <<ENV
+          DATABASE_URL=postgresql://zm:zm@localhost:5432/zm_test
+          BETTER_AUTH_SECRET=ci-secret-ci-secret-ci-secret-ci-secret
+          BETTER_AUTH_URL=http://127.0.0.1:3999
+          CRON_SECRET=ci-cron-secret-0123456789
+          ENV
+          ./smoke-standalone.sh

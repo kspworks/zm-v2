@@ -6,7 +6,6 @@ import {
   accountMembers,
   authAccounts,
   categoryMembers,
-  currencies,
   transactions,
   users,
 } from "~/server/db/schema";
@@ -75,9 +74,6 @@ export const createUserWithCredentials = async (
 
   return { user: fresh ?? user, password, secret, backupCodes };
 };
-
-export const allCurrencies = () =>
-  db.select().from(currencies).orderBy(currencies.code);
 
 // ---------------------------------------------------------------------------
 // accounts, categories, sharing, raw transactions
