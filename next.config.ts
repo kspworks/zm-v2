@@ -7,9 +7,22 @@ import "./src/env";
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
+// the dev server refuses its own assets to hosts other than localhost; when
+// BETTER_AUTH_URL points at a LAN address (testing from a phone), allow that host
+const devOrigins = (): string[] => {
+  try {
+    const url = process.env.BETTER_AUTH_URL;
+
+    return url ? [new URL(url).hostname] : [];
+  } catch {
+    return [];
+  }
+};
+
 const config: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  allowedDevOrigins: devOrigins(),
   output: "standalone",
   outputFileTracingIncludes: {
     // read from disk by the RUN_MIGRATIONS escape hatch (src/instrumentation.ts)

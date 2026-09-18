@@ -89,6 +89,7 @@ function PasswordCard() {
       </CardHeader>
       <CardContent>
         <form
+          method="post"
           onSubmit={submitWith(() =>
             change.mutate({
               currentPassword: current,
@@ -182,6 +183,7 @@ function AuthenticatorCard() {
           </>
         ) : start.data ? (
           <form
+            method="post"
             className="flex flex-col gap-4"
             onSubmit={submitWith(() => confirm.mutate({ code: newCode }))}
           >
@@ -202,7 +204,10 @@ function AuthenticatorCard() {
             </Button>
           </form>
         ) : (
-          <form onSubmit={submitWith(() => start.mutate({ password, code }))}>
+          <form
+            method="post"
+            onSubmit={submitWith(() => start.mutate({ password, code }))}
+          >
             <FieldGroup>
               <TextField
                 id="re-password"
@@ -265,6 +270,7 @@ function BackupCodesCard() {
           <BackupCodes codes={regenerate.data.backupCodes} />
         ) : (
           <form
+            method="post"
             onSubmit={submitWith(() => regenerate.mutate({ password, code }))}
           >
             <FieldGroup>

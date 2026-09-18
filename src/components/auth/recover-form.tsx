@@ -118,6 +118,7 @@ export function RecoverForm({ token }: { token: string }) {
       </CardHeader>
       <CardContent>
         <form
+          method="post"
           id="recover-form"
           onSubmit={(event) => {
             event.preventDefault();

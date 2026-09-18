@@ -140,7 +140,7 @@ export function LoginForm({
           <CardDescription>{t("login.subtitle")}</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={signIn} noValidate>
+          <form method="post" onSubmit={signIn} noValidate>
             <FieldGroup>
               {errorAlert}
               <Controller
@@ -213,6 +213,7 @@ export function LoginForm({
       </CardHeader>
       <CardContent>
         <form
+          method="post"
           onSubmit={(event) => {
             event.preventDefault();
             void verify(code);

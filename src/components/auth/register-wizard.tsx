@@ -157,7 +157,7 @@ export function RegisterWizard({
         ) : null}
 
         {step === 0 ? (
-          <form id="details" onSubmit={submitDetails} noValidate>
+          <form method="post" id="details" onSubmit={submitDetails} noValidate>
             <FieldGroup>
               <Controller
                 control={form.control}
@@ -216,6 +216,7 @@ export function RegisterWizard({
 
         {step === 1 && makeQr.data ? (
           <form
+            method="post"
             id="authenticator"
             onSubmit={(event) => {
               event.preventDefault();

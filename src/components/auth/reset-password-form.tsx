@@ -66,6 +66,7 @@ export function ResetPasswordForm({
             </Alert>
           ) : (
             <form
+              method="post"
               id="forgot-form"
               onSubmit={async (event) => {
                 event.preventDefault();
@@ -140,6 +141,7 @@ export function ResetPasswordForm({
           </Alert>
         ) : (
           <form
+            method="post"
             id="reset-form"
             onSubmit={async (event) => {
               event.preventDefault();
