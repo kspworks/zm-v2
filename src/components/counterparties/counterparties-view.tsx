@@ -13,7 +13,6 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "~/components/app/confirm-dialog";
-import { Money } from "~/components/app/money";
 import { PageHeader } from "~/components/app/page-header";
 import { ResponsiveDialog } from "~/components/app/responsive-dialog";
 import { Badge } from "~/components/ui/badge";
@@ -52,6 +51,7 @@ import {
 import { Skeleton } from "~/components/ui/skeleton";
 import { Spinner } from "~/components/ui/spinner";
 import { useToastError } from "~/hooks/use-toast-error";
+import { formatMoney } from "~/lib/money";
 import { useTRPC } from "~/trpc/react";
 import type { RouterOutputs } from "~/trpc/types";
 
@@ -59,18 +59,18 @@ type Counterparty = RouterOutputs["counterparties"]["list"][number];
 
 export function DebtBalance({ sum, sign }: { sum: number; sign: string }) {
   const t = useTranslations("counterparties");
-  const amount = <Money amount={Math.abs(sum)} sign={sign} />;
+  const amount = formatMoney(Math.abs(sum), sign);
 
   return sum > 0 ? (
     <Badge
       variant="outline"
       className="border-emerald-600/40 text-emerald-700 dark:text-emerald-400"
     >
-      {t.rich("oweMe", { amount: () => amount })}
+      {t("oweMe", { amount })}
     </Badge>
   ) : (
     <Badge variant="outline" className="border-destructive/40 text-destructive">
-      {t.rich("iOwe", { amount: () => amount })}
+      {t("iOwe", { amount })}
     </Badge>
   );
 }

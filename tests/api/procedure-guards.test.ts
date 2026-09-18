@@ -134,6 +134,19 @@ const PROTECTED: [string, (caller: Caller) => Promise<unknown>][] = [
       }),
   ],
   ["planned.deleteAll", (c) => c.planned.deleteAll({ id: "x" })],
+  [
+    "reports.data",
+    (c) =>
+      c.reports.data({
+        filter: {
+          accounts: [],
+          categories: [],
+          counterparties: [],
+          startDate: "2026-01-01",
+          endDate: "2026-01-31",
+        },
+      }),
+  ],
   ["imports.list", (c) => c.imports.list()],
   [
     "imports.upload",

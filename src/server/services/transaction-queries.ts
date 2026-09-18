@@ -523,3 +523,83 @@ export const filteredTotals = async (
     })
     .filter((row) => row.expenses !== 0 || row.incomes !== 0);
 };
+
+export const REPORT_LIMIT = 100_000;
+
+export type ReportRow = {
+  id: string;
+  date: string;
+  amount: number;
+  currencyCode: string;
+  currencySign: string;
+  categoryId: string | null;
+  categoryName: string | null;
+  parentId: string | null;
+  parentName: string | null;
+  comment: string | null;
+};
+
+/**
+ * Report data: submitted rows in range, counted like the totals (no
+ * own-account transfers, a debt pair by its real-account leg), capped at
+ * REPORT_LIMIT; limit + 1 is fetched so truncation is reported, not hidden.
+ */
+export const reportRows = async (
+  db: DbOrTx,
+  userId: string,
+  filter: Partial<TransactionFilter>,
+  limit = REPORT_LIMIT,
+): Promise<{ rows: ReportRow[]; truncated: boolean }> => {
+  const raw = await db.execute<{
+    id: string;
+    date: string;
+    amount: string;
+    currency_code: string;
+    currency_sign: string;
+    category_id: string | null;
+    category_name: string | null;
+    parent_id: string | null;
+    parent_name: string | null;
+    comment: string | null;
+  }>(sql`
+    SELECT p.id, p.date,
+      CASE WHEN p.batch_id IS NOT NULL AND pa.type = 'debt'
+        THEN l.amount ELSE p.amount END AS amount,
+      CASE WHEN p.batch_id IS NOT NULL AND pa.type = 'debt'
+        THEN lc.code ELSE pc.code END AS currency_code,
+      CASE WHEN p.batch_id IS NOT NULL AND pa.type = 'debt'
+        THEN lc.sign ELSE pc.sign END AS currency_sign,
+      cat.id AS category_id, cat.name AS category_name,
+      parent.id AS parent_id, parent.name AS parent_name,
+      p.comment
+    ${pairsFrom(
+      userId,
+      "submitted",
+      filter,
+      [
+        sql`NOT (p.batch_id IS NOT NULL AND pa.type <> 'debt' AND la.type <> 'debt')`,
+      ],
+      sql`
+        LEFT JOIN categories cat ON cat.id = p.category_id
+        LEFT JOIN categories parent ON parent.id = cat.parent_id
+      `,
+    )}
+    ORDER BY p.date, p.created_at, p.id
+    LIMIT ${limit + 1}
+  `);
+
+  const rows = [...raw].map((row) => ({
+    id: row.id,
+    date: row.date,
+    amount: Number(row.amount),
+    currencyCode: row.currency_code,
+    currencySign: row.currency_sign,
+    categoryId: row.category_id,
+    categoryName: row.category_name,
+    parentId: row.parent_id,
+    parentName: row.parent_name,
+    comment: row.comment,
+  }));
+
+  return { rows: rows.slice(0, limit), truncated: rows.length > limit };
+};

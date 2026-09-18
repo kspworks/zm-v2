@@ -493,5 +493,19 @@
     "undoDescription": "Every account, category and transaction this import created will be deleted.",
     "undone": "Import undone",
     "tooBig": "The file is larger than 256 KB"
+  },
+  "reports": {
+    "title": "Reports",
+    "expense": "Expenses",
+    "income": "Incomes",
+    "total": "Total: {amount}",
+    "empty": "Nothing to show for this period",
+    "truncated": "Showing the first {limit} transactions of this period; narrow the range to see all of them.",
+    "category": "Category",
+    "amount": "Amount",
+    "share": "Share",
+    "date": "Date",
+    "comment": "Comment",
+    "table": "As a table"
   }
 }
