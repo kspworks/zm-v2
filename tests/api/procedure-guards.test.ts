@@ -93,6 +93,19 @@ const PROTECTED: [string, (caller: Caller) => Promise<unknown>][] = [
   ],
   ["transactions.delete", (c) => c.transactions.delete({ id: "x" })],
   [
+    "transactions.bulkCreate",
+    (c) =>
+      c.transactions.bulkCreate({
+        items: [
+          { kind: "expense", date: "2026-01-01", amount: 1, accountId: "x" },
+        ],
+      }),
+  ],
+  [
+    "transactions.adjustBalance",
+    (c) => c.transactions.adjustBalance({ accountId: "x", actualBalance: 0 }),
+  ],
+  [
     "planned.create",
     (c) =>
       c.planned.create({

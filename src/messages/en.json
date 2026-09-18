@@ -451,5 +451,27 @@
     "add": "Plan a transaction",
     "empty": "Nothing planned",
     "emptyHint": "Plan a one-off payment, or a repeating one like rent or salary."
+  },
+  "adjust": {
+    "comment": "Balance adjustment",
+    "title": "Balance adjustment",
+    "description": "Enter the account's actual balance; the difference is recorded as an expense or income.",
+    "account": "Account",
+    "actual": "Actual balance",
+    "current": "Current balance",
+    "difference": "Difference",
+    "nothing": "The balance already matches, nothing to record.",
+    "done": "Balance adjusted"
+  },
+  "bulk": {
+    "title": "Bulk entry",
+    "description": "Add several transactions at once. Date and account apply to every row.",
+    "addRow": "Add row",
+    "removeRow": "Remove row",
+    "date": "Date",
+    "account": "Account",
+    "kind": "Type",
+    "saved": "{count, plural, one {# transaction saved} other {# transactions saved}}",
+    "submit": "Save all"
   }
 }

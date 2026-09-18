@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import { idSchema } from "~/lib/validators/common";
+import {
+  calendarDateSchema,
+  idSchema,
+  minorUnitsSchema,
+} from "~/lib/validators/common";
 import {
   listInputSchema,
   transactionFilterSchema,
@@ -9,6 +13,7 @@ import {
 } from "~/lib/validators/transactions";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { paginationLimit } from "~/server/config";
+import { adjustBalance, bulkCreate } from "~/server/services/bulk";
 import {
   filteredTotals,
   listOverdue,
@@ -68,4 +73,20 @@ export const transactionsRouter = createTRPCRouter({
     .mutation(({ ctx, input }) =>
       deleteTransaction(ctx.db, ctx.user.id, input.id),
     ),
+
+  /** Several transactions in one call and one DB transaction */
+  bulkCreate: protectedProcedure
+    .input(z.object({ items: z.array(transactionInputSchema).min(1).max(100) }))
+    .mutation(({ ctx, input }) => bulkCreate(ctx.db, ctx.user.id, input.items)),
+
+  /** Records the difference between the actual and the derived balance */
+  adjustBalance: protectedProcedure
+    .input(
+      z.object({
+        accountId: idSchema,
+        actualBalance: minorUnitsSchema,
+        date: calendarDateSchema.nullish(),
+      }),
+    )
+    .mutation(({ ctx, input }) => adjustBalance(ctx.db, ctx.user.id, input)),
 });
