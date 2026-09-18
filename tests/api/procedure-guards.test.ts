@@ -134,6 +134,12 @@ const PROTECTED: [string, (caller: Caller) => Promise<unknown>][] = [
       }),
   ],
   ["planned.deleteAll", (c) => c.planned.deleteAll({ id: "x" })],
+  ["imports.list", (c) => c.imports.list()],
+  [
+    "imports.upload",
+    (c) => c.imports.upload({ fileName: "a.csv", content: "YQ==" }),
+  ],
+  ["imports.undo", (c) => c.imports.undo({ id: "x" })],
   ["sharing.list", (c) => c.sharing.list({ entity: "account", id: "x" })],
   [
     "sharing.add",

@@ -8,6 +8,7 @@ import { auth } from "~/server/auth";
 import { isDev } from "~/server/config";
 import { type Db, db } from "~/server/db";
 import { users } from "~/server/db/schema";
+import { ImportRowsError } from "~/server/services/imports";
 
 export type CurrentUser = {
   id: string;
@@ -62,6 +63,8 @@ const t = initTRPC.context<Context>().create({
         ...shape.data,
         zodError:
           error.cause instanceof ZodError ? z.flattenError(error.cause) : null,
+        importErrors:
+          error.cause instanceof ImportRowsError ? error.cause.rows : null,
       },
     };
   },

@@ -156,9 +156,12 @@ export function BulkEntryDialog({
         </>
       }
     >
-      <div
-        role="group"
+      <form
         className="flex flex-col gap-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit();
+        }}
         onKeyDown={(event) => {
           if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
             event.preventDefault();
@@ -192,13 +195,7 @@ export function BulkEntryDialog({
           </Field>
         </div>
 
-        <form
-          className="flex flex-col gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            submit();
-          }}
-        >
+        <div className="flex flex-col gap-2">
           {rows.map((row, index) => (
             <div
               key={row.key}
@@ -269,7 +266,7 @@ export function BulkEntryDialog({
             </div>
           ))}
           <button type="submit" hidden />
-        </form>
+        </div>
 
         <Button
           type="button"
@@ -282,7 +279,7 @@ export function BulkEntryDialog({
           <PlusIcon />
           {t("addRow")}
         </Button>
-      </div>
+      </form>
     </ResponsiveDialog>
   );
 }
