@@ -147,6 +147,27 @@ const PROTECTED: [string, (caller: Caller) => Promise<unknown>][] = [
         },
       }),
   ],
+  [
+    "settings.changePassword",
+    (c) =>
+      c.settings.changePassword({
+        currentPassword: "x",
+        newPassword: "secret123",
+        code: "123456",
+      }),
+  ],
+  [
+    "settings.startReenrol",
+    (c) => c.settings.startReenrol({ password: "x", code: "123456" }),
+  ],
+  [
+    "settings.confirmReenrol",
+    (c) => c.settings.confirmReenrol({ code: "123456" }),
+  ],
+  [
+    "settings.backupCodes",
+    (c) => c.settings.backupCodes({ password: "x", code: "123456" }),
+  ],
   ["imports.list", (c) => c.imports.list()],
   [
     "imports.upload",

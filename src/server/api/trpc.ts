@@ -22,6 +22,8 @@ export type Context = {
   db: Db;
   /** The session's user id; the user row itself is re-read per procedure */
   userId: string | null;
+  /** The current session, kept when "other sessions" are revoked */
+  sessionId?: string | null;
   /** The UI locale of this request (cookie or Accept-Language) */
   locale: Locale;
   /** The public origin, for links shown to the user */
@@ -46,6 +48,7 @@ export const createTRPCContext = async ({
   return {
     db,
     userId: session?.user.id ?? null,
+    sessionId: session?.session.id ?? null,
     locale: resolveLocale({
       cookie: readCookie(headers.get("cookie"), "NEXT_LOCALE"),
       acceptLanguage: headers.get("accept-language"),
