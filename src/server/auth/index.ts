@@ -1,5 +1,6 @@
 import "server-only";
 
+import bcrypt from "bcryptjs";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import {
@@ -8,7 +9,11 @@ import {
   createAuthMiddleware,
 } from "better-auth/api";
 import { setSessionCookie } from "better-auth/cookies";
-import { symmetricDecrypt } from "better-auth/crypto";
+import {
+  hashPassword as scryptHash,
+  verifyPassword as scryptVerify,
+  symmetricDecrypt,
+} from "better-auth/crypto";
 import { nextCookies } from "better-auth/next-js";
 import { admin, twoFactor } from "better-auth/plugins";
 import type { BetterAuthPlugin } from "better-auth/types";
@@ -29,7 +34,12 @@ import {
   resetRateLimit,
 } from "~/server/lib/rate-limit";
 import { reportError } from "~/server/lib/report";
-import { DEV_OTP, generateTotp } from "~/server/lib/totp";
+import {
+  betterAuthTotp,
+  DEV_OTP,
+  LEGACY_PREFIX,
+  verifyTotp,
+} from "~/server/lib/totp";
 import { passwordResetEmail } from "~/server/mail/templates";
 import { sendMail } from "~/server/mail/transport";
 
@@ -157,12 +167,12 @@ const zm = () =>
           }),
         },
         {
-          // development only: "111111" stands in for the current TOTP code
-          matcher: (ctx) =>
-            isDev() &&
-            ctx.path === "/two-factor/verify-totp" &&
-            ctx.body?.code === DEV_OTP,
+          // translate the code the user typed into the one better-auth
+          // computes from the stored secret: the dev "111111", and codes for
+          // v1-migrated base32 secrets (stored as "b32:...")
+          matcher: (ctx) => ctx.path === "/two-factor/verify-totp",
           handler: createAuthMiddleware(async (ctx) => {
+            const code = String(ctx.body?.code ?? "");
             const cookie = ctx.context.createAuthCookie(TWO_FACTOR_COOKIE);
             const identifier = await ctx.getSignedCookie(
               cookie.name,
@@ -187,14 +197,63 @@ const zm = () =>
               key: ctx.context.secretConfig,
               data: row.secret,
             });
+            const legacy = secret.startsWith(LEGACY_PREFIX);
 
-            return {
-              context: { body: { ...ctx.body, code: generateTotp(secret) } },
-            };
+            if (
+              (isDev() && code === DEV_OTP) ||
+              (legacy && verifyTotp(secret, code))
+            ) {
+              return {
+                context: {
+                  body: { ...ctx.body, code: betterAuthTotp(secret) },
+                },
+              };
+            }
           }),
         },
       ],
       after: [
+        {
+          // v1 passwords are bcrypt: after a correct one, store scrypt instead
+          matcher: (ctx) => ctx.path === "/sign-in/email",
+          handler: createAuthMiddleware(async (ctx) => {
+            const returned = ctx.context.returned as
+              | { twoFactorRedirect?: boolean; token?: string }
+              | undefined;
+            const email = String(ctx.body?.email ?? "")
+              .trim()
+              .toLowerCase();
+            const password = String(ctx.body?.password ?? "");
+
+            if (!returned || !(returned.twoFactorRedirect || returned.token)) {
+              return;
+            }
+
+            const [credential] = await db
+              .select({
+                id: schema.authAccounts.id,
+                hash: schema.authAccounts.password,
+              })
+              .from(schema.authAccounts)
+              .innerJoin(
+                schema.users,
+                eq(schema.users.id, schema.authAccounts.userId),
+              )
+              .where(
+                and(
+                  eq(schema.users.email, email),
+                  eq(schema.authAccounts.providerId, "credential"),
+                ),
+              );
+
+            if (credential?.hash?.startsWith("$2")) {
+              await db
+                .update(schema.authAccounts)
+                .set({ password: await scryptHash(password) })
+                .where(eq(schema.authAccounts.id, credential.id));
+            }
+          }),
+        },
         {
           matcher: (ctx) => SIGN_IN_COMPLETE_PATHS.has(ctx.path ?? ""),
           handler: createAuthMiddleware(async (ctx) => {
@@ -243,6 +302,14 @@ export const auth = betterAuth({
   verification: { modelName: "verifications" },
   emailAndPassword: {
     enabled: true,
+    // bcrypt hashes migrated from v1 verify too (and are rehashed on sign-in)
+    password: {
+      hash: scryptHash,
+      verify: ({ hash, password }) =>
+        hash.startsWith("$2")
+          ? bcrypt.compare(password, hash)
+          : scryptVerify({ hash, password }),
+    },
     // invite-only: users are created by the invites.register procedure
     disableSignUp: true,
     minPasswordLength: 6,
