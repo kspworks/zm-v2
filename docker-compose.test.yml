@@ -1,0 +1,29 @@
+# Throwaway postgres for the test suite. Kept separate from docker-compose.yml
+# so the per-test TRUNCATE never touches local dev data.
+name: zm-new-test
+
+services:
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: zm-new-postgres-test
+    restart: unless-stopped
+    ports:
+      # override when 5433 is taken, together with DATABASE_URL
+      - "${ZM_TEST_DB_PORT:-5433}:5432"
+    environment:
+      POSTGRES_USER: "zm"
+      POSTGRES_PASSWORD: "zm"
+      POSTGRES_DB: "zm_test"
+      PGDATA: "/var/lib/postgresql/data/pgdata"
+    # data lives in RAM: faster, and nothing to clean up afterwards
+    tmpfs:
+      - /var/lib/postgresql/data
+    command: >
+      postgres -c fsync=off
+               -c synchronous_commit=off
+               -c full_page_writes=off
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zm -d zm_test"]
+      interval: 1s
+      timeout: 2s
+      retries: 30

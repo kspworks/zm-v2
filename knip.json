@@ -1,0 +1,6 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignore": ["src/components/ui/**", "src/hooks/use-mobile.ts"],
+  "ignoreDependencies": ["shadcn", "tw-animate-css", "tailwindcss"],
+  "tags": ["-lintignore"]
+}

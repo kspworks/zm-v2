@@ -1,0 +1,27 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+
+    directory: "/"
+
+    # the grouped PR takes one slot, the rest are for the individual major bumps
+    # that fall outside the group
+    open-pull-requests-limit: 10
+
+    schedule:
+      interval: "weekly"
+
+    groups:
+      # one PR for every patch and minor bump. Majors are left out on purpose so
+      # a single breaking bump can't hold the whole batch hostage - they arrive
+      # as separate PRs. Security updates are not covered by this either
+      # ("applies-to" defaults to version updates), so they keep landing on their
+      # own and fast.
+      all-minor-patch:
+        applies-to: version-updates
+        patterns: [ "*" ]
+        update-types: [ "minor", "patch" ]
+
+    ignore:
+      # kept in sync with the "reject" list in ".ncurc.json"
+      - dependency-name: "@types/node"

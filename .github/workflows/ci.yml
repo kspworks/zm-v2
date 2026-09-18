@@ -1,0 +1,62 @@
+name: CI
+
+# pull requests only - pushes to main are GitLab's job, and on GitHub the only
+# thing opening PRs here is Dependabot
+on:
+  pull_request:
+
+# Dependabot-triggered runs get a read-only token and no access to "secrets.*"
+# anyway, so state the floor explicitly
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: "zm"
+          POSTGRES_PASSWORD: "zm"
+          POSTGRES_DB: "zm_test"
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U zm -d zm_test"
+          --health-interval 1s
+          --health-timeout 2s
+          --health-retries 30
+
+    env:
+      # postgres comes from the service above, so global-setup must not reach
+      # for docker compose
+      TEST_DB_AUTOSTART: "0"
+      # overrides .env.test; idle_timeout lets the forked workers exit
+      DATABASE_URL: "postgresql://zm:zm@localhost:5432/zm_test?idle_timeout=2"
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # reads the pinned "packageManager" field from package.json
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm exec biome ci --colors=off .
+
+      - run: pnpm run typecheck
+
+      - run: pnpm run test
+
+      - run: pnpm run test:tz
