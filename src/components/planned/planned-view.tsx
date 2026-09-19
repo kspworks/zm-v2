@@ -14,7 +14,7 @@ import {
   PlannedRowMenu,
 } from "~/components/planned/planned-row-actions";
 import { BalancesSidebar } from "~/components/transactions/balances-sidebar";
-import { FilterBar } from "~/components/transactions/filter-bar";
+import { FilterButton } from "~/components/transactions/filter-bar";
 import { LedgerLayout } from "~/components/transactions/ledger-layout";
 import { TotalsBar } from "~/components/transactions/totals-bar";
 import {
@@ -60,6 +60,7 @@ export function PlannedView() {
   return (
     <LedgerLayout
       title={t("title")}
+      filters={<FilterButton state={state} setState={setState} reset={reset} />}
       actions={
         <Button size="sm" onClick={() => setDialog({ mode: "create" })}>
           <PlusIcon />
@@ -79,8 +80,6 @@ export function PlannedView() {
         />
       }
     >
-      <FilterBar state={state} setState={setState} reset={reset} />
-
       {filtering ? <TotalsBar filter={filter} planned /> : null}
 
       {list.isPending ? (

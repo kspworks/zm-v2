@@ -17,7 +17,7 @@ import {
 } from "~/components/planned/planned-form-dialog";
 import { DeleteTransactionDialog } from "~/components/planned/planned-row-actions";
 import { BalancesSidebar } from "~/components/transactions/balances-sidebar";
-import { FilterBar } from "~/components/transactions/filter-bar";
+import { FilterButton } from "~/components/transactions/filter-bar";
 import { LedgerLayout } from "~/components/transactions/ledger-layout";
 import { OverdueBlock } from "~/components/transactions/overdue-block";
 import { RowMenu } from "~/components/transactions/row-menu";
@@ -83,6 +83,7 @@ export function TransactionsView({
   return (
     <LedgerLayout
       title={t("title")}
+      filters={<FilterButton state={state} setState={setState} reset={reset} />}
       actions={
         <>
           {extraActions}
@@ -99,8 +100,6 @@ export function TransactionsView({
         />
       }
     >
-      <FilterBar state={state} setState={setState} reset={reset} />
-
       {filtering ? <TotalsBar filter={filter} /> : null}
 
       <OverdueBlock

@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Money } from "~/components/app/money";
 import { PageHeader } from "~/components/app/page-header";
 import { ReportTreemap } from "~/components/reports/report-treemap";
-import { FilterBar } from "~/components/transactions/filter-bar";
+import { FilterButton } from "~/components/transactions/filter-bar";
 import { useToday } from "~/components/transactions/transaction-groups";
 import { useTransactionFilter } from "~/components/transactions/use-filter";
 import { Alert, AlertDescription } from "~/components/ui/alert";
@@ -108,15 +108,18 @@ export function ReportsView() {
 
   return (
     <>
-      <PageHeader title={t("title")} />
+      <PageHeader
+        title={t("title")}
+        actions={
+          <FilterButton
+            state={state}
+            setState={setState}
+            reset={reset}
+            requireDates
+          />
+        }
+      />
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4 sm:p-6">
-        <FilterBar
-          state={state}
-          setState={setState}
-          reset={reset}
-          requireDates
-        />
-
         <Tabs
           value={view}
           onValueChange={(value) => setView(value as typeof view)}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { FilterIcon, SearchIcon, XIcon } from "lucide-react";
+import { FilterIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 
@@ -27,11 +27,6 @@ import {
   FieldLabel,
 } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "~/components/ui/input-group";
 import {
   Popover,
   PopoverContent,
@@ -79,7 +74,8 @@ export const activeFilterCount = (state: FilterState, withDates = true) =>
   (state.categories.length ? 1 : 0) +
   (state.counterparties.length ? 1 : 0) +
   (withDates && (state.startDate || state.endDate) ? 1 : 0) +
-  (state.amount ? 1 : 0);
+  (state.amount ? 1 : 0) +
+  (state.comment ? 1 : 0);
 
 function FilterFields({
   state,
@@ -98,6 +94,11 @@ function FilterFields({
   const categories = useQuery(trpc.categories.list.queryOptions());
   const counterparties = useQuery(trpc.counterparties.list.queryOptions());
 
+  const [comment, setComment] = useDebouncedField(
+    state.comment,
+    (value) => void setState({ comment: value }),
+    always,
+  );
   const [amount, setAmount] = useDebouncedField(
     state.amount,
     (value) => void setState({ amount: value }),
@@ -217,11 +218,20 @@ function FilterFields({
         />
         {amountInvalid ? <FieldError>{te("is_minor_units")}</FieldError> : null}
       </Field>
+      <Field>
+        <FieldLabel htmlFor="filter-comment">{t("comment")}</FieldLabel>
+        <Input
+          id="filter-comment"
+          autoComplete="off"
+          value={comment}
+          onChange={(event) => setComment(event.target.value)}
+        />
+      </Field>
     </FieldGroup>
   );
 }
 
-export function FilterBar({
+export function FilterButton({
   state,
   setState,
   reset,
@@ -236,17 +246,10 @@ export function FilterBar({
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
 
-  const [comment, setComment] = useDebouncedField(
-    state.comment,
-    (value) => void setState({ comment: value }),
-    always,
-  );
-
   const count = activeFilterCount(state, !requireDates);
-  const anyActive = count > 0 || !!state.comment;
 
   const trigger = (
-    <Button variant="outline" className="shrink-0">
+    <Button variant="outline" size="sm">
       <FilterIcon />
       <span className="max-sm:sr-only">{t("title")}</span>
       {count > 0 ? <Badge className="ml-0.5 px-1.5">{count}</Badge> : null}
@@ -261,57 +264,35 @@ export function FilterBar({
     />
   );
 
-  return (
-    <div className="flex items-center gap-2">
-      <InputGroup className="min-w-0 flex-1">
-        <InputGroupAddon>
-          <SearchIcon />
-        </InputGroupAddon>
-        <InputGroupInput
-          aria-label={t("comment")}
-          placeholder={t("comment")}
-          value={comment}
-          onChange={(event) => setComment(event.target.value)}
-        />
-      </InputGroup>
+  const resetButton = (variant: "ghost" | "outline") => (
+    <Button variant={variant} disabled={count === 0} onClick={reset}>
+      {t("reset")}
+    </Button>
+  );
 
-      {isMobile ? (
-        <>
-          <span onClickCapture={() => setOpen(true)}>{trigger}</span>
-          <Drawer open={open} onOpenChange={setOpen}>
-            <DrawerContent className="max-h-[92svh]">
-              <DrawerHeader className="text-left">
-                <DrawerTitle>{t("title")}</DrawerTitle>
-              </DrawerHeader>
-              <div className="overflow-y-auto px-4">{fields}</div>
-              <DrawerFooter>
-                <Button onClick={() => setOpen(false)}>{t("apply")}</Button>
-              </DrawerFooter>
-            </DrawerContent>
-          </Drawer>
-        </>
-      ) : (
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-          <PopoverContent align="end" className="w-96">
-            {fields}
-          </PopoverContent>
-        </Popover>
-      )}
-
-      {anyActive ? (
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={t("reset")}
-          onClick={() => {
-            setComment("");
-            reset();
-          }}
-        >
-          <XIcon />
-        </Button>
-      ) : null}
-    </div>
+  return isMobile ? (
+    <>
+      <span onClickCapture={() => setOpen(true)}>{trigger}</span>
+      <Drawer open={open} onOpenChange={setOpen}>
+        <DrawerContent className="max-h-[92svh]">
+          <DrawerHeader className="text-left">
+            <DrawerTitle>{t("title")}</DrawerTitle>
+          </DrawerHeader>
+          <div className="overflow-y-auto px-4">{fields}</div>
+          <DrawerFooter>
+            <Button onClick={() => setOpen(false)}>{t("apply")}</Button>
+            {resetButton("outline")}
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+    </>
+  ) : (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+      <PopoverContent align="end" className="w-96">
+        {fields}
+        <div className="flex justify-end">{resetButton("ghost")}</div>
+      </PopoverContent>
+    </Popover>
   );
 }

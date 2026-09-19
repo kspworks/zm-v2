@@ -19,11 +19,13 @@ import {
  */
 export function LedgerLayout({
   title,
+  filters,
   actions,
   sidebar,
   children,
 }: {
   title: string;
+  filters?: ReactNode;
   actions?: ReactNode;
   sidebar: ReactNode;
   children: ReactNode;
@@ -37,6 +39,7 @@ export function LedgerLayout({
         title={title}
         actions={
           <>
+            {filters}
             <Button
               variant="outline"
               size="icon"
