@@ -164,7 +164,7 @@ export const balanceSeries = async (
 export const forecast = async (
   db: DbOrTx,
   userId: string,
-  input: { currencyId: string },
+  input: { currencyId: string; includeDebts?: boolean },
   today: string = todayInAppZone(),
 ): Promise<ForecastMonth[]> => {
   const { start, end } = forecastWindow(today);
@@ -174,7 +174,12 @@ export const forecast = async (
     windowEntries(db, userId, scope.ids, start, end),
   ]);
 
-  return buildForecast({ opening, entries, today });
+  return buildForecast({
+    opening,
+    entries,
+    today,
+    includeDebts: input.includeDebts,
+  });
 };
 
 export type NearestItem = DashboardEntry & {

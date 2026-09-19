@@ -17,7 +17,12 @@ export const dashboardRouter = createTRPCRouter({
     .query(({ ctx, input }) => balanceSeries(ctx.db, ctx.user.id, input)),
 
   forecast: protectedProcedure
-    .input(z.object({ currencyId: idSchema }))
+    .input(
+      z.object({
+        currencyId: idSchema,
+        includeDebts: z.boolean().default(true),
+      }),
+    )
     .query(({ ctx, input }) => forecast(ctx.db, ctx.user.id, input)),
 
   nearest: protectedProcedure.query(({ ctx }) =>

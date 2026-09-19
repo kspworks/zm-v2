@@ -104,6 +104,33 @@ describe("buildForecast", () => {
     ]);
   });
 
+  it("keeps debts out of income and expense but in the balance", () => {
+    const entries = [
+      entry({ date: "2026-03-02", net: -100 }),
+      entry({ date: "2026-03-05", kind: "debt", net: 400 }),
+      entry({ date: "2026-04-10", planned: true, kind: "debt", net: -250 }),
+    ];
+
+    expect(
+      buildForecast({ opening: 1000, today: TODAY, months: 2, entries }),
+    ).toEqual([
+      { month: "2026-03", income: 400, expense: -100, balance: 1300 },
+      { month: "2026-04", income: 0, expense: -250, balance: 1050 },
+    ]);
+    expect(
+      buildForecast({
+        opening: 1000,
+        today: TODAY,
+        months: 2,
+        entries,
+        includeDebts: false,
+      }),
+    ).toEqual([
+      { month: "2026-03", income: 0, expense: -100, balance: 1300 },
+      { month: "2026-04", income: 0, expense: 0, balance: 1050 },
+    ]);
+  });
+
   it("spans the current month and the next ones", () => {
     expect(forecastWindow("2026-11-17", 3)).toEqual({
       start: "2026-11-01",

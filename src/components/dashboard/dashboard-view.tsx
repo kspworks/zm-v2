@@ -8,7 +8,12 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { parseAsInteger, parseAsString, useQueryStates } from "nuqs";
+import {
+  parseAsBoolean,
+  parseAsInteger,
+  parseAsString,
+  useQueryStates,
+} from "nuqs";
 import { useId, useMemo } from "react";
 
 import { PageHeader } from "~/components/app/page-header";
@@ -31,6 +36,7 @@ import {
   EmptyHeader,
   EmptyMedia,
 } from "~/components/ui/empty";
+import { Field, FieldLabel } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import {
@@ -42,6 +48,7 @@ import {
   PopoverTrigger,
 } from "~/components/ui/popover";
 import { Skeleton } from "~/components/ui/skeleton";
+import { Switch } from "~/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import {
   clampRange,
@@ -55,6 +62,7 @@ const parsers = {
   currency: parseAsString,
   back: parseAsInteger.withDefault(RANGE_DEFAULT),
   ahead: parseAsInteger.withDefault(RANGE_DEFAULT),
+  debts: parseAsBoolean.withDefault(true),
 };
 
 function RangePopover({
@@ -121,6 +129,45 @@ function RangePopover({
   );
 }
 
+function ForecastOptions({
+  includeDebts,
+  onChange,
+}: {
+  includeDebts: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  const t = useTranslations("dashboard.forecast");
+  const id = useId();
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="icon-sm" aria-label={t("options")}>
+          <SlidersHorizontalIcon />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-auto">
+        <PopoverHeader>
+          <PopoverTitle>{t("options")}</PopoverTitle>
+        </PopoverHeader>
+        <Field orientation="horizontal">
+          <Switch
+            id={`${id}-debts`}
+            checked={includeDebts}
+            onCheckedChange={onChange}
+          />
+          <FieldLabel
+            htmlFor={`${id}-debts`}
+            className="whitespace-nowrap font-normal"
+          >
+            {t("includeDebts")}
+          </FieldLabel>
+        </Field>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function DashboardView() {
   const t = useTranslations("dashboard");
   const trpc = useTRPC();
@@ -160,7 +207,10 @@ export function DashboardView() {
     enabled: !!currency,
   });
   const forecast = useQuery({
-    ...trpc.dashboard.forecast.queryOptions({ currencyId: currency?.id ?? "" }),
+    ...trpc.dashboard.forecast.queryOptions({
+      currencyId: currency?.id ?? "",
+      includeDebts: state.debts,
+    }),
     enabled: !!currency,
   });
   const nearest = useQuery(trpc.dashboard.nearest.queryOptions());
@@ -232,6 +282,12 @@ export function DashboardView() {
             <Card className="gap-2">
               <CardHeader>
                 <CardTitle>{t("forecast.title")}</CardTitle>
+                <CardAction>
+                  <ForecastOptions
+                    includeDebts={state.debts}
+                    onChange={(debts) => void setState({ debts })}
+                  />
+                </CardAction>
               </CardHeader>
               <CardContent>
                 {forecast.data ? (

@@ -168,18 +168,21 @@ export const forecastWindow = (
  * Income, expense and month-end balance for the current month and the next
  * ones. `opening` is the balance before the current month; every entry in the
  * window counts (submitted and planned), so each month reconciles:
- * balance = previous balance + income + expense.
+ * balance = previous balance + income + expense. Without `includeDebts` debt
+ * pairs stay out of income and expense but still move the balance.
  */
 export const buildForecast = ({
   opening,
   entries,
   today,
   months = FORECAST_MONTHS,
+  includeDebts = true,
 }: {
   opening: number;
   entries: DashboardEntry[];
   today: string;
   months?: number;
+  includeDebts?: boolean;
 }): ForecastMonth[] => {
   const { start } = forecastWindow(today, months);
   const first = parseISO(start);
@@ -190,16 +193,19 @@ export const buildForecast = ({
     balance: 0,
   }));
   const index = new Map(rows.map((row, i) => [row.month, i]));
+  const debts = rows.map(() => 0);
 
   for (const entry of entries) {
     const i = index.get(effectiveDate(entry, today).slice(0, 7));
     const row = i === undefined ? undefined : rows[i];
 
-    if (!row) {
+    if (i === undefined || !row) {
       continue;
     }
 
-    if (entry.net > 0) {
+    if (!includeDebts && entry.kind === "debt") {
+      debts[i] = (debts[i] ?? 0) + entry.net;
+    } else if (entry.net > 0) {
       row.income += entry.net;
     } else {
       row.expense += entry.net;
@@ -208,8 +214,8 @@ export const buildForecast = ({
 
   let balance = opening;
 
-  for (const row of rows) {
-    balance += row.income + row.expense;
+  for (const [i, row] of rows.entries()) {
+    balance += row.income + row.expense + (debts[i] ?? 0);
     row.balance = balance;
   }
 
