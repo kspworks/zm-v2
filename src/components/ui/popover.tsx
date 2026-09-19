@@ -5,10 +5,13 @@ import { cn } from "cn"
 import { Popover as PopoverPrimitive } from "radix-ui"
 import { pointerAwareCloseAutoFocus } from "~/lib/input-modality"
 
+// Modal by default: a non-modal popover portaled out of a Dialog/Drawer
+// falls outside that dialog's scroll lock, so its list can't be scrolled
 function Popover({
+  modal = true,
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Root>) {
-  return <PopoverPrimitive.Root data-slot="popover" {...props} />
+  return <PopoverPrimitive.Root data-slot="popover" modal={modal} {...props} />
 }
 
 function PopoverTrigger({
