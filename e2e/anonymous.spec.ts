@@ -1,11 +1,19 @@
 import type { Page } from "@playwright/test";
 
-import { expect, readCredentials, test, totp } from "./helpers";
+import {
+  expect,
+  readCredentials,
+  resetRateLimits,
+  test,
+  totp,
+} from "./helpers";
 
 /**
  * Signed-out visitors: the proxy gate, the two-step sign-in against the admin
  * that auth.setup.ts registered, and the one-shot admin invite.
  */
+
+test.beforeEach(resetRateLimits);
 
 const submitCredentials = async (
   page: Page,

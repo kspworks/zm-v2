@@ -2,6 +2,7 @@ import {
   expect,
   expectNoHorizontalScroll,
   readCredentials,
+  resetRateLimits,
   test,
   totp,
 } from "./helpers";
@@ -25,6 +26,7 @@ const PAGES = [
 
 test.describe("signed out", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
+  test.beforeEach(resetRateLimits);
 
   test("sign-in fits a phone screen and works", async ({ page }) => {
     const credentials = readCredentials();
