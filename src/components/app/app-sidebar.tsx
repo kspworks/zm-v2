@@ -69,6 +69,7 @@ export function AppSidebar({
                     <SidebarMenuButton
                       asChild
                       isActive={pathname.startsWith(item.href)}
+                      className="data-active:bg-sidebar-primary data-active:text-sidebar-primary-foreground data-active:hover:bg-sidebar-primary/90 data-active:hover:text-sidebar-primary-foreground"
                       tooltip={t(`nav.${item.key}`)}
                     >
                       <Link
