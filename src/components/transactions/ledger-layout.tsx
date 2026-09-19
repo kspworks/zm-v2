@@ -42,7 +42,7 @@ export function LedgerLayout({
             {filters}
             <Button
               variant="outline"
-              size="icon"
+              size="icon-sm"
               className="lg:hidden"
               aria-label={t("title")}
               onClick={() => setSheetOpen(true)}
