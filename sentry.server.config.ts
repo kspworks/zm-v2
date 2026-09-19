@@ -10,4 +10,8 @@ Sentry.init({
   tracesSampleRate: 0.1,
   // this app's events are about money: no client IP, no user identifiers
   sendDefaultPii: false,
+  // the browser dropped an RSC response mid-stream (a cancelled link prefetch,
+  // a quick second click, a closed tab); Next still reports it via
+  // onRequestError, but nothing failed
+  ignoreErrors: ["The destination stream closed early"],
 });
