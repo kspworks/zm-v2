@@ -21,6 +21,7 @@ import {
   SidebarRail,
   useSidebar,
 } from "~/components/ui/sidebar";
+import { HOME_PATH } from "~/lib/auth-routing";
 
 export function AppSidebar({
   user,
@@ -41,7 +42,7 @@ export function AppSidebar({
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link href="/transactions">
+              <Link href={HOME_PATH}>
                 <Logo className="shrink-0" />
                 <span className="font-semibold group-data-[collapsible=icon]:hidden">
                   {t("common.appName")}

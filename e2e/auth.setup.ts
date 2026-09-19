@@ -53,9 +53,9 @@ setup("bootstrap the administrator and stay signed in", async ({ page }) => {
     await page.getByRole("button", { name: "Go to ZM" }).click();
   });
 
-  await expect(page).toHaveURL(/\/transactions$/);
+  await expect(page).toHaveURL(/\/dashboard$/);
   await expect(
-    page.getByRole("heading", { name: "Transactions", level: 1 }),
+    page.getByRole("heading", { name: "Dashboard", level: 1 }),
   ).toBeVisible();
 
   mkdirSync(dirname(AUTH_CREDENTIALS), { recursive: true });

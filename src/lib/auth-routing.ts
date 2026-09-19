@@ -1,4 +1,4 @@
-export const HOME_PATH = "/transactions";
+export const HOME_PATH = "/dashboard";
 export const LOGIN_PATH = "/auth/login";
 
 /** Pages reachable without a session */

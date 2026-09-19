@@ -9,6 +9,7 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "~/components/ui/empty";
+import { HOME_PATH } from "~/lib/auth-routing";
 
 export default async function NotFound() {
   const t = await getTranslations("notFound");
@@ -25,7 +26,7 @@ export default async function NotFound() {
         </EmptyHeader>
         <EmptyContent>
           <Button asChild>
-            <Link href="/transactions">{t("home")}</Link>
+            <Link href={HOME_PATH}>{t("home")}</Link>
           </Button>
         </EmptyContent>
       </Empty>

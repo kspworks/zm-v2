@@ -70,6 +70,7 @@
     "uk": "Українська"
   },
   "nav": {
+    "dashboard": "Dashboard",
     "transactions": "Transactions",
     "planned": "Planned",
     "reports": "Reports",
@@ -485,6 +486,33 @@
     "undoDescription": "Every account, category and transaction this import created will be deleted.",
     "undone": "Import undone",
     "tooBig": "The file is larger than 256 KB"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "balance": {
+      "title": "Balance",
+      "actual": "Actual",
+      "planned": "Planned",
+      "range": "Chart range",
+      "back": "Days back",
+      "ahead": "Days ahead",
+      "rangeHint": "From {min} to {max} days",
+      "more": "+{count} more",
+      "noChanges": "No changes",
+      "overdue": "overdue"
+    },
+    "forecast": {
+      "title": "Forecast",
+      "income": "Income",
+      "expense": "Expense",
+      "balance": "Balance"
+    },
+    "nearest": {
+      "title": "Nearest planned",
+      "empty": "Nothing planned yet"
+    },
+    "noAccounts": "Create an account to see your dashboard.",
+    "createAccount": "Create account"
   },
   "reports": {
     "title": "Reports",

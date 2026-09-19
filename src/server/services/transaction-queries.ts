@@ -659,3 +659,98 @@ export const reportRows = async (
 
   return { rows: rows.slice(0, limit), truncated: rows.length > limit };
 };
+
+export type DashboardPairRow = {
+  id: string;
+  kind: (typeof transactions.$inferSelect)["kind"];
+  date: string;
+  isPlanned: boolean;
+  amount: number;
+  accountId: string;
+  accountName: string;
+  accountType: string;
+  currencySign: string;
+  linkedAmount: number | null;
+  linkedAccountId: string | null;
+  linkedAccountName: string | null;
+  linkedCurrencySign: string | null;
+  categoryName: string | null;
+  categoryParentName: string | null;
+  comment: string | null;
+  counterpartyName: string | null;
+};
+
+/**
+ * Pairs for the dashboard with both legs' amounts and accounts, so callers
+ * can work out a pair's net effect on a set of accounts (a transfer with a
+ * fee is not zero). Unlike the totals, own-account transfers are kept.
+ */
+export const dashboardPairs = (
+  db: DbOrTx,
+  userId: string,
+  planned: Planned,
+  {
+    accountIds,
+    startDate,
+    endDate,
+  }: { accountIds?: string[]; startDate?: string; endDate?: string },
+): Promise<DashboardPairRow[]> =>
+  pairsQuery(
+    db,
+    {
+      id: p.id,
+      kind: p.kind,
+      date: p.date,
+      isPlanned: p.isPlanned,
+      amount: p.amount,
+      accountId: p.accountId,
+      accountName: pa.name,
+      accountType: pa.type,
+      currencySign: pc.sign,
+      linkedAmount: l.amount,
+      linkedAccountId: l.accountId,
+      linkedAccountName: la.name,
+      linkedCurrencySign: lc.sign,
+      categoryName: cat.name,
+      categoryParentName: parent.name,
+      comment: p.comment,
+      counterpartyName: cp.name,
+    },
+    userId,
+    planned,
+    {},
+    [
+      accountIds
+        ? or(inArray(p.accountId, accountIds), inArray(l.accountId, accountIds))
+        : undefined,
+      startDate ? gte(p.date, startDate) : undefined,
+      endDate ? lte(p.date, endDate) : undefined,
+    ],
+  ).orderBy(asc(p.date), asc(p.createdAt), asc(p.id));
+
+/**
+ * The first `limit` distinct dates with planned pairs, overdue ones counted
+ * as today.
+ */
+export const nearestPlannedDates = async (
+  db: DbOrTx,
+  userId: string,
+  todayDate: string,
+  limit: number,
+): Promise<string[]> => {
+  const x = pairsQuery(
+    db,
+    { day: sql<string>`greatest(${p.date}, ${todayDate}::date)`.as("day") },
+    userId,
+    "planned",
+    {},
+  ).as("x");
+
+  const rows = await db
+    .selectDistinct({ day: sql<string>`${x.day}::text` })
+    .from(x)
+    .orderBy(sql`1`)
+    .limit(limit);
+
+  return rows.map((row) => row.day);
+};

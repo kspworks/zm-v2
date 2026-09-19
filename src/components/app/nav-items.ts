@@ -3,6 +3,7 @@ import {
   CalendarClockIcon,
   ChartPieIcon,
   FolderTreeIcon,
+  LayoutDashboardIcon,
   type LucideIcon,
   UploadIcon,
   UsersIcon,
@@ -11,6 +12,7 @@ import {
 } from "lucide-react";
 
 export type NavKey =
+  | "dashboard"
   | "transactions"
   | "planned"
   | "reports"
@@ -26,6 +28,7 @@ export const NAV_ITEMS: {
   icon: LucideIcon;
   adminOnly?: boolean;
 }[] = [
+  { key: "dashboard", href: "/dashboard", icon: LayoutDashboardIcon },
   { key: "transactions", href: "/transactions", icon: ArrowLeftRightIcon },
   { key: "planned", href: "/planned", icon: CalendarClockIcon },
   { key: "reports", href: "/reports", icon: ChartPieIcon },

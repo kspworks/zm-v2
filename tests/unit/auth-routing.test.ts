@@ -32,8 +32,8 @@ describe("sanitizeCallbackUrl", () => {
     ["accounts"],
     [`/acc${String.fromCharCode(10)}ounts`],
     ["/auth/login?callbackUrl=/x"],
-  ])("replaces %j with /transactions", (input) => {
-    expect(sanitizeCallbackUrl(input)).toBe("/transactions");
+  ])("replaces %j with /dashboard", (input) => {
+    expect(sanitizeCallbackUrl(input)).toBe("/dashboard");
   });
 });
 

@@ -14,6 +14,7 @@ import {
  */
 
 const PAGES = [
+  ["Dashboard", "/dashboard"],
   ["Transactions", "/transactions"],
   ["Planned", "/planned"],
   ["Reports", "/reports"],
@@ -41,7 +42,7 @@ test.describe("signed out", () => {
     await expectNoHorizontalScroll(page);
 
     await page.getByLabel("Code").fill(totp(credentials.manualKey));
-    await expect(page).toHaveURL(/\/transactions$/);
+    await expect(page).toHaveURL(/\/dashboard$/);
   });
 });
 

@@ -7,6 +7,7 @@ import { expect, test } from "./helpers";
  */
 
 const PAGES = [
+  "Dashboard",
   "Transactions",
   "Planned",
   "Reports",

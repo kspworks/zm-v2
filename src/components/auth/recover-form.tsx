@@ -25,6 +25,7 @@ import { Skeleton } from "~/components/ui/skeleton";
 import { Spinner } from "~/components/ui/spinner";
 import { useErrorMessage } from "~/hooks/use-error-message";
 import { signInWithTicket } from "~/lib/auth/client";
+import { HOME_PATH } from "~/lib/auth-routing";
 import { useTRPC } from "~/trpc/react";
 
 /** Walks through the steps an admin-issued recovery link covers */
@@ -84,7 +85,7 @@ export function RecoverForm({ token }: { token: string }) {
             <Button
               onClick={async () => {
                 await signInWithTicket(ticket).catch(() => undefined);
-                router.replace("/transactions");
+                router.replace(HOME_PATH);
                 router.refresh();
               }}
             >

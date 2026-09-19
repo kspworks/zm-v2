@@ -2,6 +2,7 @@ import { accountsRouter } from "~/server/api/routers/accounts";
 import { adminRouter } from "~/server/api/routers/admin";
 import { categoriesRouter } from "~/server/api/routers/categories";
 import { counterpartiesRouter } from "~/server/api/routers/counterparties";
+import { dashboardRouter } from "~/server/api/routers/dashboard";
 import { healthRouter } from "~/server/api/routers/health";
 import { importsRouter } from "~/server/api/routers/imports";
 import { invitesRouter } from "~/server/api/routers/invites";
@@ -19,6 +20,7 @@ export const appRouter = createTRPCRouter({
   admin: adminRouter,
   categories: categoriesRouter,
   counterparties: counterpartiesRouter,
+  dashboard: dashboardRouter,
   health: healthRouter,
   imports: importsRouter,
   invites: invitesRouter,

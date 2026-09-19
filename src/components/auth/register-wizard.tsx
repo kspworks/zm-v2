@@ -27,6 +27,7 @@ import { Input } from "~/components/ui/input";
 import { Spinner } from "~/components/ui/spinner";
 import { useErrorMessage } from "~/hooks/use-error-message";
 import { signInWithTicket } from "~/lib/auth/client";
+import { HOME_PATH } from "~/lib/auth-routing";
 import { cn } from "~/lib/utils";
 import { registrationDetailsSchema } from "~/lib/validators/auth";
 import { useTRPC } from "~/trpc/react";
@@ -125,7 +126,7 @@ export function RegisterWizard({
 
     setFinishing(true);
     await signInWithTicket(ticket).catch(() => undefined);
-    router.replace("/transactions");
+    router.replace(HOME_PATH);
     router.refresh();
   };
 
