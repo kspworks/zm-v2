@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { and, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
 
 import { occurrenceDates } from "~/lib/schedule";
 import type { ScheduleFields } from "~/lib/validators/planned";
@@ -231,7 +231,7 @@ export const regenerateAll = async (
         isNull(plannedTransactions.deletedAt),
         or(
           isNull(plannedTransactions.batchId),
-          sql`${plannedTransactions.amount} < 0`,
+          lt(plannedTransactions.amount, 0),
         ),
       ),
     );

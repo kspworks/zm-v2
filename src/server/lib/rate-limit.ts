@@ -1,4 +1,4 @@
-import { lt, sql } from "drizzle-orm";
+import { eq, lt, sql } from "drizzle-orm";
 
 import { type DbOrTx, db as defaultDb } from "~/server/db";
 import { rateLimits } from "~/server/db/schema";
@@ -60,7 +60,7 @@ export const resetRateLimit = async (
   key: string,
   db: DbOrTx = defaultDb,
 ): Promise<void> => {
-  await db.delete(rateLimits).where(sql`${rateLimits.key} = ${key}`);
+  await db.delete(rateLimits).where(eq(rateLimits.key, key));
 };
 
 /** Drops windows older than 24 h; run by the nightly cron */

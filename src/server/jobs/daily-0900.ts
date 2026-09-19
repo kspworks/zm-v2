@@ -1,9 +1,17 @@
-import { sql } from "drizzle-orm";
+import { and, asc, eq, isNull, lt, ne, sql, sum } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
 import type { Locale } from "~/i18n/config";
 import { type MailConfig, mailConfig } from "~/server/config";
 import type { CronLog } from "~/server/cron";
 import type { DbOrTx } from "~/server/db";
+import {
+  accountMembers,
+  accounts,
+  currencies,
+  transactions,
+  users,
+} from "~/server/db/schema";
 import { tomorrow as tomorrowInAppZone } from "~/server/lib/clock";
 import {
   insufficientFundsEmail,
@@ -27,64 +35,102 @@ export const collectShortages = async (
   db: DbOrTx,
   day: string,
 ): Promise<Recipient[]> => {
-  const rows = await db.execute<{
-    user_id: string;
-    email: string;
-    locale: string;
-    account_name: string;
-    currency_sign: string;
-    planned_sum: string;
-    balance: string;
-  }>(sql`
-    WITH planned AS (
-      SELECT t.account_id, sum(t.amount) AS planned_sum
-      FROM transactions t
-      JOIN accounts a ON a.id = t.account_id
-      WHERE t.is_planned AND t.deleted_at IS NULL AND t.date = ${day}::date
-        AND a.deleted_at IS NULL AND a.type <> 'debt'
-      GROUP BY t.account_id
-    ), balances AS (
-      SELECT p.account_id, p.planned_sum,
-        a.initial_balance + coalesce((
-          SELECT sum(t.amount) FROM transactions t
-          WHERE t.account_id = p.account_id
-            AND t.deleted_at IS NULL AND NOT t.is_planned
-        ), 0) AS balance
-      FROM planned p JOIN accounts a ON a.id = p.account_id
+  const settled = alias(transactions, "settled");
+
+  const planned = db.$with("planned").as(
+    db
+      .select({
+        accountId: transactions.accountId,
+        plannedSum: sum(transactions.amount).as("planned_sum"),
+      })
+      .from(transactions)
+      .innerJoin(accounts, eq(accounts.id, transactions.accountId))
+      .where(
+        and(
+          eq(transactions.isPlanned, true),
+          isNull(transactions.deletedAt),
+          eq(transactions.date, day),
+          isNull(accounts.deletedAt),
+          ne(accounts.type, "debt"),
+        ),
+      )
+      .groupBy(transactions.accountId),
+  );
+
+  const balances = db.$with("balances").as(
+    db
+      .select({
+        accountId: planned.accountId,
+        plannedSum: planned.plannedSum,
+        balance: sql<string>`${accounts.initialBalance} + coalesce((${db
+          .select({ sum: sum(settled.amount) })
+          .from(settled)
+          .where(
+            and(
+              eq(settled.accountId, planned.accountId),
+              isNull(settled.deletedAt),
+              eq(settled.isPlanned, false),
+            ),
+          )}), 0)`.as("balance"),
+      })
+      .from(planned)
+      .innerJoin(accounts, eq(accounts.id, planned.accountId)),
+  );
+
+  const rows = await db
+    .with(planned, balances)
+    .select({
+      userId: users.id,
+      email: users.email,
+      locale: users.locale,
+      accountName: accounts.name,
+      currencySign: currencies.sign,
+      plannedSum: balances.plannedSum,
+      balance: balances.balance,
+    })
+    .from(balances)
+    .innerJoin(accounts, eq(accounts.id, balances.accountId))
+    .innerJoin(currencies, eq(currencies.id, accounts.currencyId))
+    .innerJoin(
+      accountMembers,
+      and(
+        eq(accountMembers.accountId, accounts.id),
+        isNull(accountMembers.deletedAt),
+        eq(accountMembers.canRead, true),
+      ),
     )
-    SELECT u.id AS user_id, u.email, u.locale, a.name AS account_name,
-      c.sign AS currency_sign, b.planned_sum, b.balance
-    FROM balances b
-    JOIN accounts a ON a.id = b.account_id
-    JOIN currencies c ON c.id = a.currency_id
-    JOIN account_members m ON m.account_id = a.id
-      AND m.deleted_at IS NULL AND m.can_read
-    JOIN users u ON u.id = m.user_id AND u.deleted_at IS NULL AND NOT u.banned
-    WHERE b.balance + b.planned_sum < 0
-    ORDER BY u.id, a.name
-  `);
+    .innerJoin(
+      users,
+      and(
+        eq(users.id, accountMembers.userId),
+        isNull(users.deletedAt),
+        eq(users.banned, false),
+      ),
+    )
+    .where(lt(sql`${balances.balance} + ${balances.plannedSum}`, 0))
+    .orderBy(asc(users.id), asc(accounts.name));
 
   const byUser = new Map<string, Recipient>();
 
   for (const row of rows) {
-    const plannedAmount = Number(row.planned_sum);
+    const plannedAmount = Number(row.plannedSum);
     const currentBalance = Number(row.balance);
-    const recipient = byUser.get(row.user_id) ?? {
-      userId: row.user_id,
+    const recipient = byUser.get(row.userId) ?? {
+      userId: row.userId,
       email: row.email,
       locale: row.locale === "en" ? "en" : "uk",
       sections: [],
     };
 
     recipient.sections.push({
-      accountName: row.account_name,
+      accountName: row.accountName,
       date: day,
       plannedAmount,
       currentBalance,
       shortage: plannedAmount + currentBalance,
-      currencySign: row.currency_sign,
+      currencySign: row.currencySign,
     });
-    byUser.set(row.user_id, recipient);
+    byUser.set(row.userId, recipient);
   }
 
   return [...byUser.values()];

@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, sql, sum } from "drizzle-orm";
 
 import type { TransactionInput } from "~/lib/validators/transactions";
 import type { DbOrTx } from "~/server/db";
@@ -222,16 +222,19 @@ export const balancesOf = async (db: DbOrTx, accountIds: string[]) => {
     .select({
       id: accounts.id,
       name: accounts.name,
-      balance: sql<number>`${accounts.initialBalance} + coalesce((
-        SELECT sum(t.amount) FROM ${transactions} t
-        WHERE t.account_id = "accounts"."id"
-          AND t.deleted_at IS NULL AND NOT t.is_planned
-      ), 0)`.mapWith(Number),
+      balance: sql<number>`${accounts.initialBalance} + coalesce((${db
+        .select({ sum: sum(transactions.amount) })
+        .from(transactions)
+        .where(
+          and(
+            eq(transactions.accountId, accounts.id),
+            isNull(transactions.deletedAt),
+            eq(transactions.isPlanned, false),
+          ),
+        )}), 0)`.mapWith(Number),
     })
     .from(accounts)
-    .where(
-      and(inArray(accounts.id, accountIds), sql`${accounts.type} <> 'debt'`),
-    );
+    .where(and(inArray(accounts.id, accountIds), ne(accounts.type, "debt")));
 };
 
 export const createTransaction = (

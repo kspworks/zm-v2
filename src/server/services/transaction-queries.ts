@@ -1,4 +1,26 @@
-import { type SQL, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  between,
+  desc,
+  eq,
+  gte,
+  ilike,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  lte,
+  ne,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
+import {
+  alias,
+  type PgSelectBase,
+  type SelectedFields,
+} from "drizzle-orm/pg-core";
 
 import { type DebtLabel, debtLabel } from "~/lib/debt-label";
 import { amountFilterRange } from "~/lib/money";
@@ -8,6 +30,15 @@ import {
   type TransactionFilter,
 } from "~/lib/validators/transactions";
 import type { DbOrTx } from "~/server/db";
+import {
+  accountMembers,
+  accounts,
+  categories,
+  counterparties,
+  currencies,
+  plannedTransactions,
+  transactions,
+} from "~/server/db/schema";
 import { today } from "~/server/lib/clock";
 
 /*
@@ -18,58 +49,66 @@ import { today } from "~/server/lib/clock";
 
 type Planned = "submitted" | "planned";
 
+const p = alias(transactions, "p");
+const l = alias(transactions, "l");
+const pa = alias(accounts, "pa");
+const la = alias(accounts, "la");
+const pc = alias(currencies, "pc");
+const lc = alias(currencies, "lc");
+const cat = alias(categories, "cat");
+const parent = alias(categories, "parent");
+const cp = alias(counterparties, "cp");
+const pt = alias(plannedTransactions, "pt");
+
 const escapeLike = (value: string) => value.replace(/[\\%_]/g, (c) => `\\${c}`);
 
-/** A parenthesised, parameterised list for `IN`; callers pass non-empty lists */
-const inList = (ids: string[]) =>
-  sql`(${sql.join(
-    ids.map((id) => sql`${id}`),
-    sql`, `,
-  )})`;
-
 /** The filter conditions, each matching either leg */
-const filterConditions = (filter: Partial<TransactionFilter>): SQL[] => {
-  const conditions: SQL[] = [];
+const filterConditions = (filter: Partial<TransactionFilter>) => {
+  const conditions: (SQL | undefined)[] = [];
 
   if (filter.accounts?.length) {
     conditions.push(
-      sql`(p.account_id IN ${inList(filter.accounts)} OR l.account_id IN ${inList(filter.accounts)})`,
+      or(
+        inArray(p.accountId, filter.accounts),
+        inArray(l.accountId, filter.accounts),
+      ),
     );
   }
 
   if (filter.categories?.length) {
     const ids = filter.categories.filter((id) => id !== NO_CATEGORY);
-    const parts: SQL[] = [];
+    const parts: (SQL | undefined)[] = [];
 
     if (filter.categories.includes(NO_CATEGORY)) {
       // "no category" only matches non-batched rows without a category
-      parts.push(sql`(p.batch_id IS NULL AND p.category_id IS NULL)`);
+      parts.push(and(isNull(p.batchId), isNull(p.categoryId)));
     }
 
     if (ids.length) {
-      parts.push(
-        sql`p.category_id IN ${inList(ids)} OR l.category_id IN ${inList(ids)}`,
-      );
+      parts.push(inArray(p.categoryId, ids), inArray(l.categoryId, ids));
     }
 
-    conditions.push(sql`(${sql.join(parts, sql` OR `)})`);
+    conditions.push(or(...parts));
   }
 
   if (filter.counterparties?.length) {
     conditions.push(
-      sql`(p.counterparty_id IN ${inList(filter.counterparties)} OR l.counterparty_id IN ${inList(filter.counterparties)})`,
+      or(
+        inArray(p.counterpartyId, filter.counterparties),
+        inArray(l.counterpartyId, filter.counterparties),
+      ),
     );
   }
 
   if (filter.startDate) {
     conditions.push(
-      sql`(p.date >= ${filter.startDate}::date OR l.date >= ${filter.startDate}::date)`,
+      or(gte(p.date, filter.startDate), gte(l.date, filter.startDate)),
     );
   }
 
   if (filter.endDate) {
     conditions.push(
-      sql`(p.date <= ${filter.endDate}::date OR l.date <= ${filter.endDate}::date)`,
+      or(lte(p.date, filter.endDate), lte(l.date, filter.endDate)),
     );
   }
 
@@ -78,7 +117,10 @@ const filterConditions = (filter: Partial<TransactionFilter>): SQL[] => {
 
     if (range) {
       conditions.push(
-        sql`(abs(p.amount) BETWEEN ${range.min} AND ${range.max} OR abs(l.amount) BETWEEN ${range.min} AND ${range.max})`,
+        or(
+          between(sql`abs(${p.amount})`, range.min, range.max),
+          between(sql`abs(${l.amount})`, range.min, range.max),
+        ),
       );
     }
   }
@@ -86,120 +128,150 @@ const filterConditions = (filter: Partial<TransactionFilter>): SQL[] => {
   if (filter.comment) {
     const pattern = `%${escapeLike(filter.comment)}%`;
 
-    conditions.push(
-      sql`(p.comment ILIKE ${pattern} OR l.comment ILIKE ${pattern})`,
-    );
+    conditions.push(or(ilike(p.comment, pattern), ilike(l.comment, pattern)));
   }
 
   return conditions;
 };
 
-/** FROM + WHERE shared by the list, totals, overdue and report queries */
-const pairsFrom = (
+/** Leaves out transfers between two real accounts, which net to zero */
+const notOwnTransfer = or(
+  isNull(p.batchId),
+  eq(pa.type, "debt"),
+  eq(la.type, "debt"),
+);
+
+/** For a debt pair the real-account leg is what counts */
+const primaryIsDebtLeg = and(isNotNull(p.batchId), eq(pa.type, "debt"));
+
+/** Which of the pairsQuery tables are left-joined, and so may be null */
+type PairsNullability = {
+  p: "not-null";
+  l: "nullable";
+  pa: "not-null";
+  pc: "not-null";
+  la: "nullable";
+  lc: "nullable";
+  cat: "nullable";
+  parent: "nullable";
+  cp: "nullable";
+  pt: "nullable";
+};
+
+/**
+ * Pairs with their accounts, currencies and display joins, shared by the
+ * list, totals, overdue and report queries. Unused display joins are left
+ * joins on primary keys, which Postgres removes from the plan.
+ *
+ * Drizzle can't resolve join result types over a generic selection, so the
+ * chain is built on the base type and the result typed from PairsNullability.
+ */
+const pairsQuery = <TFields extends SelectedFields>(
+  db: DbOrTx,
+  fields: TFields,
   userId: string,
   planned: Planned,
   filter: Partial<TransactionFilter>,
-  extra: SQL[] = [],
-  joins: SQL = sql``,
-) => {
-  const readable = sql`(
-    SELECT am.account_id FROM account_members am
-    WHERE am.user_id = ${userId} AND am.deleted_at IS NULL AND am.can_read
-  )`;
+  extra: (SQL | undefined)[] = [],
+): PgSelectBase<"p", TFields, "partial", PairsNullability, true> => {
+  const readable = db
+    .select({ id: accountMembers.accountId })
+    .from(accountMembers)
+    .where(
+      and(
+        eq(accountMembers.userId, userId),
+        isNull(accountMembers.deletedAt),
+        eq(accountMembers.canRead, true),
+      ),
+    );
 
-  const conditions = [
-    sql`p.deleted_at IS NULL`,
-    planned === "planned" ? sql`p.is_planned` : sql`NOT p.is_planned`,
-    sql`(p.batch_id IS NULL OR p.amount < 0)`,
-    sql`(p.account_id IN ${readable} OR l.account_id IN ${readable})`,
-    ...filterConditions(filter),
-    ...extra,
-  ];
-
-  return sql`
-    FROM transactions p
-    LEFT JOIN transactions l
-      ON l.batch_id = p.batch_id AND l.id <> p.id AND l.deleted_at IS NULL
-    JOIN accounts pa ON pa.id = p.account_id
-    JOIN currencies pc ON pc.id = pa.currency_id
-    LEFT JOIN accounts la ON la.id = l.account_id
-    LEFT JOIN currencies lc ON lc.id = la.currency_id
-    ${joins}
-    WHERE ${sql.join(conditions, sql` AND `)}
-  `;
+  return db
+    .select(fields as SelectedFields)
+    .from(p)
+    .$dynamic()
+    .leftJoin(
+      l,
+      and(eq(l.batchId, p.batchId), ne(l.id, p.id), isNull(l.deletedAt)),
+    )
+    .innerJoin(pa, eq(pa.id, p.accountId))
+    .innerJoin(pc, eq(pc.id, pa.currencyId))
+    .leftJoin(la, eq(la.id, l.accountId))
+    .leftJoin(lc, eq(lc.id, la.currencyId))
+    .leftJoin(cat, eq(cat.id, p.categoryId))
+    .leftJoin(parent, eq(parent.id, cat.parentId))
+    .leftJoin(cp, eq(cp.id, p.counterpartyId))
+    .leftJoin(pt, eq(pt.id, p.plannedTransactionId))
+    .where(
+      and(
+        isNull(p.deletedAt),
+        eq(p.isPlanned, planned === "planned"),
+        or(isNull(p.batchId), lt(p.amount, 0)),
+        or(inArray(p.accountId, readable), inArray(l.accountId, readable)),
+        ...filterConditions(filter),
+        ...extra,
+      ),
+    ) as unknown as PgSelectBase<
+    "p",
+    TFields,
+    "partial",
+    PairsNullability,
+    true
+  >;
 };
 
-type RawRow = {
-  id: string;
-  kind: "expense" | "income" | "transfer" | "debt";
-  batch_id: string | null;
-  date: string;
-  amount: string;
-  account_id: string;
-  category_id: string | null;
-  comment: string | null;
-  counterparty_id: string | null;
-  planned_transaction_id: string | null;
-  is_planned: boolean;
-  created_at: string;
-  cursor_created_at: string;
-  created_by: string;
-  account_name: string;
-  account_type: string;
-  account_active: boolean;
-  currency_id: string;
-  currency_code: string;
-  currency_sign: string;
-  category_name: string | null;
-  category_deleted: boolean | null;
-  category_parent_name: string | null;
-  counterparty_name: string | null;
-  linked_id: string | null;
-  linked_amount: string | null;
-  linked_account_id: string | null;
-  linked_account_name: string | null;
-  linked_account_type: string | null;
-  linked_account_active: boolean | null;
-  linked_currency_id: string | null;
-  linked_currency_code: string | null;
-  linked_currency_sign: string | null;
-  schedule_id: string | null;
-  schedule_repeat_type: "daily" | "weekly" | "monthly" | "yearly" | null;
-  schedule_repeat_interval: number | null;
-  schedule_repeat_weekdays: number[] | null;
-  schedule_start_date: string | null;
-  schedule_end_date: string | null;
-  schedule_deleted: boolean | null;
+const listFields = {
+  id: p.id,
+  kind: p.kind,
+  batchId: p.batchId,
+  date: p.date,
+  amount: p.amount,
+  accountId: p.accountId,
+  categoryId: p.categoryId,
+  comment: p.comment,
+  counterpartyId: p.counterpartyId,
+  plannedTransactionId: p.plannedTransactionId,
+  isPlanned: p.isPlanned,
+  createdAt: p.createdAt,
+  // full microsecond precision, so the cursor never skips a row
+  cursorCreatedAt: sql<string>`${p.createdAt}::text`,
+  createdBy: p.createdBy,
+  accountName: pa.name,
+  accountType: pa.type,
+  accountActive: pa.isActive,
+  currencyId: pc.id,
+  currencyCode: pc.code,
+  currencySign: pc.sign,
+  categoryName: cat.name,
+  categoryDeletedAt: cat.deletedAt,
+  categoryParentName: parent.name,
+  counterpartyName: cp.name,
+  linkedId: l.id,
+  linkedAmount: l.amount,
+  linkedAccountId: l.accountId,
+  linkedAccountName: la.name,
+  linkedAccountType: la.type,
+  linkedAccountActive: la.isActive,
+  linkedCurrencyId: lc.id,
+  linkedCurrencyCode: lc.code,
+  linkedCurrencySign: lc.sign,
+  scheduleId: pt.id,
+  scheduleRepeatType: pt.repeatType,
+  scheduleRepeatInterval: pt.repeatInterval,
+  scheduleRepeatWeekdays: pt.repeatWeekdays,
+  scheduleStartDate: pt.startDate,
+  scheduleEndDate: pt.endDate,
+  scheduleDeletedAt: pt.deletedAt,
 };
 
-const selectColumns = sql`
-  p.id, p.kind, p.batch_id, p.date, p.amount, p.account_id, p.category_id,
-  p.comment, p.counterparty_id, p.planned_transaction_id, p.is_planned,
-  p.created_at, p.created_at::text AS cursor_created_at, p.created_by,
-  pa.name AS account_name, pa.type AS account_type,
-  pa.is_active AS account_active,
-  pc.id AS currency_id, pc.code AS currency_code, pc.sign AS currency_sign,
-  cat.name AS category_name, cat.deleted_at IS NOT NULL AS category_deleted,
-  parent.name AS category_parent_name,
-  cp.name AS counterparty_name,
-  l.id AS linked_id, l.amount AS linked_amount, l.account_id AS linked_account_id,
-  la.name AS linked_account_name, la.type AS linked_account_type,
-  la.is_active AS linked_account_active,
-  lc.id AS linked_currency_id, lc.code AS linked_currency_code,
-  lc.sign AS linked_currency_sign,
-  pt.id AS schedule_id, pt.repeat_type AS schedule_repeat_type,
-  pt.repeat_interval AS schedule_repeat_interval,
-  pt.repeat_weekdays AS schedule_repeat_weekdays,
-  pt.start_date AS schedule_start_date, pt.end_date AS schedule_end_date,
-  pt.deleted_at IS NOT NULL AS schedule_deleted
-`;
+const listQuery = (
+  db: DbOrTx,
+  userId: string,
+  planned: Planned,
+  filter: Partial<TransactionFilter>,
+  extra: (SQL | undefined)[],
+) => pairsQuery(db, listFields, userId, planned, filter, extra);
 
-const displayJoins = sql`
-  LEFT JOIN categories cat ON cat.id = p.category_id
-  LEFT JOIN categories parent ON parent.id = cat.parent_id
-  LEFT JOIN counterparties cp ON cp.id = p.counterparty_id
-  LEFT JOIN planned_transactions pt ON pt.id = p.planned_transaction_id
-`;
+type ListRow = Awaited<ReturnType<typeof listQuery>>[number];
 
 export type TransactionAccountRef = {
   id: string;
@@ -213,7 +285,7 @@ export type TransactionAccountRef = {
 
 export type TransactionRow = {
   id: string;
-  kind: RawRow["kind"];
+  kind: (typeof transactions.$inferSelect)["kind"];
   batchId: string | null;
   date: string;
   amount: number;
@@ -249,79 +321,78 @@ export type TransactionRow = {
   cursor: ListCursor;
 };
 
-const mapRow = (row: RawRow): TransactionRow => {
+const mapRow = (row: ListRow): TransactionRow => {
   const linked =
-    row.linked_id && row.linked_account_id
+    row.linkedId && row.linkedAccountId
       ? {
-          id: row.linked_id,
-          amount: Number(row.linked_amount),
+          id: row.linkedId,
+          amount: row.linkedAmount ?? 0,
           account: {
-            id: row.linked_account_id,
-            name: row.linked_account_name ?? "",
-            type: row.linked_account_type ?? "",
-            isActive: row.linked_account_active ?? true,
-            currencyId: row.linked_currency_id ?? "",
-            currencyCode: row.linked_currency_code ?? "",
-            currencySign: row.linked_currency_sign ?? "",
+            id: row.linkedAccountId,
+            name: row.linkedAccountName ?? "",
+            type: row.linkedAccountType ?? "",
+            isActive: row.linkedAccountActive ?? true,
+            currencyId: row.linkedCurrencyId ?? "",
+            currencyCode: row.linkedCurrencyCode ?? "",
+            currencySign: row.linkedCurrencySign ?? "",
           },
         }
       : null;
 
-  const amount = Number(row.amount);
   const realAmount =
     row.kind !== "debt"
       ? null
-      : row.account_type === "debt"
+      : row.accountType === "debt"
         ? (linked?.amount ?? null)
-        : amount;
+        : row.amount;
 
   return {
     id: row.id,
     kind: row.kind,
-    batchId: row.batch_id,
+    batchId: row.batchId,
     date: row.date,
-    amount,
+    amount: row.amount,
     account: {
-      id: row.account_id,
-      name: row.account_name,
-      type: row.account_type,
-      isActive: row.account_active,
-      currencyId: row.currency_id,
-      currencyCode: row.currency_code,
-      currencySign: row.currency_sign,
+      id: row.accountId,
+      name: row.accountName,
+      type: row.accountType,
+      isActive: row.accountActive,
+      currencyId: row.currencyId,
+      currencyCode: row.currencyCode,
+      currencySign: row.currencySign,
     },
-    category: row.category_id
+    category: row.categoryId
       ? {
-          id: row.category_id,
-          name: row.category_name ?? "",
-          parentName: row.category_parent_name,
-          deleted: row.category_deleted === true,
+          id: row.categoryId,
+          name: row.categoryName ?? "",
+          parentName: row.categoryParentName,
+          deleted: row.categoryDeletedAt !== null,
         }
       : null,
     comment: row.comment,
     counterparty:
-      row.counterparty_id && row.counterparty_name
-        ? { id: row.counterparty_id, name: row.counterparty_name }
+      row.counterpartyId && row.counterpartyName
+        ? { id: row.counterpartyId, name: row.counterpartyName }
         : null,
-    isPlanned: row.is_planned,
-    plannedTransactionId: row.planned_transaction_id,
-    createdAt: new Date(row.created_at),
-    createdBy: row.created_by,
+    isPlanned: row.isPlanned,
+    plannedTransactionId: row.plannedTransactionId,
+    createdAt: row.createdAt,
+    createdBy: row.createdBy,
     linked,
     schedule:
-      row.schedule_id && row.schedule_repeat_type && !row.schedule_deleted
+      row.scheduleId && row.scheduleRepeatType && !row.scheduleDeletedAt
         ? {
-            id: row.schedule_id,
-            repeatType: row.schedule_repeat_type,
-            repeatInterval: row.schedule_repeat_interval ?? 1,
-            repeatWeekdays: row.schedule_repeat_weekdays ?? [],
-            startDate: row.schedule_start_date ?? "",
-            endDate: row.schedule_end_date,
+            id: row.scheduleId,
+            repeatType: row.scheduleRepeatType,
+            repeatInterval: row.scheduleRepeatInterval ?? 1,
+            repeatWeekdays: row.scheduleRepeatWeekdays ?? [],
+            startDate: row.scheduleStartDate ?? "",
+            endDate: row.scheduleEndDate,
           }
         : null,
     direction: realAmount === null ? null : realAmount < 0 ? "gave" : "took",
     debtLabel: null,
-    cursor: { date: row.date, createdAt: row.cursor_created_at, id: row.id },
+    cursor: { date: row.date, createdAt: row.cursorCreatedAt, id: row.id },
   };
 };
 
@@ -347,31 +418,40 @@ const attachDebtLabels = async (db: DbOrTx, rows: TransactionRow[]) => {
     ...new Set(debtRows.map((row) => row.counterparty?.id ?? "")),
   ];
 
-  const windows = await db.execute<{
-    id: string;
-    amount: string;
-    prev_submitted: string;
-    prev_projected: string;
-  }>(sql`
-    SELECT w.id, w.amount, w.prev_submitted, w.prev_projected FROM (
-      SELECT t.id, t.amount,
-        COALESCE(SUM(t.amount) FILTER (WHERE NOT t.is_planned) OVER w, 0) AS prev_submitted,
-        COALESCE(SUM(t.amount) OVER w, 0) AS prev_projected
-      FROM transactions t
-      JOIN accounts a ON a.id = t.account_id
-      WHERE a.type = 'debt'
-        AND t.deleted_at IS NULL
-        AND t.counterparty_id IN ${inList(counterpartyIds)}
-      WINDOW w AS (
-        PARTITION BY t.counterparty_id, a.currency_id
-        ORDER BY t.date, t.created_at, t.id
-        ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
-      )
-    ) w
-    WHERE w.id IN ${inList(legIds)}
-  `);
+  const t = alias(transactions, "t");
+  const a = alias(accounts, "a");
+  const window = sql`over (
+    partition by ${t.counterpartyId}, ${a.currencyId}
+    order by ${t.date}, ${t.createdAt}, ${t.id}
+    rows between unbounded preceding and 1 preceding
+  )`;
 
-  const byId = new Map([...windows].map((row) => [row.id, row]));
+  const w = db
+    .select({
+      id: t.id,
+      amount: t.amount,
+      prevSubmitted:
+        sql<string>`coalesce(sum(${t.amount}) filter (where not ${t.isPlanned}) ${window}, 0)`.as(
+          "prev_submitted",
+        ),
+      prevProjected: sql<string>`coalesce(sum(${t.amount}) ${window}, 0)`.as(
+        "prev_projected",
+      ),
+    })
+    .from(t)
+    .innerJoin(a, eq(a.id, t.accountId))
+    .where(
+      and(
+        eq(a.type, "debt"),
+        isNull(t.deletedAt),
+        inArray(t.counterpartyId, counterpartyIds),
+      ),
+    )
+    .as("w");
+
+  const windows = await db.select().from(w).where(inArray(w.id, legIds));
+
+  const byId = new Map(windows.map((row) => [row.id, row]));
 
   for (const row of debtRows) {
     const window = byId.get(debtLegId(row));
@@ -381,11 +461,11 @@ const attachDebtLabels = async (db: DbOrTx, rows: TransactionRow[]) => {
     }
 
     const before = Number(
-      row.isPlanned ? window.prev_projected : window.prev_submitted,
+      row.isPlanned ? window.prevProjected : window.prevSubmitted,
     );
 
     row.debtLabel = {
-      ...debtLabel(before, Number(window.amount)),
+      ...debtLabel(before, window.amount),
       forecast: row.isPlanned,
     };
   }
@@ -397,8 +477,8 @@ const cursorCondition = (
 ) =>
   cursor
     ? desc
-      ? sql`(p.date, p.created_at, p.id) < (${cursor.date}::date, ${cursor.createdAt}::timestamptz, ${cursor.id})`
-      : sql`(p.date, p.created_at, p.id) > (${cursor.date}::date, ${cursor.createdAt}::timestamptz, ${cursor.id})`
+      ? sql`(${p.date}, ${p.createdAt}, ${p.id}) < (${cursor.date}::date, ${cursor.createdAt}::timestamptz, ${cursor.id})`
+      : sql`(${p.date}, ${p.createdAt}, ${p.id}) > (${cursor.date}::date, ${cursor.createdAt}::timestamptz, ${cursor.id})`
     : undefined;
 
 export const listTransactions = async (
@@ -415,30 +495,21 @@ export const listTransactions = async (
     cursor?: ListCursor | null;
     planned: Planned;
     limit: number;
-    extra?: SQL[];
+    extra?: (SQL | undefined)[];
   },
 ): Promise<{ items: TransactionRow[]; nextCursor: ListCursor | null }> => {
   // submitted: newest first; planned: oldest first
-  const desc = planned === "submitted";
-  const after = cursorCondition(cursor, desc);
-  const order = desc
-    ? sql`p.date DESC, p.created_at DESC, p.id DESC`
-    : sql`p.date ASC, p.created_at ASC, p.id ASC`;
+  const newestFirst = planned === "submitted";
+  const direction = newestFirst ? desc : asc;
 
-  const raw = await db.execute<RawRow>(sql`
-    SELECT ${selectColumns}
-    ${pairsFrom(
-      userId,
-      planned,
-      filter,
-      [...extra, ...(after ? [after] : [])],
-      displayJoins,
-    )}
-    ORDER BY ${order}
-    LIMIT ${limit + 1}
-  `);
+  const raw = await listQuery(db, userId, planned, filter, [
+    ...extra,
+    cursorCondition(cursor, newestFirst),
+  ])
+    .orderBy(direction(p.date), direction(p.createdAt), direction(p.id))
+    .limit(limit + 1);
 
-  const rows = [...raw].map(mapRow);
+  const rows = raw.map(mapRow);
   const hasMore = rows.length > limit;
   const items = hasMore ? rows.slice(0, limit) : rows;
 
@@ -460,7 +531,7 @@ export const listOverdue = (
     filter,
     planned: "planned",
     limit: 50,
-    extra: [sql`p.date <= ${today()}::date`],
+    extra: [lte(p.date, today())],
   }).then((result) => result.items);
 
 export type CurrencyTotal = {
@@ -483,40 +554,50 @@ export const filteredTotals = async (
   filter: Partial<TransactionFilter>,
   planned: Planned = "submitted",
 ): Promise<CurrencyTotal[]> => {
-  const rows = await db.execute<{
-    currency_id: string;
-    currency_code: string;
-    currency_sign: string;
-    expenses: string | null;
-    incomes: string | null;
-  }>(sql`
-    SELECT x.currency_id, c.code AS currency_code, c.sign AS currency_sign,
-      SUM(x.amount) FILTER (WHERE x.amount < 0) AS expenses,
-      SUM(x.amount) FILTER (WHERE x.amount > 0) AS incomes
-    FROM (
-      SELECT
-        CASE WHEN p.batch_id IS NOT NULL AND pa.type = 'debt'
-          THEN l.amount ELSE p.amount END AS amount,
-        CASE WHEN p.batch_id IS NOT NULL AND pa.type = 'debt'
-          THEN la.currency_id ELSE pa.currency_id END AS currency_id
-      ${pairsFrom(userId, planned, filter, [
-        sql`NOT (p.batch_id IS NOT NULL AND pa.type <> 'debt' AND la.type <> 'debt')`,
-      ])}
-    ) x
-    JOIN currencies c ON c.id = x.currency_id
-    GROUP BY x.currency_id, c.code, c.sign
-    ORDER BY c.code
-  `);
+  const x = pairsQuery(
+    db,
+    {
+      amount:
+        sql<number>`case when ${primaryIsDebtLeg} then ${l.amount} else ${p.amount} end`.as(
+          "amount",
+        ),
+      currencyId:
+        sql<string>`case when ${primaryIsDebtLeg} then ${la.currencyId} else ${pa.currencyId} end`.as(
+          "currency_id",
+        ),
+    },
+    userId,
+    planned,
+    filter,
+    [notOwnTransfer],
+  ).as("x");
 
-  return [...rows]
+  const rows = await db
+    .select({
+      currencyId: x.currencyId,
+      currencyCode: currencies.code,
+      currencySign: currencies.sign,
+      expenses: sql<
+        string | null
+      >`sum(${x.amount}) filter (where ${x.amount} < 0)`,
+      incomes: sql<
+        string | null
+      >`sum(${x.amount}) filter (where ${x.amount} > 0)`,
+    })
+    .from(x)
+    .innerJoin(currencies, eq(currencies.id, x.currencyId))
+    .groupBy(x.currencyId, currencies.code, currencies.sign)
+    .orderBy(asc(currencies.code));
+
+  return rows
     .map((row) => {
       const expenses = Number(row.expenses ?? 0);
       const incomes = Number(row.incomes ?? 0);
 
       return {
-        currencyId: row.currency_id,
-        currencyCode: row.currency_code,
-        currencySign: row.currency_sign,
+        currencyId: row.currencyId,
+        currencyCode: row.currencyCode,
+        currencySign: row.currencySign,
         expenses,
         incomes,
         total: expenses + incomes,
@@ -551,56 +632,30 @@ export const reportRows = async (
   filter: Partial<TransactionFilter>,
   limit = REPORT_LIMIT,
 ): Promise<{ rows: ReportRow[]; truncated: boolean }> => {
-  const raw = await db.execute<{
-    id: string;
-    date: string;
-    amount: string;
-    currency_code: string;
-    currency_sign: string;
-    category_id: string | null;
-    category_name: string | null;
-    parent_id: string | null;
-    parent_name: string | null;
-    comment: string | null;
-  }>(sql`
-    SELECT p.id, p.date,
-      CASE WHEN p.batch_id IS NOT NULL AND pa.type = 'debt'
-        THEN l.amount ELSE p.amount END AS amount,
-      CASE WHEN p.batch_id IS NOT NULL AND pa.type = 'debt'
-        THEN lc.code ELSE pc.code END AS currency_code,
-      CASE WHEN p.batch_id IS NOT NULL AND pa.type = 'debt'
-        THEN lc.sign ELSE pc.sign END AS currency_sign,
-      cat.id AS category_id, cat.name AS category_name,
-      parent.id AS parent_id, parent.name AS parent_name,
-      p.comment
-    ${pairsFrom(
-      userId,
-      "submitted",
-      filter,
-      [
-        sql`NOT (p.batch_id IS NOT NULL AND pa.type <> 'debt' AND la.type <> 'debt')`,
-      ],
-      sql`
-        LEFT JOIN categories cat ON cat.id = p.category_id
-        LEFT JOIN categories parent ON parent.id = cat.parent_id
-      `,
-    )}
-    ORDER BY p.date, p.created_at, p.id
-    LIMIT ${limit + 1}
-  `);
-
-  const rows = [...raw].map((row) => ({
-    id: row.id,
-    date: row.date,
-    amount: Number(row.amount),
-    currencyCode: row.currency_code,
-    currencySign: row.currency_sign,
-    categoryId: row.category_id,
-    categoryName: row.category_name,
-    parentId: row.parent_id,
-    parentName: row.parent_name,
-    comment: row.comment,
-  }));
+  const rows = await pairsQuery(
+    db,
+    {
+      id: p.id,
+      date: p.date,
+      amount:
+        sql<number>`case when ${primaryIsDebtLeg} then ${l.amount} else ${p.amount} end`.mapWith(
+          Number,
+        ),
+      currencyCode: sql<string>`case when ${primaryIsDebtLeg} then ${lc.code} else ${pc.code} end`,
+      currencySign: sql<string>`case when ${primaryIsDebtLeg} then ${lc.sign} else ${pc.sign} end`,
+      categoryId: cat.id,
+      categoryName: cat.name,
+      parentId: parent.id,
+      parentName: parent.name,
+      comment: p.comment,
+    },
+    userId,
+    "submitted",
+    filter,
+    [notOwnTransfer],
+  )
+    .orderBy(asc(p.date), asc(p.createdAt), asc(p.id))
+    .limit(limit + 1);
 
   return { rows: rows.slice(0, limit), truncated: rows.length > limit };
 };

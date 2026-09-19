@@ -1,4 +1,17 @@
-import { and, asc, desc, eq, isNull, ne, or, type SQL, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  isNull,
+  like,
+  ne,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
 import type { AccountInput } from "~/lib/validators/accounts";
 import type { DbOrTx } from "~/server/db";
@@ -73,7 +86,7 @@ export const accountStats = (db: DbOrTx) =>
       total: sql<number>`coalesce(sum(${transactions.amount}), 0)`
         .mapWith(Number)
         .as("total"),
-      usage: sql<number>`count(*)`.mapWith(Number).as("usage"),
+      usage: count().as("usage"),
     })
     .from(transactions)
     .where(
@@ -85,10 +98,7 @@ export const accountStats = (db: DbOrTx) =>
     )
     .as("stats");
 
-const memberCount = sql<number>`(
-  SELECT count(*) FROM ${accountMembers} am
-  WHERE am.account_id = ${accounts.id} AND am.deleted_at IS NULL
-)`.mapWith(Number);
+const members = alias(accountMembers, "am");
 
 /** Readable accounts with derived balance, usage, rights and sharing info */
 export const readableAccounts = (db: DbOrTx, userId: string, where?: SQL) => {
@@ -112,7 +122,12 @@ export const readableAccounts = (db: DbOrTx, userId: string, where?: SQL) => {
         Number,
       ),
       usage: stats.usage,
-      memberCount,
+      memberCount: sql<number>`(${db
+        .select({ count: count() })
+        .from(members)
+        .where(
+          and(eq(members.accountId, accounts.id), isNull(members.deletedAt)),
+        )})`.mapWith(Number),
     })
     .from(accounts)
     .innerJoin(
@@ -191,18 +206,28 @@ const requireEditableAccount = async (
 
 /** Any live transaction (submitted or planned) or live schedule */
 const accountInUse = async (db: DbOrTx, id: string): Promise<boolean> => {
-  const [row] = await db.execute<{ used: boolean }>(sql`
-    SELECT EXISTS (
-      SELECT 1 FROM ${transactions}
-      WHERE ${transactions.accountId} = ${id} AND ${transactions.deletedAt} IS NULL
-    ) OR EXISTS (
-      SELECT 1 FROM ${plannedTransactions}
-      WHERE ${plannedTransactions.accountId} = ${id}
-        AND ${plannedTransactions.deletedAt} IS NULL
-    ) AS used
-  `);
+  const [transaction] = await db
+    .select({ id: transactions.id })
+    .from(transactions)
+    .where(and(eq(transactions.accountId, id), isNull(transactions.deletedAt)))
+    .limit(1);
 
-  return row?.used === true;
+  if (transaction) {
+    return true;
+  }
+
+  const [schedule] = await db
+    .select({ id: plannedTransactions.id })
+    .from(plannedTransactions)
+    .where(
+      and(
+        eq(plannedTransactions.accountId, id),
+        isNull(plannedTransactions.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  return schedule !== undefined;
 };
 
 export const updateAccount = async (
@@ -361,10 +386,7 @@ export const getOrCreateDebtAccount = async (
             eq(accounts.createdBy, userId),
             eq(accounts.currencyId, currencyId),
             isNull(accounts.deletedAt),
-            or(
-              eq(accounts.name, base),
-              sql`${accounts.name} LIKE ${`${base} (%)`}`,
-            ),
+            or(eq(accounts.name, base), like(accounts.name, `${base} (%)`)),
           ),
         )
     ).map((row) => row.name),

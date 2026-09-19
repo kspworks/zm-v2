@@ -108,18 +108,38 @@ export const addShare = (
       throw appError("BAD_REQUEST", "share_self");
     }
 
-    const tableName =
-      input.entity === "account" ? "account_members" : "category_members";
-    const keyColumn = input.entity === "account" ? "account_id" : "category_id";
-
     // one live member row per pair: re-sharing updates the rights in place
-    await tx.execute(sql`
-      INSERT INTO ${sql.identifier(tableName)}
-        (id, ${sql.identifier(keyColumn)}, user_id, can_read, can_write)
-      VALUES (${newId()}, ${input.id}, ${target.id}, true, ${input.canWrite})
-      ON CONFLICT (${sql.identifier(keyColumn)}, user_id) WHERE deleted_at IS NULL
-      DO UPDATE SET can_read = true, can_write = excluded.can_write, updated_at = now()
-    `);
+    const rights = { canRead: true, canWrite: input.canWrite };
+
+    if (input.entity === "account") {
+      await tx
+        .insert(accountMembers)
+        .values({
+          id: newId(),
+          accountId: input.id,
+          userId: target.id,
+          ...rights,
+        })
+        .onConflictDoUpdate({
+          target: [accountMembers.accountId, accountMembers.userId],
+          targetWhere: isNull(accountMembers.deletedAt),
+          set: rights,
+        });
+    } else {
+      await tx
+        .insert(categoryMembers)
+        .values({
+          id: newId(),
+          categoryId: input.id,
+          userId: target.id,
+          ...rights,
+        })
+        .onConflictDoUpdate({
+          target: [categoryMembers.categoryId, categoryMembers.userId],
+          targetWhere: isNull(categoryMembers.deletedAt),
+          set: rights,
+        });
+    }
 
     await audit(tx, {
       entityType: input.entity,

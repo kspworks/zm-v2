@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, sql, sum } from "drizzle-orm";
 
 import type { DbOrTx } from "~/server/db";
 import {
@@ -28,14 +28,13 @@ export const resolveCounterparty = async (
 ): Promise<string> => {
   const name = normalizeCounterpartyName(rawName).slice(0, 255);
 
-  const inserted = await tx.execute<{ id: string }>(sql`
-    INSERT INTO ${counterparties} (id, owner_id, name)
-    VALUES (${newId()}, ${ownerId}, ${name})
-    ON CONFLICT (owner_id, lower(name)) WHERE deleted_at IS NULL DO NOTHING
-    RETURNING id
-  `);
-
-  const created = [...inserted][0];
+  // untargeted: the builder can't name the lower(name) index, and the only
+  // other unique constraint is the fresh primary key
+  const [created] = await tx
+    .insert(counterparties)
+    .values({ id: newId(), ownerId, name })
+    .onConflictDoNothing()
+    .returning({ id: counterparties.id });
 
   if (created) {
     return created.id;
@@ -105,7 +104,7 @@ export const counterpartyBalances = async (db: DbOrTx, userId: string) => {
       currencyId: accounts.currencyId,
       currencyCode: currencies.code,
       currencySign: currencies.sign,
-      sum: sql<number>`sum(${transactions.amount})`.mapWith(Number),
+      sum: sum(transactions.amount).mapWith(Number),
     })
     .from(transactions)
     .innerJoin(accounts, eq(accounts.id, transactions.accountId))
@@ -139,7 +138,7 @@ export const counterpartyBalances = async (db: DbOrTx, userId: string) => {
       currencies.sign,
     )
     .orderBy(
-      sql`sum(${transactions.amount}) DESC`,
+      desc(sum(transactions.amount)),
       asc(counterparties.name),
       asc(currencies.code),
     );
@@ -153,10 +152,13 @@ export const listCounterparties = async (db: DbOrTx, userId: string) => {
     .select({
       id: counterparties.id,
       name: counterparties.name,
-      usage: sql<number>`(
-        SELECT count(*) FROM ${transactions} t
-        WHERE t.counterparty_id = "counterparties"."id" AND t.deleted_at IS NULL
-      )`.mapWith(Number),
+      usage: db.$count(
+        transactions,
+        and(
+          eq(transactions.counterpartyId, counterparties.id),
+          isNull(transactions.deletedAt),
+        ),
+      ),
     })
     .from(counterparties)
     .where(
@@ -281,23 +283,40 @@ export const mergeCounterparties = (
     return { moved: moved.length };
   });
 
+/** Any live transaction (submitted or planned) or live schedule */
+const counterpartyInUse = async (db: DbOrTx, id: string): Promise<boolean> => {
+  const [transaction] = await db
+    .select({ id: transactions.id })
+    .from(transactions)
+    .where(
+      and(eq(transactions.counterpartyId, id), isNull(transactions.deletedAt)),
+    )
+    .limit(1);
+
+  if (transaction) {
+    return true;
+  }
+
+  const [schedule] = await db
+    .select({ id: plannedTransactions.id })
+    .from(plannedTransactions)
+    .where(
+      and(
+        eq(plannedTransactions.counterpartyId, id),
+        isNull(plannedTransactions.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  return schedule !== undefined;
+};
+
 /** Soft delete, only while no live transaction or schedule uses it */
 export const deleteCounterparty = (db: DbOrTx, userId: string, id: string) =>
   db.transaction(async (tx) => {
     await requireOwned(tx, userId, id);
 
-    const [row] = await tx.execute<{ used: boolean }>(sql`
-      SELECT EXISTS (
-        SELECT 1 FROM ${transactions}
-        WHERE ${transactions.counterpartyId} = ${id} AND ${transactions.deletedAt} IS NULL
-      ) OR EXISTS (
-        SELECT 1 FROM ${plannedTransactions}
-        WHERE ${plannedTransactions.counterpartyId} = ${id}
-          AND ${plannedTransactions.deletedAt} IS NULL
-      ) AS used
-    `);
-
-    if (row?.used) {
+    if (await counterpartyInUse(tx, id)) {
       throw appError("BAD_REQUEST", "counterparty_in_use");
     }
 

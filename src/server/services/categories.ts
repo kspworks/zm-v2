@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import type { Locale } from "~/i18n/config";
@@ -54,6 +54,8 @@ export const insertCategory = async (
 };
 
 const parent = alias(categories, "parent");
+const child = alias(categories, "child");
+const members = alias(categoryMembers, "cm");
 
 /** Readable categories with the parent's name, rights and sharing info */
 export const listCategories = async (
@@ -74,14 +76,18 @@ export const listCategories = async (
       createdBy: categories.createdBy,
       ownerName: users.name,
       canWrite: categoryMembers.canWrite,
-      memberCount: sql<number>`(
-        SELECT count(*) FROM ${categoryMembers} cm
-        WHERE cm.category_id = ${categories.id} AND cm.deleted_at IS NULL
-      )`.mapWith(Number),
-      childCount: sql<number>`(
-        SELECT count(*) FROM ${categories} c
-        WHERE c.parent_id = ${categories.id} AND c.deleted_at IS NULL
-      )`.mapWith(Number),
+      memberCount: sql<number>`(${db
+        .select({ count: count() })
+        .from(members)
+        .where(
+          and(eq(members.categoryId, categories.id), isNull(members.deletedAt)),
+        )})`.mapWith(Number),
+      childCount: sql<number>`(${db
+        .select({ count: count() })
+        .from(child)
+        .where(
+          and(eq(child.parentId, categories.id), isNull(child.deletedAt)),
+        )})`.mapWith(Number),
     })
     .from(categories)
     .innerJoin(
