@@ -112,20 +112,42 @@ export function RepeatFields({
                   min={1}
                   max={31}
                   className="w-16 tabular-nums"
-                  value={value.repeatInterval}
+                  // NaN stands for an empty field while the user is typing
+                  value={
+                    Number.isNaN(value.repeatInterval)
+                      ? ""
+                      : value.repeatInterval
+                  }
                   aria-invalid={showErrors && errors.interval}
+                  onFocus={(event) => event.currentTarget.select()}
                   onChange={(event) =>
                     onChange({
                       ...value,
-                      repeatInterval: Number(event.target.value),
+                      repeatInterval:
+                        event.target.value === ""
+                          ? Number.NaN
+                          : Number(event.target.value),
                     })
                   }
+                  onBlur={(event) => {
+                    const interval = Math.min(
+                      31,
+                      Math.max(1, Math.round(value.repeatInterval) || 1),
+                    );
+
+                    // drop leading zeros React leaves in place ("01" == 1)
+                    event.currentTarget.value = String(interval);
+
+                    if (interval !== value.repeatInterval) {
+                      onChange({ ...value, repeatInterval: interval });
+                    }
+                  }}
                 />
                 <span className="text-muted-foreground text-sm">
                   {value.repeatType === "none"
                     ? null
                     : t(`intervalUnit.${value.repeatType}`, {
-                        count: value.repeatInterval,
+                        count: value.repeatInterval || 1,
                       })}
                 </span>
               </div>
