@@ -46,8 +46,30 @@ win, which is how CI (and a machine where port 5433 is taken:
 the suite at another database. Every table except `currencies` is truncated
 between tests.
 
+### Browser tests
+
+Playwright drives the built standalone bundle (`dist/server.js`) in desktop
+Chrome and on a Pixel 7: the admin bootstrap and sign-in with TOTP, every page
+through the sidebar or the mobile menu sheet, and a money journey (account,
+expense, income, planned payment, report). Any console error or uncaught
+exception fails the test, which is what catches most breakage after a
+dependency upgrade. They use a throwaway `zm_e2e` database on the same Docker
+postgres as `pnpm test`, recreated on every run.
+
+```shell
+pnpm exec playwright install chromium   # once, and after a Playwright upgrade
+pnpm test:e2e      # builds dist/, then runs the setup, anonymous, desktop and mobile projects
+pnpm test:e2e:ui   # the same in Playwright's UI mode
+E2E_PREBUILT=1 pnpm test:e2e   # reuse an existing dist/ (skips the ~1 min build)
+E2E_DEV=1 pnpm test:e2e        # against `next dev`, for writing specs (stop your own `pnpm dev` first)
+```
+
+After `pnpm check-updates -u && pnpm install`, run `pnpm test && pnpm test:e2e`.
+Screenshots of every page at phone width land in `test-results/`.
+
 Before merging, CI also runs `biome ci`, `knip`, the typecheck, the migration
-drift check and a smoke test of the standalone bundle (`smoke-standalone.sh`).
+drift check, a smoke test of the standalone bundle (`smoke-standalone.sh`) and
+the browser tests against that bundle.
 
 ## Deploying with docker-compose
 

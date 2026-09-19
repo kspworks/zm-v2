@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "export NEXT_PUBLIC_BUILD_ID=${NEXT_PUBLIC_BUILD_ID:-$(date +%y.%-m.%-d)} && NEXT_TELEMETRY_DISABLED=1 next build",
-    "build:selfhosted": "pnpm run build && rm -rf dist && cp -r public .next/standalone/ && cp -r .next/static .next/standalone/.next/ && mv .next/standalone dist",
+    "build:selfhosted": "pnpm run build && rm -rf dist && { [ ! -d public ] || cp -r public .next/standalone/; } && cp -r .next/static .next/standalone/.next/ && mv .next/standalone dist",
     "smoke": "./smoke-standalone.sh",
     "vercel-build": "pnpm run build && pnpm run db:migrate",
     "start": "next start",
@@ -24,6 +24,9 @@
     "test:watch": "TZ=UTC vitest",
     "test:db:up": "docker compose -f docker-compose.test.yml up -d --wait",
     "test:db:down": "docker compose -f docker-compose.test.yml down -v",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:db": "tsx e2e/setup-db.ts",
     "knip": "SKIP_ENV_VALIDATION=1 knip",
     "check-updates": "npm-check-updates"
   },
@@ -77,6 +80,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.14",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^24.13.5",
     "@types/qrcode": "^1.5.6",

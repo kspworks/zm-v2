@@ -91,3 +91,34 @@ jobs:
           CRON_SECRET=ci-cron-secret-0123456789
           ENV
           ./smoke-standalone.sh
+
+      - name: Playwright browser version
+        id: playwright
+        run: echo "version=$(pnpm exec playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the Playwright browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
+      - name: Install the Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      # desktop and mobile browser tests against the dist/ built above; the
+      # e2e database is a separate one on the same postgres service
+      - name: Browser tests
+        env:
+          E2E_PREBUILT: "1"
+          E2E_DATABASE_URL: "postgresql://zm:zm@localhost:5432/zm_e2e?idle_timeout=2"
+        run: pnpm test:e2e
+
+      - name: Upload the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

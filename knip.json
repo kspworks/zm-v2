@@ -1,5 +1,8 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
+  "playwright": {
+    "entry": ["e2e/**/*.{spec,setup}.ts"]
+  },
   "ignore": [
     "src/components/ui/**",
     "ecosystem.config.example.cjs",
