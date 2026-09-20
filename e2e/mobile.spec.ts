@@ -101,3 +101,49 @@ test("adds a transaction from the bottom drawer", async ({ page }) => {
   await expect(page.locator("main").getByText("Cat food")).toBeVisible();
   await expectNoHorizontalScroll(page);
 });
+
+test("adds a subcategory and the indented row still fits", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/categories");
+
+  // a long name on purpose: the indented row is the tightest case on a phone
+  const parent = page
+    .locator('[data-slot="item"]')
+    .filter({ hasText: "Clothing, shoes, accessories" });
+
+  await parent.getByRole("button", { name: "Actions" }).click();
+  await page.getByRole("menuitem", { name: "Add subcategory" }).click();
+
+  const drawer = page.getByRole("dialog", { name: "New category" });
+  await drawer.getByLabel("Name").fill("Sneakers");
+  await drawer.getByRole("button", { name: "Save" }).click();
+  await expect(drawer).toBeHidden();
+
+  const child = page
+    .locator('[data-slot="item"]')
+    .filter({ hasText: "Sneakers" });
+  await expect(child).toBeVisible();
+  await expectNoHorizontalScroll(page);
+
+  // indented, yet never past the right edge its parent row ends at
+  const parentBox = (await parent.boundingBox()) ?? null;
+  const childBox = (await child.boundingBox()) ?? null;
+  expect(parentBox).not.toBeNull();
+  expect(childBox).not.toBeNull();
+
+  if (parentBox && childBox) {
+    expect(childBox.x).toBeGreaterThan(parentBox.x);
+    expect(childBox.x + childBox.width).toBeLessThanOrEqual(
+      parentBox.x + parentBox.width + 0.5,
+    );
+    // the indent must not cost the row a second line: name, badge and menu
+    // only split apart once the name would be squeezed under its 10rem floor
+    expect(childBox.height).toBe(parentBox.height);
+  }
+
+  await page.screenshot({
+    path: testInfo.outputPath("categories-subcategory.png"),
+    fullPage: true,
+  });
+});

@@ -127,17 +127,16 @@ export function CategoriesView() {
                 key={category.id}
                 variant="outline"
                 size="sm"
-                className={cn(category.parentId && "ml-6 sm:ml-8")}
+                className={cn(category.parentId && "ml-6 w-auto sm:ml-8")}
               >
-                <ItemContent className="min-w-0">
+                <ItemContent className="min-w-40">
                   <ItemTitle className="w-full flex-wrap">
-                    {category.parentId ? (
-                      <CornerDownRightIcon className="size-3.5 text-muted-foreground" />
-                    ) : null}
-                    <span className="truncate">{category.name}</span>
-                    {category.importId ? (
-                      <Badge variant="secondary">{tc("imported")}</Badge>
-                    ) : null}
+                    <span className="flex min-w-0 items-center gap-2">
+                      {category.parentId ? (
+                        <CornerDownRightIcon className="size-3.5 text-muted-foreground" />
+                      ) : null}
+                      <span className="truncate">{category.name}</span>
+                    </span>
                     {category.isShared ? (
                       <Badge variant="secondary">
                         <UsersIcon />
@@ -151,7 +150,7 @@ export function CategoriesView() {
                     </ItemDescription>
                   )}
                 </ItemContent>
-                <ItemActions>
+                <ItemActions className="ml-auto">
                   {category.isExpense ? (
                     <Badge variant="outline">{t("isExpense")}</Badge>
                   ) : null}
