@@ -7,8 +7,6 @@ tracking, ZenMoney CSV import, treemap reports, and email alerts when
 tomorrow's planned payments would overdraw an account. English and
 Ukrainian, light and dark.
 
-The behaviour is specified in [docs/rewrite-spec.md](docs/rewrite-spec.md).
-
 ## Stack
 
 Next.js (App Router), TypeScript, tRPC, Drizzle ORM on PostgreSQL 15+,

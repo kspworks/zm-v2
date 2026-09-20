@@ -397,10 +397,10 @@ const mapRow = (row: ListRow): TransactionRow => {
 };
 
 /**
- * Labels debt rows (section 14.1). The running balance before each entry is a
- * window over the counterparty's whole history in that currency, computed
- * before (and independently of) the list filters, so filtering never changes
- * a label. Only the partitions of the given rows are scanned.
+ * Labels debt rows via `~/lib/debt-label`. The running balance before each
+ * entry is a window over the counterparty's whole history in that currency,
+ * computed before (and independently of) the list filters, so filtering never
+ * changes a label. Only the partitions of the given rows are scanned.
  */
 const attachDebtLabels = async (db: DbOrTx, rows: TransactionRow[]) => {
   const debtRows = rows.filter(

@@ -1,5 +1,5 @@
 /**
- * Debt wording (spec section 14.1). Given B, the running balance with the
+ * Debt wording. Given B, the running balance with the
  * counterparty in this currency just *before* the entry (positive: they owe
  * me), and the entry's debt-account leg (positive: "I gave"), decide between
  * lent / borrowed / repaid / repaid-to-me, splitting when the entry crosses

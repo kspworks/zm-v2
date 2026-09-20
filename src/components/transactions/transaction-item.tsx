@@ -29,9 +29,9 @@ export const useAccountName = () => {
 };
 
 /**
- * Debt wording (section 14.1) as text: "I lent to Alex", or for a split
- * "Alex repaid me 300 ₴ · I borrowed 200 ₴". Forecast wording for planned
- * rows.
+ * Debt wording (see `~/lib/debt-label`) as text: "I lent to Alex", or for a
+ * split "Alex repaid me 300 ₴ · I borrowed 200 ₴". Forecast wording for
+ * planned rows.
  */
 export const useDebtLabelText = () => {
   const t = useTranslations("transactions");

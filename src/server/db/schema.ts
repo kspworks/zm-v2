@@ -19,7 +19,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 /*
- * Conventions (see docs/rewrite-spec.md, section 3):
+ * Conventions (see AGENTS.md):
  * - money is a bigint in minor units (mode "number": safe up to 2^53)
  * - calendar dates are `date` columns handled as "yyyy-MM-dd" strings
  * - soft delete via deletedAt, uniqueness via partial indexes on live rows
@@ -480,7 +480,7 @@ export const recoveryLinks = pgTable(
   (t) => [index("recovery_links_user_id_idx").on(t.userId)],
 );
 
-/** Fixed-window counters shared by every app limiter (section 12) */
+/** Fixed-window counters shared by every app limiter */
 export const rateLimits = pgTable("rate_limits", {
   key: text().primaryKey(),
   count: integer().notNull(),
