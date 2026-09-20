@@ -77,7 +77,6 @@
     "accounts": "Accounts",
     "categories": "Categories",
     "counterparties": "Counterparties",
-    "import": "Import",
     "users": "Users",
     "settings": "Settings",
     "logout": "Log out",
@@ -468,7 +467,6 @@
     "submit": "Save all"
   },
   "import": {
-    "title": "Import",
     "upload": "Import a ZenMoney export",
     "description": "A CSV exported from ZenMoney, up to 256 KB. Accounts, categories and payees are created as needed.",
     "choose": "Choose a CSV file",

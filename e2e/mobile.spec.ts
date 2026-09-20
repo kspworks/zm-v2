@@ -21,7 +21,6 @@ const PAGES = [
   ["Accounts", "/accounts"],
   ["Categories", "/categories"],
   ["Counterparties", "/counterparties"],
-  ["Import", "/import"],
   ["Users", "/users"],
 ] as const;
 

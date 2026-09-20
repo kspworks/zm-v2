@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { PageHeader } from "~/components/app/page-header";
 import { BackupCodes } from "~/components/auth/backup-codes";
 import { TotpEnrolment } from "~/components/auth/totp-enrolment";
+import { ImportCard } from "~/components/settings/import-card";
 import { Alert, AlertDescription } from "~/components/ui/alert";
 import { Button } from "~/components/ui/button";
 import {
@@ -324,6 +325,7 @@ export function SettingsView({ reenrolPrompt }: { reenrolPrompt: boolean }) {
         <AuthenticatorCard />
         <PasswordCard />
         <BackupCodesCard />
+        <ImportCard />
       </div>
     </>
   );

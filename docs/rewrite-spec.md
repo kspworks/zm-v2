@@ -350,7 +350,7 @@ All limits live in Postgres, as a fixed-window counter in **one atomic upsert** 
   5. Resolve `payee` to a counterparty (create-or-match, case-insensitive, trimmed) and attach it to both legs.
   6. Set the category from the full `categoryName`. Set `createdAt` from `createdDate` interpreted in `APP_TIMEZONE`. **[FIX]** No `+3h` shifts; dates stay plain `date` strings.
 - On success, redirect to Transactions.
-- **Import history and undo** **[NEW]**, replacing the dev-only admin "clear imports": the Import page lists the user's imports (file name, date, counts). "Undo import" (with confirmation) soft-deletes that import and every account, category and transaction it created, in one transaction.
+- **Import history and undo** **[NEW]**, replacing the dev-only admin "clear imports": the import block at the bottom of Settings lists the user's imports (file name, date, counts). "Undo import" (with confirmation) soft-deletes that import and every account, category and transaction it created, in one transaction.
 
 ## 14. Counterparties and debts
 
@@ -404,8 +404,8 @@ The Users page is admin-only, with an admin-only menu entry.
 
 ## 17. Shell and UX-level requirements
 
-- Nav: Transactions, Planned, Reports, Accounts, Categories and Import. The Users entry is admin-only.
-- The user menu has name and email, a language switch (sets the cookie and profile, then refreshes in place), a theme switch (system/light/dark, persisted; default dark), a **Settings** entry (password, authenticator, backup codes; section 5.1), and logout.
+- Nav: Transactions, Planned, Reports, Accounts, Categories and Counterparties. The Users entry is admin-only.
+- The user menu has name and email, a language switch (sets the cookie and profile, then refreshes in place), a theme switch (system/light/dark, persisted; default dark), a **Settings** entry (password, authenticator, backup codes; section 5.1, plus the CSV import block; section 13), and logout.
 - A "DEV" badge appears when no build id is set.
 - `NEXT_PUBLIC_BUILD_ID` is set at build time as `yy.M.d`.
 - There is a localized 404 page and a global error page that reports to Sentry.

@@ -14,7 +14,6 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "~/components/app/confirm-dialog";
-import { PageHeader } from "~/components/app/page-header";
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
 import { Button } from "~/components/ui/button";
 import {
@@ -79,7 +78,7 @@ const rowErrorsOf = (error: unknown): RowError[] | null => {
   return rows?.length ? rows : null;
 };
 
-export function ImportView() {
+export function ImportCard() {
   const t = useTranslations("import");
   const te = useTranslations("errors");
   const format = useFormatter();
@@ -146,68 +145,63 @@ export function ImportView() {
 
   return (
     <>
-      <PageHeader title={t("title")} />
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 sm:p-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("upload")}</CardTitle>
-            <CardDescription>{t("description")}</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <input
-              ref={inputRef}
-              type="file"
-              accept=".csv,text/csv"
-              className="sr-only"
-              id="import-file"
-              onChange={(event) => void onFile(event.target.files?.[0])}
-            />
-            <Button
-              className="self-start"
-              disabled={upload.isPending}
-              onClick={() => inputRef.current?.click()}
-            >
-              {upload.isPending ? <Spinner /> : <FileUpIcon />}
-              {upload.isPending ? t("importing") : t("choose")}
-            </Button>
+      <Card id="import">
+        <CardHeader>
+          <CardTitle>{t("upload")}</CardTitle>
+          <CardDescription>{t("description")}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="sr-only"
+            id="import-file"
+            onChange={(event) => void onFile(event.target.files?.[0])}
+          />
+          <Button
+            className="self-start"
+            disabled={upload.isPending}
+            onClick={() => inputRef.current?.click()}
+          >
+            {upload.isPending ? <Spinner /> : <FileUpIcon />}
+            {upload.isPending ? t("importing") : t("choose")}
+          </Button>
 
-            {rowErrors ? (
-              <Alert variant="destructive">
-                <AlertCircleIcon />
-                <AlertTitle>{t("errorsTitle")}</AlertTitle>
-                <AlertDescription>
-                  <Table className="mt-2">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>{t("line")}</TableHead>
-                        <TableHead>{t("field")}</TableHead>
-                        <TableHead>{t("problem")}</TableHead>
+          {rowErrors ? (
+            <Alert variant="destructive">
+              <AlertCircleIcon />
+              <AlertTitle>{t("errorsTitle")}</AlertTitle>
+              <AlertDescription className="min-w-0">
+                <Table className="mt-2">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t("line")}</TableHead>
+                      <TableHead>{t("field")}</TableHead>
+                      <TableHead>{t("problem")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rowErrors.slice(0, 100).map((row) => (
+                      <TableRow key={`${row.line}-${row.field}`}>
+                        <TableCell className="tabular-nums">
+                          {row.line}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {row.field}
+                        </TableCell>
+                        <TableCell className="whitespace-normal">
+                          {isErrorKey(row.key) ? te(row.key) : row.key}
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {rowErrors.slice(0, 100).map((row) => (
-                        <TableRow key={`${row.line}-${row.field}`}>
-                          <TableCell className="tabular-nums">
-                            {row.line}
-                          </TableCell>
-                          <TableCell className="font-mono text-xs">
-                            {row.field}
-                          </TableCell>
-                          <TableCell>
-                            {isErrorKey(row.key) ? te(row.key) : row.key}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </AlertDescription>
-              </Alert>
-            ) : null}
-          </CardContent>
-        </Card>
+                    ))}
+                  </TableBody>
+                </Table>
+              </AlertDescription>
+            </Alert>
+          ) : null}
 
-        <section className="flex flex-col gap-3">
-          <h2 className="font-semibold text-sm">{t("history")}</h2>
+          <h3 className="font-semibold text-sm">{t("history")}</h3>
           {history.data?.length === 0 ? (
             <Empty className="border">
               <EmptyHeader>
@@ -245,8 +239,8 @@ export function ImportView() {
               ))}
             </ItemGroup>
           )}
-        </section>
-      </div>
+        </CardContent>
+      </Card>
 
       <ConfirmDialog
         open={undoing !== null}

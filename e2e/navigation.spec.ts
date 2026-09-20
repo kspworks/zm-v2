@@ -14,7 +14,6 @@ const PAGES = [
   "Accounts",
   "Categories",
   "Counterparties",
-  "Import",
   // admin-only, and the setup user is the bootstrap admin
   "Users",
 ];
@@ -40,6 +39,8 @@ test("settings are in the user menu", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Settings", level: 1 }),
   ).toBeVisible();
+  // import lives at the bottom of settings, not in the sidebar
+  await expect(page.getByText("Import a ZenMoney export")).toBeVisible();
 });
 
 test("switches the language and back", async ({ page }) => {
