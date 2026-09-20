@@ -114,7 +114,6 @@ export const readableAccounts = (db: DbOrTx, userId: string, where?: SQL) => {
       currencySign: currencies.sign,
       initialBalance: accounts.initialBalance,
       isActive: accounts.isActive,
-      importId: accounts.importId,
       createdBy: accounts.createdBy,
       ownerName: users.name,
       canWrite: accountMembers.canWrite,

@@ -166,9 +166,6 @@ export function AccountsView() {
                       {!account.isActive ? (
                         <Badge variant="outline">{tc("inactive")}</Badge>
                       ) : null}
-                      {account.importId ? (
-                        <Badge variant="secondary">{tc("imported")}</Badge>
-                      ) : null}
                       {account.isShared ? (
                         <Badge variant="secondary">
                           <UsersIcon />

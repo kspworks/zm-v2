@@ -71,7 +71,6 @@ export const listCategories = async (
       parentName: parent.name,
       isExpense: categories.isExpense,
       isIncome: categories.isIncome,
-      importId: categories.importId,
       seedKey: categories.seedKey,
       createdBy: categories.createdBy,
       ownerName: users.name,
