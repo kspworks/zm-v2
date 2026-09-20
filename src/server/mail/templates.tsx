@@ -6,10 +6,10 @@ import {
   Heading,
   Hr,
   Html,
+  render,
   Section,
   Text,
-} from "@react-email/components";
-import { render } from "@react-email/render";
+} from "react-email";
 
 import type { Locale } from "~/i18n/config";
 import { formatDisplayDate } from "~/lib/dates";
@@ -46,20 +46,27 @@ const renderBoth = async (element: React.ReactElement) => ({
   text: await render(element, { plainText: true }),
 });
 
-export const insufficientFundsEmail = async (
-  locale: Locale,
-  sections: ShortageSection[],
-) => {
+/**
+ * The components below are async so they can translate themselves; that keeps
+ * them mountable by the `email dev` preview server (see "emails/"), which needs
+ * a plain element, not the rendered `{ subject, html, text }` payload.
+ */
+export const InsufficientFundsEmail = async ({
+  locale,
+  sections,
+}: {
+  locale: Locale;
+  sections: ShortageSection[];
+}) => {
   const t = await getServerTranslator(locale);
-  const subject = t("mail.insufficientFunds.subject");
 
-  const element = (
+  return (
     <Html lang={locale}>
       <Head />
       <Body style={body}>
         <Container style={card}>
           <Heading as="h2" style={{ fontSize: "18px" }}>
-            {subject}
+            {t("mail.insufficientFunds.subject")}
           </Heading>
           <Text>{t("mail.insufficientFunds.intro")}</Text>
           {sections.map((section) => (
@@ -95,24 +102,40 @@ export const insufficientFundsEmail = async (
       </Body>
     </Html>
   );
-
-  return { subject, ...(await renderBoth(element)) };
 };
 
-export const passwordResetEmail = async (
+export const insufficientFundsEmail = async (
   locale: Locale,
-  { name, url }: { name: string; url: string },
+  sections: ShortageSection[],
 ) => {
   const t = await getServerTranslator(locale);
-  const subject = t("mail.passwordReset.subject");
 
-  const element = (
+  return {
+    subject: t("mail.insufficientFunds.subject"),
+    ...(await renderBoth(
+      <InsufficientFundsEmail locale={locale} sections={sections} />,
+    )),
+  };
+};
+
+export const PasswordResetEmail = async ({
+  locale,
+  name,
+  url,
+}: {
+  locale: Locale;
+  name: string;
+  url: string;
+}) => {
+  const t = await getServerTranslator(locale);
+
+  return (
     <Html lang={locale}>
       <Head />
       <Body style={body}>
         <Container style={card}>
           <Heading as="h2" style={{ fontSize: "18px" }}>
-            {subject}
+            {t("mail.passwordReset.subject")}
           </Heading>
           <Text>{t("mail.passwordReset.greeting", { name })}</Text>
           <Text>{t("mail.passwordReset.body")}</Text>
@@ -134,6 +157,18 @@ export const passwordResetEmail = async (
       </Body>
     </Html>
   );
+};
 
-  return { subject, ...(await renderBoth(element)) };
+export const passwordResetEmail = async (
+  locale: Locale,
+  { name, url }: { name: string; url: string },
+) => {
+  const t = await getServerTranslator(locale);
+
+  return {
+    subject: t("mail.passwordReset.subject"),
+    ...(await renderBoth(
+      <PasswordResetEmail locale={locale} name={name} url={url} />,
+    )),
+  };
 };

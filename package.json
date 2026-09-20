@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
+    "email": "email dev --port 3001",
     "build": "export NEXT_PUBLIC_BUILD_ID=${NEXT_PUBLIC_BUILD_ID:-$(date +%y.%-m.%-d)} && NEXT_TELEMETRY_DISABLED=1 next build",
     "build:selfhosted": "pnpm run build && rm -rf dist && { [ ! -d public ] || cp -r public .next/standalone/; } && cp -r .next/static .next/standalone/.next/ && mv .next/standalone dist",
     "smoke": "./smoke-standalone.sh",
@@ -39,8 +40,6 @@
     "@date-fns/tz": "^1.5.0",
     "@hookform/resolvers": "^5.9.1",
     "@paralleldrive/cuid2": "^3.3.0",
-    "@react-email/components": "^1.0.12",
-    "@react-email/render": "^2.1.0",
     "@sentry/nextjs": "^10.75.0",
     "@t3-oss/env-nextjs": "^0.13.11",
     "@tanstack/react-query": "^5.103.1",
@@ -69,6 +68,7 @@
     "react": "^19.3.0",
     "react-day-picker": "^10.0.1",
     "react-dom": "^19.3.0",
+    "react-email": "^6.9.5",
     "react-hook-form": "^7.88.0",
     "recharts": "^3.10.1",
     "server-only": "^0.0.1",
@@ -81,6 +81,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.14",
     "@playwright/test": "^1.63.0",
+    "@react-email/ui": "^6.9.5",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^24.13.5",
     "@types/qrcode": "^1.5.6",
