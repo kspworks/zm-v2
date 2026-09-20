@@ -10,7 +10,13 @@ import {
   transactions,
 } from "~/server/db/schema";
 import { callerFor } from "../helpers/caller";
-import { buildCsv, type CsvRow, expenseRow } from "../helpers/csv";
+import {
+  buildCsv,
+  type CsvRow,
+  csvText,
+  encodeCsv,
+  expenseRow,
+} from "../helpers/csv";
 import { expectTRPCError } from "../helpers/errors";
 import {
   CURRENCY,
@@ -208,15 +214,41 @@ describe("imports.upload", () => {
     expect(await db.select().from(imports)).toEqual([]);
   });
 
-  it("refuses files over 256 KB", async () => {
+  it("imports a file well past the old 256 KB limit", async () => {
+    const user = await createUser();
+    const rows = Array.from({ length: 3200 }, (_, i) =>
+      expenseRow({ comment: `row ${i}` }),
+    );
+    expect(Buffer.byteLength(csvText(rows))).toBeGreaterThan(256 * 1024);
+
+    await expect(upload(user, rows)).resolves.toMatchObject({
+      transactions: 3200,
+    });
+  });
+
+  it("refuses files over 4 MB once decompressed", async () => {
+    const user = await createUser();
+    // compresses to a few KB, so it passes the router cap and trips the
+    // decoder's bounded output instead
+    const huge = encodeCsv("a".repeat(5 * 1024 * 1024));
+
+    await expectTRPCError(
+      callerFor(user).imports.upload({ fileName: "big.csv", content: huge }),
+      "BAD_REQUEST",
+      "import_invalid",
+    );
+  });
+
+  it("refuses a payload that is not gzipped", async () => {
     const user = await createUser();
 
     await expectTRPCError(
       callerFor(user).imports.upload({
-        fileName: "big.csv",
-        content: Buffer.alloc(300 * 1024, "a").toString("base64"),
+        fileName: "plain.csv",
+        content: Buffer.from(csvText([expenseRow()])).toString("base64"),
       }),
       "BAD_REQUEST",
+      "import_invalid",
     );
   });
 

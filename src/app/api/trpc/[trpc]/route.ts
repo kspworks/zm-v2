@@ -17,4 +17,10 @@ const handler = (req: Request) =>
     },
   });
 
+/**
+ * A CSV import writes the whole file in one transaction and is by far the
+ * longest call here; serverless hosts read this from the build output.
+ */
+export const maxDuration = 60;
+
 export { handler as GET, handler as POST };

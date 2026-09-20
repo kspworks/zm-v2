@@ -1,3 +1,5 @@
+import { gzipSync } from "node:zlib";
+
 import { CSV_COLUMNS } from "~/server/lib/csv-import";
 
 export type CsvRow = Partial<Record<(typeof CSV_COLUMNS)[number], string>>;
@@ -33,8 +35,11 @@ export const csvText = (rows: CsvRow[]): string =>
     ),
   ].join("\n");
 
-export const buildCsv = (rows: CsvRow[]): string =>
-  Buffer.from(csvText(rows)).toString("base64");
+/** The upload wire format: gzipped, then base64 (see `gzipBase64` in the UI) */
+export const encodeCsv = (text: string): string =>
+  gzipSync(Buffer.from(text)).toString("base64");
+
+export const buildCsv = (rows: CsvRow[]): string => encodeCsv(csvText(rows));
 
 export const expenseRow = (overrides: CsvRow = {}): CsvRow => ({
   categoryName: "Food",

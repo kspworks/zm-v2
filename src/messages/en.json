@@ -467,7 +467,7 @@
   },
   "import": {
     "upload": "Import a ZenMoney export",
-    "description": "A CSV exported from ZenMoney, up to 256 KB. Accounts, categories and payees are created as needed.",
+    "description": "A CSV exported from ZenMoney, up to 4 MB. Accounts, categories and payees are created as needed.",
     "choose": "Choose a CSV file",
     "importing": "Importing…",
     "done": "{count, plural, one {# transaction imported} other {# transactions imported}}",
@@ -482,7 +482,7 @@
     "undoTitle": "Undo \"{name}\"?",
     "undoDescription": "Every account, category and transaction this import created will be deleted.",
     "undone": "Import undone",
-    "tooBig": "The file is larger than 256 KB"
+    "tooBig": "The file is larger than 4 MB"
   },
   "dashboard": {
     "title": "Dashboard",

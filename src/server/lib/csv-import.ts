@@ -22,9 +22,6 @@ export const CSV_COLUMNS = [
   "changedDate",
 ] as const;
 
-/** 256 KB, measured on the decoded file */
-export const MAX_IMPORT_BYTES = 256 * 1024;
-
 /** The first data line in the file (line 1 is a title, line 2 the header) */
 const FIRST_DATA_LINE = 3;
 

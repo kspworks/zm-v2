@@ -123,6 +123,26 @@ Per entity, through the member tables, with `canRead` / `canWrite`:
   back under the new rules. Occurrences the user deleted one by one keep their
   hash and stay gone, and overdue un-submitted ones are kept.
 
+## CSV import (ZenMoney export)
+
+- The client **gzips** the file and sends it base64 in the tRPC JSON body, so a
+  4 MB export is a ~700 KB request — inside the 4.5 MB body cap serverless
+  hosts impose. Both limits live in `~/lib/import-limits`: `MAX_IMPORT_BYTES`
+  measures the decoded file, `MAX_UPLOAD_BYTES` the compressed payload the
+  router accepts.
+- The server gunzips with `maxOutputLength`, so the decoded cap is enforced
+  **during** inflation and a zip bomb never materialises. An oversized or
+  non-gzip payload is `import_invalid`.
+- The export carries a title on line 1 and the header on line 2, and amounts
+  use a **comma decimal with exactly two places** (`"3000,00"`), so stripping
+  the comma gives minor units. Reject a value that isn't an integer afterwards
+  (`is_minor_units`) — a dot-decimal file would otherwise land 100× too small.
+  Columns and the account-type keywords are in `~/server/lib/csv-import`.
+- The **whole file is validated first**, returning row-level errors and writing
+  nothing; only then are the import row, categories, accounts, transactions and
+  counterparties created in one transaction. Accounts, categories and
+  transactions carry the `importId` that Undo soft-deletes by.
+
 ## Locales
 
 `en` and `uk`, default `uk`, with **no locale segment in URLs** (next-intl

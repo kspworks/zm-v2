@@ -48,24 +48,33 @@ import {
 } from "~/components/ui/table";
 import { useToastError } from "~/hooks/use-toast-error";
 import { isErrorKey } from "~/lib/error-keys";
+import { MAX_IMPORT_BYTES } from "~/lib/import-limits";
 import { useTRPC } from "~/trpc/react";
 import type { RouterOutputs } from "~/trpc/types";
-
-const MAX_BYTES = 256 * 1024;
 
 type RowError = { line: number; field: string; key: string };
 type ImportItem = RouterOutputs["imports"]["list"][number];
 
-const readBase64 = (file: File) =>
-  new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = String(reader.result);
-      resolve(result.slice(result.indexOf(",") + 1));
-    };
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
+/** btoa takes a binary string, and spreading the whole array overflows it */
+const toBase64 = (bytes: Uint8Array): string => {
+  let binary = "";
+
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+
+  return btoa(binary);
+};
+
+/**
+ * A ZenMoney export compresses ~6x, which keeps the request well inside the
+ * body limit serverless hosts impose. The server gunzips it.
+ */
+const gzipBase64 = async (file: File): Promise<string> => {
+  const stream = file.stream().pipeThrough(new CompressionStream("gzip"));
+
+  return toBase64(new Uint8Array(await new Response(stream).arrayBuffer()));
+};
 
 const rowErrorsOf = (error: unknown): RowError[] | null => {
   if (!(error instanceof TRPCClientError)) {
@@ -131,12 +140,12 @@ export function ImportCard() {
       return;
     }
 
-    if (file.size > MAX_BYTES) {
+    if (file.size > MAX_IMPORT_BYTES) {
       toast.error(t("tooBig"));
       return;
     }
 
-    upload.mutate({ fileName: file.name, content: await readBase64(file) });
+    upload.mutate({ fileName: file.name, content: await gzipBase64(file) });
 
     if (inputRef.current) {
       inputRef.current.value = "";
