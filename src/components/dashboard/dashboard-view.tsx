@@ -16,7 +16,8 @@ import {
 } from "nuqs";
 import { useId, useMemo } from "react";
 
-import { PageHeader } from "~/components/app/page-header";
+import { BalancesSidebar } from "~/components/app/balances-sidebar";
+import { LedgerLayout } from "~/components/app/ledger-layout";
 import { BalanceChart } from "~/components/dashboard/balance-chart";
 import { ForecastTable } from "~/components/dashboard/forecast-table";
 import { NearestPlanned } from "~/components/dashboard/nearest-planned";
@@ -218,110 +219,108 @@ export function DashboardView() {
   const noAccounts = accounts.isSuccess && currencies.length === 0;
 
   return (
-    <>
-      <PageHeader
-        title={t("title")}
-        actions={
-          currencies.length > 1 && currency ? (
-            <Tabs
-              value={currency.code}
-              onValueChange={(code) => void setState({ currency: code })}
-            >
-              <TabsList>
-                {currencies.map((c) => (
-                  <TabsTrigger key={c.id} value={c.code}>
-                    {c.code}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-          ) : null
-        }
-      />
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-4 sm:p-6">
-        {noAccounts ? (
-          <Empty className="border">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <LayoutDashboardIcon />
-              </EmptyMedia>
-              <EmptyDescription>{t("noAccounts")}</EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              <Button asChild>
-                <Link href="/accounts">{t("createAccount")}</Link>
-              </Button>
-            </EmptyContent>
-          </Empty>
-        ) : (
-          <>
-            <Card className="gap-2">
-              <CardHeader>
-                <CardTitle>{t("balance.title")}</CardTitle>
-                <CardAction>
-                  <RangePopover
-                    back={back}
-                    ahead={ahead}
-                    onChange={(value) => void setState(value)}
-                  />
-                </CardAction>
-              </CardHeader>
-              <CardContent className="px-2 sm:px-6">
-                {balance.data && currency ? (
-                  <BalanceChart
-                    points={balance.data}
-                    today={today}
-                    sign={currency.sign}
-                  />
-                ) : (
-                  <Skeleton className="h-56 w-full sm:h-80" />
-                )}
-              </CardContent>
-            </Card>
+    <LedgerLayout
+      title={t("title")}
+      filters={
+        currencies.length > 1 && currency ? (
+          <Tabs
+            value={currency.code}
+            onValueChange={(code) => void setState({ currency: code })}
+          >
+            <TabsList>
+              {currencies.map((c) => (
+                <TabsTrigger key={c.id} value={c.code}>
+                  {c.code}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        ) : null
+      }
+      sidebar={<BalancesSidebar />}
+    >
+      {noAccounts ? (
+        <Empty className="border">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <LayoutDashboardIcon />
+            </EmptyMedia>
+            <EmptyDescription>{t("noAccounts")}</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button asChild>
+              <Link href="/accounts">{t("createAccount")}</Link>
+            </Button>
+          </EmptyContent>
+        </Empty>
+      ) : (
+        <>
+          <Card className="gap-2">
+            <CardHeader>
+              <CardTitle>{t("balance.title")}</CardTitle>
+              <CardAction>
+                <RangePopover
+                  back={back}
+                  ahead={ahead}
+                  onChange={(value) => void setState(value)}
+                />
+              </CardAction>
+            </CardHeader>
+            <CardContent className="px-2 sm:px-6">
+              {balance.data && currency ? (
+                <BalanceChart
+                  points={balance.data}
+                  today={today}
+                  sign={currency.sign}
+                />
+              ) : (
+                <Skeleton className="h-56 w-full sm:h-80" />
+              )}
+            </CardContent>
+          </Card>
 
-            <Card className="gap-2">
-              <CardHeader>
-                <CardTitle>{t("forecast.title")}</CardTitle>
-                <CardAction>
-                  <ForecastOptions
-                    includeDebts={state.debts}
-                    onChange={(debts) => void setState({ debts })}
-                  />
-                </CardAction>
-              </CardHeader>
-              <CardContent>
-                {forecast.data ? (
-                  <ForecastTable months={forecast.data} today={today} />
-                ) : (
-                  <Skeleton className="h-32 w-full" />
-                )}
-              </CardContent>
-            </Card>
+          <Card className="gap-2">
+            <CardHeader>
+              <CardTitle>{t("forecast.title")}</CardTitle>
+              <CardAction>
+                <ForecastOptions
+                  includeDebts={state.debts}
+                  onChange={(debts) => void setState({ debts })}
+                />
+              </CardAction>
+            </CardHeader>
+            <CardContent>
+              {forecast.data ? (
+                <ForecastTable months={forecast.data} today={today} />
+              ) : (
+                <Skeleton className="h-32 w-full" />
+              )}
+            </CardContent>
+          </Card>
 
-            <Card className="gap-2">
-              <CardHeader>
-                <CardTitle>{t("nearest.title")}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {nearest.isPending ? (
-                  <Skeleton className="h-32 w-full" />
-                ) : nearest.data && nearest.data.length > 0 ? (
-                  <NearestPlanned days={nearest.data} today={today} />
-                ) : (
-                  <Empty>
-                    <EmptyHeader>
-                      <EmptyMedia variant="icon">
-                        <CalendarClockIcon />
-                      </EmptyMedia>
-                      <EmptyDescription>{t("nearest.empty")}</EmptyDescription>
-                    </EmptyHeader>
-                  </Empty>
-                )}
-              </CardContent>
-            </Card>
-          </>
-        )}
-      </div>
-    </>
+          <Card className="gap-2">
+            <CardHeader>
+              <CardTitle>{t("nearest.title")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {nearest.isPending ? (
+                <Skeleton className="h-32 w-full" />
+              ) : nearest.data && nearest.data.length > 0 ? (
+                <NearestPlanned days={nearest.data} today={today} />
+              ) : (
+                <Empty>
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <CalendarClockIcon />
+                    </EmptyMedia>
+                    <EmptyDescription>{t("nearest.empty")}</EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
+    </LedgerLayout>
   );
 }

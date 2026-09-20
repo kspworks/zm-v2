@@ -10,15 +10,14 @@ import {
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { type ReactNode, useState } from "react";
-
+import { BalancesSidebar } from "~/components/app/balances-sidebar";
+import { LedgerLayout } from "~/components/app/ledger-layout";
 import {
   type PlannedDialogState,
   PlannedFormDialog,
 } from "~/components/planned/planned-form-dialog";
 import { DeleteTransactionDialog } from "~/components/planned/planned-row-actions";
-import { BalancesSidebar } from "~/components/transactions/balances-sidebar";
 import { FilterButton } from "~/components/transactions/filter-bar";
-import { LedgerLayout } from "~/components/transactions/ledger-layout";
 import { OverdueBlock } from "~/components/transactions/overdue-block";
 import { RowMenu } from "~/components/transactions/row-menu";
 import { TotalsBar } from "~/components/transactions/totals-bar";

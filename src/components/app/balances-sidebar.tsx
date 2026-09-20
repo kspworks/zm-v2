@@ -74,15 +74,15 @@ function Totals({
 }
 
 /**
- * Available money, debts, and the accounts list. Clicking an account toggles
- * it in the account filter.
+ * Available money, debts, and the accounts list. Clicking an account toggles it
+ * in the account filter; without `onToggleAccount` the list is display only.
  */
 export function BalancesSidebar({
   selectedAccounts,
   onToggleAccount,
 }: {
-  selectedAccounts: string[];
-  onToggleAccount: (id: string) => void;
+  selectedAccounts?: string[];
+  onToggleAccount?: (id: string) => void;
 }) {
   const t = useTranslations("sidebar");
   const trpc = useTRPC();
@@ -163,29 +163,40 @@ export function BalancesSidebar({
         ) : (
           <ul className="-mx-2 flex flex-col">
             {active.map((account) => {
-              const selected = selectedAccounts.includes(account.id);
+              const selected = selectedAccounts?.includes(account.id) ?? false;
+              const className = cn(
+                "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm",
+                onToggleAccount && "transition-colors hover:bg-accent",
+                selected && "bg-accent font-medium",
+              );
+              const row = (
+                <>
+                  <span className="min-w-0 flex-1 truncate">
+                    {account.name}
+                  </span>
+                  <Money
+                    amount={account.balance}
+                    sign={account.currencySign}
+                    className={cn(account.balance < 0 && "text-destructive")}
+                  />
+                  {selected ? <XIcon className="size-3.5 shrink-0" /> : null}
+                </>
+              );
 
               return (
                 <li key={account.id}>
-                  <button
-                    type="button"
-                    aria-pressed={selected}
-                    onClick={() => onToggleAccount(account.id)}
-                    className={cn(
-                      "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent",
-                      selected && "bg-accent font-medium",
-                    )}
-                  >
-                    <span className="min-w-0 flex-1 truncate">
-                      {account.name}
-                    </span>
-                    <Money
-                      amount={account.balance}
-                      sign={account.currencySign}
-                      className={cn(account.balance < 0 && "text-destructive")}
-                    />
-                    {selected ? <XIcon className="size-3.5 shrink-0" /> : null}
-                  </button>
+                  {onToggleAccount ? (
+                    <button
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => onToggleAccount(account.id)}
+                      className={className}
+                    >
+                      {row}
+                    </button>
+                  ) : (
+                    <div className={className}>{row}</div>
+                  )}
                 </li>
               );
             })}

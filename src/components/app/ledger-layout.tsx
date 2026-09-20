@@ -14,8 +14,8 @@ import {
 } from "~/components/ui/sheet";
 
 /**
- * Shell shared by the Transactions and Planned pages: the list on the left,
- * the balances sidebar on the right (a sheet on smaller screens).
+ * Shell shared by the Transactions, Planned and Dashboard pages: the content on
+ * the left, the balances sidebar on the right (a sheet on smaller screens).
  */
 export function LedgerLayout({
   title,
