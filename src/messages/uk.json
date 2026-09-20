@@ -410,7 +410,7 @@
       "settled": "Ви з {name} розраховані"
     },
     "preview": "Буде показано як: {label}",
-    "submitHint": "Ctrl+Enter — зберегти",
+    "submitHint": "{shortcut} — зберегти",
     "repeat": "Повтор",
     "repeatTypes": {
       "none": "Не повторюється",

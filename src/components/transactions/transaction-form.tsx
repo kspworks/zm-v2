@@ -38,6 +38,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Textarea } from "~/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
+import { useIsMac } from "~/hooks/use-is-mac";
 import { useToastError } from "~/hooks/use-toast-error";
 import { categoryOptions } from "~/lib/category-options";
 import { formatDisplayDate } from "~/lib/dates";
@@ -229,6 +230,7 @@ export function TransactionForm({
   describeDate = formatDisplayDate,
 }: TransactionFormProps) {
   const t = useTranslations("form");
+  const isMac = useIsMac();
   const tt = useTranslations("transactions");
   const locale = useLocale();
   const trpc = useTRPC();
@@ -710,7 +712,7 @@ export function TransactionForm({
         {extraFields}
 
         <p className={cn("hidden text-muted-foreground text-xs sm:block")}>
-          {t("submitHint")}
+          {t("submitHint", { shortcut: isMac ? "⌘+Enter" : "Ctrl+Enter" })}
         </p>
       </FieldGroup>
       {footer({ pending, dirty: form.formState.isDirty })}

@@ -410,7 +410,7 @@
       "settled": "You and {name} are settled"
     },
     "preview": "Will be shown as: {label}",
-    "submitHint": "Ctrl+Enter to save",
+    "submitHint": "{shortcut} to save",
     "repeat": "Repeat",
     "repeatTypes": {
       "none": "Doesn't repeat",
