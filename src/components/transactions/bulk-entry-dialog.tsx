@@ -12,7 +12,6 @@ import { CategorySelect } from "~/components/transactions/category-select";
 import { useInvalidateMoney } from "~/components/transactions/transaction-form";
 import { useToday } from "~/components/transactions/transaction-groups";
 import { Button } from "~/components/ui/button";
-import { Field, FieldLabel } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
 import {
   Select,
@@ -33,7 +32,10 @@ type Row = {
   kind: "expense" | "income";
   amount: string;
   categoryId: string | null;
-  comment: string;
+  /** `null` is today */
+  date: string | null;
+  /** `""` is the default account */
+  accountId: string;
 };
 
 let nextKey = 1;
@@ -43,10 +45,11 @@ const emptyRow = (kind: Row["kind"] = "expense"): Row => ({
   kind,
   amount: "",
   categoryId: null,
-  comment: "",
+  date: null,
+  accountId: "",
 });
 
-/** Several rows sharing a date and an account, saved in one call */
+/** Several rows, each with its own date and account, saved in one call */
 export function BulkEntryDialog({
   open,
   onOpenChange,
@@ -69,11 +72,9 @@ export function BulkEntryDialog({
   const accountOptions = (accounts.data ?? []).filter(
     (a) => a.canWrite && a.isActive,
   );
-  const [date, setDate] = useState<string | null>(null);
-  const [accountId, setAccountId] = useState("");
   const [rows, setRows] = useState<Row[]>(() => [emptyRow(), emptyRow()]);
   const [showErrors, setShowErrors] = useState(false);
-  const selectedAccount = accountId || accountOptions[0]?.id || "";
+  const accountOf = (row: Row) => row.accountId || accountOptions[0]?.id || "";
 
   const options = useMemo(
     () => ({
@@ -118,18 +119,21 @@ export function BulkEntryDialog({
   const submit = () => {
     setShowErrors(true);
 
-    if (filled.length === 0 || invalidKeys.size > 0 || !selectedAccount) {
+    if (
+      filled.length === 0 ||
+      invalidKeys.size > 0 ||
+      filled.some((row) => !accountOf(row))
+    ) {
       return;
     }
 
     save.mutate({
       items: filled.map((row) => ({
         kind: row.kind,
-        date: date ?? today,
+        date: row.date ?? today,
         amount: parseAmountInput(row.amount) ?? 0,
-        accountId: selectedAccount,
+        accountId: accountOf(row),
         categoryId: row.categoryId,
-        comment: row.comment.trim() || null,
       })),
     });
   };
@@ -140,7 +144,7 @@ export function BulkEntryDialog({
       onOpenChange={onOpenChange}
       title={t("title")}
       description={t("description")}
-      className="sm:max-w-3xl"
+      className="sm:max-w-4xl"
       footer={
         <>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -169,38 +173,17 @@ export function BulkEntryDialog({
           }
         }}
       >
-        <div className="grid grid-cols-2 gap-3">
-          <Field>
-            <FieldLabel htmlFor="bulk-date">{t("date")}</FieldLabel>
-            <DatePicker
-              id="bulk-date"
-              value={date ?? today}
-              onChange={(value) => setDate(value)}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="bulk-account">{t("account")}</FieldLabel>
-            <Select value={selectedAccount} onValueChange={setAccountId}>
-              <SelectTrigger id="bulk-account" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {accountOptions.map((option) => (
-                  <SelectItem key={option.id} value={option.id}>
-                    {option.name} · {option.currencyCode}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-        </div>
-
         <div className="flex flex-col gap-2">
           {rows.map((row, index) => (
             <div
               key={row.key}
-              className="grid grid-cols-[auto_1fr_auto] gap-2 rounded-lg border p-2 sm:grid-cols-[auto_8rem_minmax(0,1fr)_minmax(0,1fr)_auto] sm:border-0 sm:p-0"
+              className="grid grid-cols-[auto_1fr_auto] gap-2 rounded-lg border p-2 sm:grid-cols-[9rem_auto_7rem_minmax(0,1fr)_minmax(0,1fr)_auto] sm:border-0 sm:p-0"
             >
+              <DatePicker
+                className="col-span-3 max-sm:order-1 sm:col-span-1"
+                value={row.date ?? today}
+                onChange={(date) => update(row.key, { date })}
+              />
               <Button
                 type="button"
                 variant="outline"
@@ -233,11 +216,35 @@ export function BulkEntryDialog({
                   update(row.key, { amount: event.target.value })
                 }
               />
+              <div className="col-span-3 max-sm:order-1 sm:col-span-1">
+                <CategorySelect
+                  options={options[row.kind]}
+                  value={row.categoryId}
+                  onChange={(categoryId) => update(row.key, { categoryId })}
+                />
+              </div>
+              <Select
+                value={accountOf(row)}
+                onValueChange={(accountId) => update(row.key, { accountId })}
+              >
+                <SelectTrigger
+                  aria-label={t("account")}
+                  className="col-span-3 w-full max-sm:order-1 sm:col-span-1"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {accountOptions.map((option) => (
+                    <SelectItem key={option.id} value={option.id}>
+                      {option.name} · {option.currencyCode}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="sm:order-last"
                 aria-label={t("removeRow")}
                 disabled={rows.length === 1}
                 onClick={() =>
@@ -246,23 +253,6 @@ export function BulkEntryDialog({
               >
                 <Trash2Icon />
               </Button>
-              <div className="col-span-3 sm:col-span-1">
-                <CategorySelect
-                  options={options[row.kind]}
-                  value={row.categoryId}
-                  onChange={(categoryId) => update(row.key, { categoryId })}
-                />
-              </div>
-              <Input
-                className="col-span-3 sm:col-span-1"
-                aria-label={tf("comment")}
-                placeholder={tf("comment")}
-                maxLength={500}
-                value={row.comment}
-                onChange={(event) =>
-                  update(row.key, { comment: event.target.value })
-                }
-              />
             </div>
           ))}
           <button type="submit" hidden />

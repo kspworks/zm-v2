@@ -456,7 +456,7 @@
   },
   "bulk": {
     "title": "Bulk entry",
-    "description": "Add several transactions at once. Date and account apply to every row.",
+    "description": "Add several transactions at once.",
     "addRow": "Add row",
     "removeRow": "Remove row",
     "date": "Date",
