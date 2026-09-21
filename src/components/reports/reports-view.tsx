@@ -11,6 +11,7 @@ import { PageHeader } from "~/components/app/page-header";
 import { ReportTreemap } from "~/components/reports/report-treemap";
 import { FilterButton } from "~/components/transactions/filter-bar";
 import { useToday } from "~/components/transactions/transaction-groups";
+import { useDebtLabelText } from "~/components/transactions/transaction-item";
 import { useTransactionFilter } from "~/components/transactions/use-filter";
 import { Alert, AlertDescription } from "~/components/ui/alert";
 import {
@@ -42,7 +43,7 @@ import {
 } from "~/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { formatMoney } from "~/lib/money";
-import { buildReport, colorSlots } from "~/lib/report";
+import { buildReport, colorSlots, type ReportInput } from "~/lib/report";
 import { useTRPC } from "~/trpc/react";
 
 const SLOTS = 8;
@@ -52,6 +53,7 @@ export function ReportsView() {
   const tt = useTranslations("transactions");
   const trpc = useTRPC();
   const today = useToday();
+  const debtLabelText = useDebtLabelText();
   const { state, setState, filter, reset } = useTransactionFilter();
   const [view, setView] = useState<"expense" | "income">("expense");
 
@@ -79,13 +81,27 @@ export function ReportsView() {
     enabled: range !== null,
   });
 
-  const charts = useMemo(
-    () =>
-      buildReport(data.data?.rows ?? [], view, {
-        noCategory: tt("noCategory"),
-      }),
-    [data.data, view, tt],
-  );
+  const charts = useMemo(() => {
+    // same wording as the transactions list; old rows without a
+    // counterparty say Gave/Took
+    const debtDescription = (row: ReportInput) => {
+      const name = row.counterpartyName ?? "";
+
+      if (!row.debtLabel) {
+        const direction = row.amount < 0 ? tt("gave") : tt("took");
+
+        return name ? `${direction} · ${name}` : direction;
+      }
+
+      return debtLabelText(row.debtLabel, name, row.currencySign);
+    };
+
+    return buildReport(data.data?.rows ?? [], view, {
+      noCategory: tt("noCategory"),
+      debts: t("debts"),
+      debtDescription,
+    });
+  }, [data.data, view, t, tt, debtLabelText]);
 
   // slots go to the largest tiles in the view, so the blocks that dominate
   // the chart get distinct hues; the tail and "no category" are gray. Tiles

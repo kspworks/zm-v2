@@ -1,8 +1,14 @@
+import type { DebtLabel } from "~/lib/debt-label";
+
 /** Tile key of the "No category" tile. */
 export const NO_CATEGORY_KEY = "__none__";
 
+/** Tile key of the "Debts" tile, which holds every debt pair in the view. */
+export const DEBTS_KEY = "__debts__";
+
 export type ReportInput = {
   id: string;
+  kind: "expense" | "income" | "transfer" | "debt";
   date: string;
   amount: number;
   currencyCode: string;
@@ -12,6 +18,8 @@ export type ReportInput = {
   parentId: string | null;
   parentName: string | null;
   comment: string | null;
+  counterpartyName: string | null;
+  debtLabel: DebtLabel | null;
 };
 
 export type ReportLeaf = {
@@ -41,13 +49,18 @@ export type ReportChart = {
  * One chart per currency (never summed across currencies), largest total
  * first. Expense and income are separate views: only negative or positive
  * amounts count, as absolute values. Children roll up under their parent;
- * rows without a category form a "No category" tile. Leaves are single
- * transactions. Zero-total tiles are dropped.
+ * debt pairs (lent, borrowed, repaid) form one "Debts" tile, described by
+ * `debtDescription`; other rows without a category form a "No category"
+ * tile. Leaves are single transactions. Zero-total tiles are dropped.
  */
 export const buildReport = (
   rows: ReportInput[],
   view: "expense" | "income",
-  labels: { noCategory: string },
+  labels: {
+    noCategory: string;
+    debts: string;
+    debtDescription: (row: ReportInput) => string;
+  },
 ): ReportChart[] => {
   const charts = new Map<
     string,
@@ -66,8 +79,14 @@ export const buildReport = (
     };
     charts.set(row.currencyCode, chart);
 
-    const topId = row.parentId ?? row.categoryId ?? NO_CATEGORY_KEY;
-    const topName = row.parentName ?? row.categoryName ?? labels.noCategory;
+    const isDebt = row.kind === "debt";
+    const description = isDebt ? labels.debtDescription(row) : null;
+    const topId = isDebt
+      ? DEBTS_KEY
+      : (row.parentId ?? row.categoryId ?? NO_CATEGORY_KEY);
+    const topName = isDebt
+      ? labels.debts
+      : (row.parentName ?? row.categoryName ?? labels.noCategory);
     const tile = chart.tiles.get(topId) ?? {
       key: topId,
       name: topName,
@@ -79,12 +98,14 @@ export const buildReport = (
     tile.value += value;
     tile.children.push({
       id: row.id,
-      name: row.comment ?? row.categoryName ?? labels.noCategory,
+      name: row.comment ?? description ?? row.categoryName ?? labels.noCategory,
       value,
       date: row.date,
-      category: row.parentName
-        ? `${row.parentName} → ${row.categoryName ?? ""}`
-        : (row.categoryName ?? labels.noCategory),
+      category:
+        description ??
+        (row.parentName
+          ? `${row.parentName} → ${row.categoryName ?? ""}`
+          : (row.categoryName ?? labels.noCategory)),
       comment: row.comment,
     });
   }

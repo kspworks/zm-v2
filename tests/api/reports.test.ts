@@ -55,10 +55,47 @@ describe("reports.data", () => {
     const result = await c.reports.data({ filter: range });
 
     expect(result.truncated).toBe(false);
-    expect(result.rows.map((r) => [r.amount, r.categoryName])).toEqual([
-      [-100, "Food"],
+    expect(
+      result.rows.map((r) => [
+        r.kind,
+        r.amount,
+        r.categoryName,
+        r.counterpartyName,
+        r.debtLabel?.parts ?? null,
+      ]),
+    ).toEqual([
+      ["expense", -100, "Food", null, null],
       // the debt counts by its real-account leg
-      [30, null],
+      ["debt", 30, null, "Alex", [{ kind: "borrowed", amount: 30 }]],
+    ]);
+  });
+
+  it("labels debts against the counterparty's history before the range", async () => {
+    const user = await createUser();
+    const account = await makeAccount(user);
+    const c = callerFor(user);
+
+    await c.transactions.create({
+      kind: "debt",
+      date: "2026-02-10",
+      amount: 500,
+      accountId: account.id,
+      direction: "gave",
+      counterparty: { name: "Alex" },
+    });
+    await c.transactions.create({
+      kind: "debt",
+      date: "2026-03-10",
+      amount: 300,
+      accountId: account.id,
+      direction: "took",
+      counterparty: { name: "Alex" },
+    });
+
+    const result = await c.reports.data({ filter: range });
+
+    expect(result.rows.map((r) => [r.amount, r.debtLabel])).toEqual([
+      [300, { parts: [{ kind: "repaidToMe", amount: 300 }], settles: false }],
     ]);
   });
 

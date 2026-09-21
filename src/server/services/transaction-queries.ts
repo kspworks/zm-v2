@@ -13,6 +13,7 @@ import {
   lte,
   ne,
   or,
+  param,
   type SQL,
   sql,
 } from "drizzle-orm";
@@ -396,26 +397,33 @@ const mapRow = (row: ListRow): TransactionRow => {
   };
 };
 
-/**
- * Labels debt rows via `~/lib/debt-label`. The running balance before each
- * entry is a window over the counterparty's whole history in that currency,
- * computed before (and independently of) the list filters, so filtering never
- * changes a label. Only the partitions of the given rows are scanned.
- */
-const attachDebtLabels = async (db: DbOrTx, rows: TransactionRow[]) => {
-  const debtRows = rows.filter(
-    (row) => row.kind === "debt" && row.counterparty && row.linked,
-  );
+type DebtEntry = {
+  debtLegId: string;
+  counterpartyId: string;
+  isPlanned: boolean;
+};
 
-  if (debtRows.length === 0) {
-    return;
+/**
+ * Debt wording via `~/lib/debt-label`, keyed by debt-leg id. The running
+ * balance before each entry is a window over the counterparty's whole history
+ * in that currency, computed before (and independently of) any list filters,
+ * so filtering never changes a label. Only the partitions of the given
+ * entries are scanned; ids go as one array parameter, so a report's worth of
+ * entries stays inside the bind-parameter limit.
+ */
+const debtLabelsFor = async (
+  db: DbOrTx,
+  entries: DebtEntry[],
+): Promise<Map<string, DebtLabel & { forecast: boolean }>> => {
+  const labels = new Map<string, DebtLabel & { forecast: boolean }>();
+
+  if (entries.length === 0) {
+    return labels;
   }
 
-  const debtLegId = (row: TransactionRow) =>
-    row.account.type === "debt" ? row.id : (row.linked?.id ?? "");
-  const legIds = debtRows.map(debtLegId);
+  const legIds = [...new Set(entries.map((entry) => entry.debtLegId))];
   const counterpartyIds = [
-    ...new Set(debtRows.map((row) => row.counterparty?.id ?? "")),
+    ...new Set(entries.map((entry) => entry.counterpartyId)),
   ];
 
   const t = alias(transactions, "t");
@@ -444,30 +452,57 @@ const attachDebtLabels = async (db: DbOrTx, rows: TransactionRow[]) => {
       and(
         eq(a.type, "debt"),
         isNull(t.deletedAt),
-        inArray(t.counterpartyId, counterpartyIds),
+        sql`${t.counterpartyId} = any(${param(counterpartyIds)}::text[])`,
       ),
     )
     .as("w");
 
-  const windows = await db.select().from(w).where(inArray(w.id, legIds));
+  const windows = await db
+    .select()
+    .from(w)
+    .where(sql`${w.id} = any(${param(legIds)}::text[])`);
 
   const byId = new Map(windows.map((row) => [row.id, row]));
 
-  for (const row of debtRows) {
-    const window = byId.get(debtLegId(row));
+  for (const entry of entries) {
+    const window = byId.get(entry.debtLegId);
 
     if (!window) {
       continue;
     }
 
     const before = Number(
-      row.isPlanned ? window.prevProjected : window.prevSubmitted,
+      entry.isPlanned ? window.prevProjected : window.prevSubmitted,
     );
 
-    row.debtLabel = {
+    labels.set(entry.debtLegId, {
       ...debtLabel(before, window.amount),
-      forecast: row.isPlanned,
-    };
+      forecast: entry.isPlanned,
+    });
+  }
+
+  return labels;
+};
+
+/** Labels the list's debt rows (see debtLabelsFor) */
+const attachDebtLabels = async (db: DbOrTx, rows: TransactionRow[]) => {
+  const debtLegId = (row: TransactionRow) =>
+    row.account.type === "debt" ? row.id : (row.linked?.id ?? "");
+  const debtRows = rows.filter(
+    (row) => row.kind === "debt" && row.counterparty && row.linked,
+  );
+
+  const labels = await debtLabelsFor(
+    db,
+    debtRows.map((row) => ({
+      debtLegId: debtLegId(row),
+      counterpartyId: row.counterparty?.id ?? "",
+      isPlanned: row.isPlanned,
+    })),
+  );
+
+  for (const row of debtRows) {
+    row.debtLabel = labels.get(debtLegId(row)) ?? null;
   }
 };
 
@@ -610,6 +645,7 @@ export const REPORT_LIMIT = 100_000;
 
 export type ReportRow = {
   id: string;
+  kind: (typeof transactions.$inferSelect)["kind"];
   date: string;
   amount: number;
   currencyCode: string;
@@ -619,6 +655,9 @@ export type ReportRow = {
   parentId: string | null;
   parentName: string | null;
   comment: string | null;
+  counterpartyName: string | null;
+  /** Debt wording, labelled against the counterparty's whole history */
+  debtLabel: DebtLabel | null;
 };
 
 /**
@@ -636,6 +675,7 @@ export const reportRows = async (
     db,
     {
       id: p.id,
+      kind: p.kind,
       date: p.date,
       amount:
         sql<number>`case when ${primaryIsDebtLeg} then ${l.amount} else ${p.amount} end`.mapWith(
@@ -648,6 +688,11 @@ export const reportRows = async (
       parentId: parent.id,
       parentName: parent.name,
       comment: p.comment,
+      counterpartyId: p.counterpartyId,
+      counterpartyName: cp.name,
+      debtLegId: sql<
+        string | null
+      >`case when ${primaryIsDebtLeg} then ${p.id} else ${l.id} end`,
     },
     userId,
     "submitted",
@@ -657,7 +702,27 @@ export const reportRows = async (
     .orderBy(asc(p.date), asc(p.createdAt), asc(p.id))
     .limit(limit + 1);
 
-  return { rows: rows.slice(0, limit), truncated: rows.length > limit };
+  const kept = rows.slice(0, limit);
+  const entries = kept.flatMap(({ kind, debtLegId, counterpartyId }) =>
+    kind === "debt" && debtLegId && counterpartyId
+      ? [{ debtLegId, counterpartyId, isPlanned: false }]
+      : [],
+  );
+  const labels = await debtLabelsFor(db, entries);
+
+  return {
+    rows: kept.map(({ debtLegId, counterpartyId: _, ...row }) => {
+      const label = debtLegId ? labels.get(debtLegId) : undefined;
+
+      return {
+        ...row,
+        debtLabel: label
+          ? { parts: label.parts, settles: label.settles }
+          : null,
+      };
+    }),
+    truncated: rows.length > limit,
+  };
 };
 
 export type DashboardPairRow = {

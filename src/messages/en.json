@@ -528,7 +528,8 @@
     "share": "Share",
     "date": "Date",
     "comment": "Comment",
-    "table": "As a table"
+    "table": "As a table",
+    "debts": "Debts"
   },
   "users": {
     "title": "Users",

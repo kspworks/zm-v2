@@ -2,7 +2,7 @@
 
 import { ArrowRightIcon, CheckCheckIcon, RepeatIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import type { ReactNode } from "react";
+import { type ReactNode, useCallback } from "react";
 
 import { Money } from "~/components/app/money";
 import {
@@ -36,34 +36,37 @@ export const useAccountName = () => {
 export const useDebtLabelText = () => {
   const t = useTranslations("transactions");
 
-  return (
-    label: DebtLabel & { forecast?: boolean },
-    name: string,
-    currencySign: string,
-  ): string => {
-    const prefix = label.forecast ? "debt.forecast" : "debt";
-    const [first, second] = label.parts;
+  return useCallback(
+    (
+      label: DebtLabel & { forecast?: boolean },
+      name: string,
+      currencySign: string,
+    ): string => {
+      const prefix = label.forecast ? "debt.forecast" : "debt";
+      const [first, second] = label.parts;
 
-    if (first && !second) {
-      const key = {
-        lent: "lentTo",
-        borrowed: "borrowedFrom",
-        repaid: "repaidTo",
-        repaidToMe: "repaidMe",
-      } as const;
+      if (first && !second) {
+        const key = {
+          lent: "lentTo",
+          borrowed: "borrowedFrom",
+          repaid: "repaidTo",
+          repaidToMe: "repaidMe",
+        } as const;
 
-      return t(`${prefix}.${key[first.kind]}`, { name });
-    }
+        return t(`${prefix}.${key[first.kind]}`, { name });
+      }
 
-    return label.parts
-      .map((part) =>
-        t(`${prefix}.${part.kind}`, {
-          name,
-          amount: formatMoney(part.amount, currencySign),
-        }),
-      )
-      .join(" · ");
-  };
+      return label.parts
+        .map((part) =>
+          t(`${prefix}.${part.kind}`, {
+            name,
+            amount: formatMoney(part.amount, currencySign),
+          }),
+        )
+        .join(" · ");
+    },
+    [t],
+  );
 };
 
 /** A debt row's description; old rows without a counterparty say Gave/Took */

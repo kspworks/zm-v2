@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildReport,
   colorSlots,
+  DEBTS_KEY,
   NO_CATEGORY_KEY,
   type ReportChart,
   type ReportInput,
@@ -11,6 +12,7 @@ import {
 let n = 0;
 const row = (overrides: Partial<ReportInput>): ReportInput => ({
   id: String(++n),
+  kind: "expense",
   date: "2026-03-01",
   amount: -100,
   currencyCode: "UAH",
@@ -20,10 +22,17 @@ const row = (overrides: Partial<ReportInput>): ReportInput => ({
   parentId: null,
   parentName: null,
   comment: null,
+  counterpartyName: null,
+  debtLabel: null,
   ...overrides,
 });
 
-const labels = { noCategory: "No category" };
+const labels = {
+  noCategory: "No category",
+  debts: "Debts",
+  debtDescription: (r: ReportInput) =>
+    `${r.debtLabel?.parts[0]?.kind ?? "?"} ${r.counterpartyName ?? ""}`,
+};
 
 describe("buildReport", () => {
   it("rolls children up under their parent and sorts tiles by total", () => {
@@ -108,6 +117,44 @@ describe("buildReport", () => {
       "Food",
       "bread",
     ]);
+  });
+
+  it("puts debt pairs in one Debts tile, described by their wording", () => {
+    const debt = (amount: number, name: string, comment: string | null) =>
+      row({
+        kind: "debt",
+        amount,
+        counterpartyName: name,
+        comment,
+        debtLabel: {
+          parts: [{ kind: amount < 0 ? "lent" : "borrowed", amount: -amount }],
+          settles: false,
+        },
+      });
+    const rows = [
+      debt(-300, "Alex", null),
+      debt(-200, "Sam", "for the tickets"),
+      debt(700, "Alex", null),
+      row({ amount: -50 }),
+    ];
+
+    const [expense] = buildReport(rows, "expense", labels);
+    expect(expense?.tiles.map((t) => [t.key, t.name, t.value])).toEqual([
+      [DEBTS_KEY, "Debts", 500],
+      [NO_CATEGORY_KEY, "No category", 50],
+    ]);
+    expect(
+      expense?.tiles[0]?.children.map((c) => [c.name, c.category]),
+    ).toEqual([
+      ["lent Alex", "lent Alex"],
+      ["for the tickets", "lent Sam"],
+    ]);
+
+    const [income] = buildReport(rows, "income", labels);
+    expect(income?.tiles.map((t) => [t.name, t.value])).toEqual([
+      ["Debts", 700],
+    ]);
+    expect(colorSlots([income as ReportChart], 8).get(DEBTS_KEY)).toBe(1);
   });
 });
 
