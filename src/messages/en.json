@@ -447,7 +447,7 @@
   "adjust": {
     "comment": "Balance adjustment",
     "title": "Balance adjustment",
-    "description": "Enter the account's actual balance; split the difference across income and expense categories.",
+    "description": "Enter the account's actual balance, then split the difference across income and expense categories.",
     "account": "Account",
     "actual": "Actual balance",
     "current": "Current balance",
