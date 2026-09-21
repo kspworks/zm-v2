@@ -28,6 +28,13 @@ governs. Enumerations stay in code and are cited by path here, never copied.
   rows, transactions and schedules. Every read filters `deletedAt IS NULL`, and
   uniqueness uses **partial unique indexes** `WHERE deleted_at IS NULL` — never
   a plain UNIQUE that includes `deleted_at`.
+- **Queries** use Drizzle's query builder (`select`, `insert`, `update`,
+  `delete`, `.for("update")`, `onConflictDoUpdate` …) whenever it can express
+  the statement. Reach for the `sql` template only for an expression the
+  builder lacks, embedded in a builder call, and for a whole raw statement
+  (``tx.execute(sql`…`)``) only when no builder form exists — advisory locks,
+  for example. Never build SQL with string concatenation or `sql.raw` on
+  input.
 
 ## Multi-process safety
 
