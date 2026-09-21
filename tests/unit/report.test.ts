@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { buildReport, type ReportInput } from "~/lib/report";
+import {
+  buildReport,
+  colorSlots,
+  NO_CATEGORY_KEY,
+  type ReportChart,
+  type ReportInput,
+} from "~/lib/report";
 
 let n = 0;
 const row = (overrides: Partial<ReportInput>): ReportInput => ({
@@ -102,5 +108,87 @@ describe("buildReport", () => {
       "Food",
       "bread",
     ]);
+  });
+});
+
+const chart = (
+  currencyCode: string,
+  tiles: [key: string, value: number][],
+): ReportChart => ({
+  currencyCode,
+  currencySign: "",
+  total: tiles.reduce((sum, [, value]) => sum + value, 0),
+  tiles: tiles.map(([key, value]) => ({
+    key,
+    name: key,
+    value,
+    children: [],
+  })),
+});
+
+describe("colorSlots", () => {
+  it("gives slots to the largest tiles in size order and none past the limit", () => {
+    const slots = colorSlots(
+      [
+        chart("UAH", [
+          ["rent", 900],
+          ["food", 500],
+          ["fun", 300],
+          ["misc", 100],
+        ]),
+      ],
+      2,
+    );
+
+    expect([...slots.entries()]).toEqual([
+      ["rent", 1],
+      ["food", 2],
+    ]);
+  });
+
+  it("never gives a slot to the no-category tile", () => {
+    const slots = colorSlots(
+      [
+        chart("UAH", [
+          [NO_CATEGORY_KEY, 1000],
+          ["food", 10],
+        ]),
+      ],
+      8,
+    );
+
+    expect(slots.has(NO_CATEGORY_KEY)).toBe(false);
+    expect(slots.get("food")).toBe(1);
+  });
+
+  it("sums a category across currencies", () => {
+    const slots = colorSlots(
+      [
+        chart("UAH", [
+          ["rent", 600],
+          ["food", 500],
+        ]),
+        chart("USD", [["food", 200]]),
+      ],
+      8,
+    );
+
+    expect(slots.get("food")).toBe(1);
+    expect(slots.get("rent")).toBe(2);
+  });
+
+  it("breaks ties by key", () => {
+    const slots = colorSlots(
+      [
+        chart("UAH", [
+          ["b", 100],
+          ["a", 100],
+        ]),
+      ],
+      8,
+    );
+
+    expect(slots.get("a")).toBe(1);
+    expect(slots.get("b")).toBe(2);
   });
 });

@@ -1,3 +1,6 @@
+/** Tile key of the "No category" tile. */
+export const NO_CATEGORY_KEY = "__none__";
+
 export type ReportInput = {
   id: string;
   date: string;
@@ -63,7 +66,7 @@ export const buildReport = (
     };
     charts.set(row.currencyCode, chart);
 
-    const topId = row.parentId ?? row.categoryId ?? "__none__";
+    const topId = row.parentId ?? row.categoryId ?? NO_CATEGORY_KEY;
     const topName = row.parentName ?? row.categoryName ?? labels.noCategory;
     const tile = chart.tiles.get(topId) ?? {
       key: topId,
@@ -105,4 +108,32 @@ export const buildReport = (
     })
     .filter((chart) => chart.total !== 0)
     .sort((a, b) => b.total - a.total);
+};
+
+/**
+ * Color slot (1..slots) per tile key. The largest tiles in the view win, so
+ * the blocks that dominate the chart are the ones told apart; totals are
+ * summed across currencies so a category keeps one color in every chart.
+ * "No category" and the tail past `slots` get no slot (gray).
+ */
+export const colorSlots = (
+  charts: ReportChart[],
+  slots: number,
+): Map<string, number> => {
+  const totals = new Map<string, number>();
+
+  for (const chart of charts) {
+    for (const tile of chart.tiles) {
+      if (tile.key !== NO_CATEGORY_KEY) {
+        totals.set(tile.key, (totals.get(tile.key) ?? 0) + tile.value);
+      }
+    }
+  }
+
+  return new Map(
+    [...totals.entries()]
+      .sort(([a, x], [b, y]) => y - x || (a < b ? -1 : a > b ? 1 : 0))
+      .slice(0, slots)
+      .map(([key], index) => [key, index + 1]),
+  );
 };

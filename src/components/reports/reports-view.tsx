@@ -42,7 +42,7 @@ import {
 } from "~/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { formatMoney } from "~/lib/money";
-import { buildReport } from "~/lib/report";
+import { buildReport, colorSlots } from "~/lib/report";
 import { useTRPC } from "~/trpc/react";
 
 const SLOTS = 8;
@@ -78,7 +78,6 @@ export function ReportsView() {
     }),
     enabled: range !== null,
   });
-  const categories = useQuery(trpc.categories.list.queryOptions());
 
   const charts = useMemo(
     () =>
@@ -88,23 +87,18 @@ export function ReportsView() {
     [data.data, view, tt],
   );
 
-  // color follows the category, not its rank: slots go to top-level
-  // categories in their stable list order; past 8 (and "no category") is gray
+  // slots go to the largest tiles in the view, so the blocks that dominate
+  // the chart get distinct hues; the tail and "no category" are gray. Tiles
+  // carry a name label, so identity never depends on color alone
   const colorOf = useMemo(() => {
-    const slots = new Map<string, number>();
-
-    for (const category of categories.data ?? []) {
-      if (category.parentId === null && slots.size < SLOTS) {
-        slots.set(category.id, slots.size + 1);
-      }
-    }
+    const slots = colorSlots(charts, SLOTS);
 
     return (key: string) => {
       const slot = slots.get(key);
 
       return slot ? `var(--series-${slot})` : "var(--series-other)";
     };
-  }, [categories.data]);
+  }, [charts]);
 
   return (
     <>
