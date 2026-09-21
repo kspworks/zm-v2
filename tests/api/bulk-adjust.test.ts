@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import { db } from "~/server/db";
-import { categories, transactions } from "~/server/db/schema";
+import { categories, historyLogs, transactions } from "~/server/db/schema";
 import { callerFor } from "../helpers/caller";
 import { expectTRPCError } from "../helpers/errors";
 import {
@@ -207,6 +207,99 @@ describe("transactions.adjustBalance", () => {
         actualBalance: 500,
       }),
     ).toEqual({ created: false, difference: 0 });
+    expect(await db.select().from(transactions)).toEqual([]);
+  });
+
+  it("books each split as its own row", async () => {
+    const user = await createUser({ locale: "en" });
+    const account = await makeAccount(user, { initialBalance: 300 });
+    const food = await makeCategory(user);
+    const fees = await makeCategory(user);
+
+    const result = await callerFor(user).transactions.adjustBalance({
+      accountId: account.id,
+      actualBalance: 150,
+      splits: [
+        { kind: "expense", amount: 100, categoryId: food.id },
+        { kind: "expense", amount: 50, categoryId: fees.id },
+      ],
+    });
+
+    expect(result).toMatchObject({ created: true, difference: -150 });
+    const rows = await db.select().from(transactions);
+    expect(
+      rows
+        .map((row) => ({ amount: row.amount, categoryId: row.categoryId }))
+        .sort((a, b) => a.amount - b.amount),
+    ).toEqual([
+      { amount: -100, categoryId: food.id },
+      { amount: -50, categoryId: fees.id },
+    ]);
+    expect(rows.every((row) => row.comment === "Balance adjustment")).toBe(
+      true,
+    );
+    expect(
+      await db
+        .select()
+        .from(historyLogs)
+        .where(eq(historyLogs.entityType, "transaction")),
+    ).toHaveLength(2);
+    expect(await balanceOf(user, account.id)).toBe(150);
+  });
+
+  it("mixes income and expense splits whose net is the difference", async () => {
+    const user = await createUser();
+    const account = await makeAccount(user);
+
+    await callerFor(user).transactions.adjustBalance({
+      accountId: account.id,
+      actualBalance: 100,
+      splits: [
+        { kind: "income", amount: 130, categoryId: null },
+        { kind: "expense", amount: 30, categoryId: null },
+      ],
+    });
+
+    expect(await db.select().from(transactions)).toHaveLength(2);
+    expect(await balanceOf(user, account.id)).toBe(100);
+  });
+
+  it("refuses splits that don't add up to the difference", async () => {
+    const user = await createUser();
+    const account = await makeAccount(user, { initialBalance: 300 });
+
+    await expectTRPCError(
+      callerFor(user).transactions.adjustBalance({
+        accountId: account.id,
+        actualBalance: 150,
+        splits: [{ kind: "expense", amount: 100, categoryId: null }],
+      }),
+      "BAD_REQUEST",
+      "adjust_balance_changed",
+    );
+    expect(await db.select().from(transactions)).toEqual([]);
+  });
+
+  it("checks every split's category and writes nothing on failure", async () => {
+    const user = await createUser();
+    const account = await makeAccount(user, { initialBalance: 300 });
+    const incomeOnly = await makeCategory(user, {
+      isExpense: false,
+      isIncome: true,
+    });
+
+    await expectTRPCError(
+      callerFor(user).transactions.adjustBalance({
+        accountId: account.id,
+        actualBalance: 150,
+        splits: [
+          { kind: "expense", amount: 100, categoryId: null },
+          { kind: "expense", amount: 50, categoryId: incomeOnly.id },
+        ],
+      }),
+      "BAD_REQUEST",
+      "fields_integrity_not_expense_category",
+    );
     expect(await db.select().from(transactions)).toEqual([]);
   });
 

@@ -49,6 +49,7 @@ export const ERROR_KEYS = [
   "amount_sign",
   "not_planned",
   "not_recurring",
+  "adjust_balance_changed",
 ] as const;
 
 export type ErrorKey = (typeof ERROR_KEYS)[number];

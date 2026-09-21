@@ -189,6 +189,7 @@
     "unknown_currency": "Unknown currency",
     "amount_sign": "The amount has the wrong sign",
     "not_planned": "This transaction is not planned",
+    "adjust_balance_changed": "The balance has changed since you opened the form, check the amounts and try again",
     "not_recurring": "This transaction doesn't repeat"
   },
   "notFound": {
@@ -446,13 +447,18 @@
   "adjust": {
     "comment": "Balance adjustment",
     "title": "Balance adjustment",
-    "description": "Enter the account's actual balance; the difference is recorded as an expense or income.",
+    "description": "Enter the account's actual balance; split the difference across income and expense categories.",
     "account": "Account",
     "actual": "Actual balance",
     "current": "Current balance",
     "difference": "Difference",
     "nothing": "The balance already matches, nothing to record.",
-    "done": "Balance adjusted"
+    "done": "Balance adjusted",
+    "income": "Income",
+    "expenses": "Expenses",
+    "addRow": "Add row",
+    "removeRow": "Remove row",
+    "overflow": "The rows add up to more than the difference"
   },
   "bulk": {
     "title": "Bulk entry",

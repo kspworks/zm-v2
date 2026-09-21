@@ -7,6 +7,7 @@ import {
 } from "~/lib/validators/common";
 import {
   listInputSchema,
+  magnitudeSchema,
   transactionFilterSchema,
   transactionInputSchema,
   transactionUpdateSchema,
@@ -97,6 +98,18 @@ export const transactionsRouter = createTRPCRouter({
         accountId: idSchema,
         actualBalance: minorUnitsSchema,
         date: calendarDateSchema.nullish(),
+        splits: z
+          .array(
+            z.object({
+              kind: z.enum(["expense", "income"]),
+              amount: magnitudeSchema,
+              categoryId: idSchema
+                .nullish()
+                .transform((value) => value ?? null),
+            }),
+          )
+          .max(100)
+          .nullish(),
       }),
     )
     .mutation(({ ctx, input }) => adjustBalance(ctx.db, ctx.user.id, input)),
