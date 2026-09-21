@@ -12,10 +12,7 @@
       "!**/drizzle/**/*",
       "!vercel.json",
       "!knip.json",
-      "!.pnpm-store/**/*",
-      "!src/components/ui/**/*",
-      "!src/hooks/use-mobile.ts",
-      "!src/lib/utils.ts"
+      "!.pnpm-store/**/*"
     ]
   },
   "formatter": {
@@ -52,6 +49,14 @@
         "noReExportAll": "error"
       },
       "style": {
+        "noRestrictedGlobals": {
+          "level": "error",
+          "options": {
+            "deniedGlobals": {
+              "React": "Import what you use from \"react\" instead of the UMD global."
+            }
+          }
+        },
         "noYodaExpression": "error",
         "useBlockStatements": "error",
         "useConsistentArrayType": "error",
@@ -67,6 +72,40 @@
       }
     }
   },
+  "overrides": [
+    {
+      // Vendored shadcn code keeps its upstream style and gets only the
+      // UMD-global check. A rule or domain turned on above needs an "off"
+      // here, or it leaks into these files.
+      "includes": [
+        "src/components/ui/**",
+        "src/hooks/use-mobile.ts",
+        "src/lib/utils.ts"
+      ],
+      "formatter": { "enabled": false },
+      "assist": { "enabled": false },
+      "linter": {
+        "domains": { "next": "none", "react": "none" },
+        "rules": {
+          "preset": "none",
+          "correctness": { "noUnusedImports": "off" },
+          "nursery": { "useSortedClasses": "off" },
+          "performance": { "noBarrelFile": "off", "noReExportAll": "off" },
+          "style": {
+            "noYodaExpression": "off",
+            "useBlockStatements": "off",
+            "useConsistentArrayType": "off",
+            "useConsistentBuiltinInstantiation": "off",
+            "useFilenamingConvention": "off",
+            "useForOf": "off",
+            "useThrowOnlyError": "off",
+            "useAtIndex": "off"
+          },
+          "suspicious": { "noEmptyBlockStatements": "off", "noConsole": "off" }
+        }
+      }
+    }
+  ],
   "css": {
     "parser": {
       "tailwindDirectives": true

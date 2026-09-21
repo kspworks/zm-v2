@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import {
   Body,
   Button,
@@ -41,7 +42,7 @@ export type ShortageSection = {
   currencySign: string;
 };
 
-const renderBoth = async (element: React.ReactElement) => ({
+const renderBoth = async (element: ReactElement) => ({
   html: await render(element),
   text: await render(element, { plainText: true }),
 });
