@@ -6,6 +6,7 @@ import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceArea,
   ReferenceLine,
   Tooltip,
   type TooltipContentProps,
@@ -24,6 +25,34 @@ import { cn } from "~/lib/utils";
 /** Whole units with thousands grouping, for the Y axis */
 const axisMoney = (minor: number) =>
   formatMoney(Math.round(minor / 100) * 100).replace(/\.00$/, "");
+
+/** Y axis tick that can pick out the zero line, where the money runs out */
+function MoneyTick({
+  x,
+  y,
+  payload,
+  highlightZero,
+}: {
+  x?: number | string;
+  y?: number | string;
+  payload?: { value: number };
+  highlightZero?: boolean;
+}) {
+  const zero = highlightZero && payload?.value === 0;
+  return (
+    <text
+      x={x}
+      y={y}
+      dy="0.355em"
+      textAnchor="end"
+      className={
+        zero ? "fill-destructive font-semibold" : "fill-muted-foreground"
+      }
+    >
+      {axisMoney(payload?.value ?? 0)}
+    </text>
+  );
+}
 
 function PointTooltip({
   active,
@@ -120,6 +149,12 @@ export function BalanceChart({
   } satisfies ChartConfig;
   // many days: smaller dots so the line stays readable
   const r = points.length > 45 ? 1.5 : 2.5;
+  // the below-zero tint reaches past the lowest point, clipped to the plot
+  const lowest = Math.min(
+    0,
+    ...points.flatMap((p) => [p.actual ?? 0, p.planned ?? 0]),
+  );
+  const belowZero = lowest < 0;
 
   return (
     <ChartContainer config={config} className="aspect-auto h-56 w-full sm:h-80">
@@ -141,7 +176,7 @@ export function BalanceChart({
           width={72}
           tickLine={false}
           axisLine={false}
-          tickFormatter={axisMoney}
+          tick={<MoneyTick highlightZero={belowZero} />}
           domain={["auto", "auto"]}
         />
         <ReferenceLine
@@ -150,6 +185,26 @@ export function BalanceChart({
           strokeDasharray="3 3"
           strokeOpacity={0.6}
         />
+        {/* zero is marked only once the balance goes below it */}
+        {belowZero ? (
+          <>
+            <ReferenceArea
+              y1={lowest * 2}
+              y2={0}
+              fill="var(--destructive)"
+              fillOpacity={0.06}
+              strokeOpacity={0}
+              ifOverflow="hidden"
+            />
+            <ReferenceLine
+              y={0}
+              stroke="var(--destructive)"
+              strokeWidth={1.5}
+              strokeOpacity={0.8}
+              ifOverflow="discard"
+            />
+          </>
+        ) : null}
         <Tooltip
           cursor={{ stroke: "var(--border)" }}
           content={({ active, payload }) => (
