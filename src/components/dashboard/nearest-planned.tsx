@@ -11,6 +11,11 @@ import {
   TableHead,
   TableRow,
 } from "~/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 import type { Locale } from "~/i18n/config";
 import { formatListDate, relativeDay } from "~/lib/dates";
 import { cn } from "~/lib/utils";
@@ -41,9 +46,18 @@ function ItemLine({ item }: { item: Item }) {
   return (
     <div className="flex items-baseline justify-between gap-2 text-sm">
       <span className="flex min-w-0 flex-col">
-        <span className="truncate" title={item.comment ?? undefined}>
-          {label(item)}
-        </span>
+        {item.comment ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="truncate">{label(item)}</span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-sm whitespace-pre-wrap">
+              {item.comment}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <span className="truncate">{label(item)}</span>
+        )}
         {item.overdue ? (
           <span className="text-destructive text-xs">{t("overdue")}</span>
         ) : null}
