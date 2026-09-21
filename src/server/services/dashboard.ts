@@ -21,15 +21,28 @@ import {
   nearestPlannedDates,
 } from "~/server/services/transaction-queries";
 
+type ScopeInput = {
+  currencyId: string;
+  /** Narrows the scope; omitted means every account in it */
+  accountIds?: string[];
+  /** Without it debt pairs in the window count nowhere */
+  includeDebts?: boolean;
+};
+
 /**
  * The balance scope, matching the sidebar's "Available": readable, active,
- * non-debt accounts in one currency.
+ * non-debt accounts in one currency, narrowed to `accountIds` when given.
+ * IDs outside that set are ignored.
  */
 const scopeAccounts = async (
   db: DbOrTx,
   userId: string,
-  currencyId: string,
+  { currencyId, accountIds }: ScopeInput,
 ) => {
+  if (accountIds?.length === 0) {
+    return { ids: [], initial: 0 };
+  }
+
   const rows = await readableAccounts(
     db,
     userId,
@@ -37,6 +50,7 @@ const scopeAccounts = async (
       eq(accounts.currencyId, currencyId),
       eq(accounts.isActive, true),
       ne(accounts.type, "debt"),
+      accountIds ? inArray(accounts.id, accountIds) : undefined,
     ),
   );
 
@@ -124,6 +138,7 @@ const windowEntries = async (
   ids: string[],
   start: string,
   end: string,
+  includeDebts = true,
 ) => {
   if (ids.length === 0) {
     return [];
@@ -138,7 +153,11 @@ const windowEntries = async (
     dashboardPairs(db, userId, "planned", { accountIds: ids, endDate: end }),
   ]);
 
-  return netEntries([...submitted, ...planned], ids);
+  const entries = netEntries([...submitted, ...planned], ids);
+
+  return includeDebts
+    ? entries
+    : entries.filter((entry) => entry.kind !== "debt");
 };
 
 const shift = (date: string, days: number) =>
@@ -147,15 +166,15 @@ const shift = (date: string, days: number) =>
 export const balanceSeries = async (
   db: DbOrTx,
   userId: string,
-  input: { currencyId: string; back: number; ahead: number },
+  input: ScopeInput & { back: number; ahead: number },
   today: string = todayInAppZone(),
 ): Promise<BalancePoint[]> => {
   const start = shift(today, -input.back);
   const end = shift(today, input.ahead);
-  const scope = await scopeAccounts(db, userId, input.currencyId);
+  const scope = await scopeAccounts(db, userId, input);
   const [opening, entries] = await Promise.all([
     balanceBefore(db, scope, start),
-    windowEntries(db, userId, scope.ids, start, end),
+    windowEntries(db, userId, scope.ids, start, end, input.includeDebts),
   ]);
 
   return buildBalanceSeries({ opening, entries, start, end, today });
@@ -164,22 +183,17 @@ export const balanceSeries = async (
 export const forecast = async (
   db: DbOrTx,
   userId: string,
-  input: { currencyId: string; includeDebts?: boolean },
+  input: ScopeInput,
   today: string = todayInAppZone(),
 ): Promise<ForecastMonth[]> => {
   const { start, end } = forecastWindow(today);
-  const scope = await scopeAccounts(db, userId, input.currencyId);
+  const scope = await scopeAccounts(db, userId, input);
   const [opening, entries] = await Promise.all([
     balanceBefore(db, scope, start),
-    windowEntries(db, userId, scope.ids, start, end),
+    windowEntries(db, userId, scope.ids, start, end, input.includeDebts),
   ]);
 
-  return buildForecast({
-    opening,
-    entries,
-    today,
-    includeDebts: input.includeDebts,
-  });
+  return buildForecast({ opening, entries, today });
 };
 
 export type NearestItem = DashboardEntry & {

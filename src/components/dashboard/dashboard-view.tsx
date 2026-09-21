@@ -8,13 +8,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import {
-  parseAsBoolean,
-  parseAsInteger,
-  parseAsString,
-  useQueryStates,
-} from "nuqs";
-import { useId, useMemo } from "react";
+import { parseAsString, useQueryStates } from "nuqs";
+import { type ReactNode, useId, useMemo } from "react";
+import { z } from "zod";
 
 import { BalancesSidebar } from "~/components/app/balances-sidebar";
 import { LedgerLayout } from "~/components/app/ledger-layout";
@@ -43,14 +39,15 @@ import { Label } from "~/components/ui/label";
 import {
   Popover,
   PopoverContent,
-  PopoverDescription,
   PopoverHeader,
   PopoverTitle,
   PopoverTrigger,
 } from "~/components/ui/popover";
+import { Separator } from "~/components/ui/separator";
 import { Skeleton } from "~/components/ui/skeleton";
 import { Switch } from "~/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { useLocalStorage } from "~/hooks/use-local-storage";
 import {
   clampRange,
   RANGE_DEFAULT,
@@ -59,21 +56,30 @@ import {
 } from "~/lib/dashboard";
 import { useTRPC } from "~/trpc/react";
 
-const parsers = {
-  currency: parseAsString,
-  back: parseAsInteger.withDefault(RANGE_DEFAULT),
-  ahead: parseAsInteger.withDefault(RANGE_DEFAULT),
-  debts: parseAsBoolean.withDefault(true),
-};
+const parsers = { currency: parseAsString };
 
-function RangePopover({
+const rangeSchema = z.object({
+  back: z.number().transform(clampRange),
+  ahead: z.number().transform(clampRange),
+});
+const RANGE_FALLBACK = { back: RANGE_DEFAULT, ahead: RANGE_DEFAULT };
+
+/** Accounts switched off (so new ones start on) and whether debts count */
+const scopeSchema = z.object({
+  excluded: z.array(z.string()),
+  debts: z.boolean(),
+});
+type Scope = z.infer<typeof scopeSchema>;
+const SCOPE_FALLBACK: Scope = { excluded: [], debts: true };
+
+function RangeFields({
   back,
   ahead,
   onChange,
 }: {
   back: number;
   ahead: number;
-  onChange: (value: { back?: number; ahead?: number }) => void;
+  onChange: (value: { back: number; ahead: number }) => void;
 }) {
   const t = useTranslations("dashboard.balance");
   const id = useId();
@@ -95,7 +101,7 @@ function RangePopover({
 
           event.target.value = String(next);
           if (next !== value) {
-            onChange({ [key]: next });
+            onChange({ back, ahead, [key]: next });
           }
         }}
         onKeyDown={(event) => {
@@ -108,62 +114,93 @@ function RangePopover({
   );
 
   return (
+    <div className="flex flex-col gap-2">
+      <p className="font-medium text-sm">{t("range")}</p>
+      <p className="text-muted-foreground text-sm">
+        {t("rangeHint", { min: RANGE_MIN, max: RANGE_MAX })}
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        {field("back", back)}
+        {field("ahead", ahead)}
+      </div>
+    </div>
+  );
+}
+
+/** Which accounts (and whether debts) a card covers, plus any extra fields */
+function ScopeOptions({
+  accounts,
+  scope,
+  onChange,
+  children,
+}: {
+  accounts: { id: string; name: string }[];
+  scope: Scope;
+  onChange: (scope: Scope) => void;
+  children?: ReactNode;
+}) {
+  const t = useTranslations("dashboard.options");
+  const id = useId();
+
+  const toggle = (accountId: string, on: boolean) =>
+    onChange({
+      ...scope,
+      excluded: on
+        ? scope.excluded.filter((x) => x !== accountId)
+        : [...scope.excluded, accountId],
+    });
+
+  const row = (
+    key: string,
+    label: string,
+    checked: boolean,
+    set: (on: boolean) => void,
+  ) => (
+    <Field key={key} orientation="horizontal">
+      <Switch id={`${id}-${key}`} checked={checked} onCheckedChange={set} />
+      <FieldLabel
+        htmlFor={`${id}-${key}`}
+        className="min-w-0 truncate font-normal"
+      >
+        {label}
+      </FieldLabel>
+    </Field>
+  );
+
+  return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label={t("range")}>
+        <Button variant="ghost" size="icon-sm" aria-label={t("title")}>
           <SlidersHorizontalIcon />
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-64">
         <PopoverHeader>
-          <PopoverTitle>{t("range")}</PopoverTitle>
-          <PopoverDescription>
-            {t("rangeHint", { min: RANGE_MIN, max: RANGE_MAX })}
-          </PopoverDescription>
+          <PopoverTitle>{t("title")}</PopoverTitle>
         </PopoverHeader>
-        <div className="grid grid-cols-2 gap-3">
-          {field("back", back)}
-          {field("ahead", ahead)}
+        {children ? (
+          <>
+            {children}
+            <Separator />
+          </>
+        ) : null}
+        <div className="flex flex-col gap-2">
+          <p className="font-medium text-sm">{t("accounts")}</p>
+          <div className="-mx-1 -my-2 flex max-h-72 flex-col gap-2 overflow-y-auto px-1 py-2">
+            {accounts.map((account) =>
+              row(
+                account.id,
+                account.name,
+                !scope.excluded.includes(account.id),
+                (on) => toggle(account.id, on),
+              ),
+            )}
+          </div>
+          <Separator />
+          {row("debts", t("debts"), scope.debts, (debts) =>
+            onChange({ ...scope, debts }),
+          )}
         </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-function ForecastOptions({
-  includeDebts,
-  onChange,
-}: {
-  includeDebts: boolean;
-  onChange: (value: boolean) => void;
-}) {
-  const t = useTranslations("dashboard.forecast");
-  const id = useId();
-
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label={t("options")}>
-          <SlidersHorizontalIcon />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-auto">
-        <PopoverHeader>
-          <PopoverTitle>{t("options")}</PopoverTitle>
-        </PopoverHeader>
-        <Field orientation="horizontal">
-          <Switch
-            id={`${id}-debts`}
-            checked={includeDebts}
-            onCheckedChange={onChange}
-          />
-          <FieldLabel
-            htmlFor={`${id}-debts`}
-            className="whitespace-nowrap font-normal"
-          >
-            {t("includeDebts")}
-          </FieldLabel>
-        </Field>
       </PopoverContent>
     </Popover>
   );
@@ -174,8 +211,21 @@ export function DashboardView() {
   const trpc = useTRPC();
   const today = useToday();
   const [state, setState] = useQueryStates(parsers);
-  const back = clampRange(state.back);
-  const ahead = clampRange(state.ahead);
+  const [range, setRange, rangeReady] = useLocalStorage(
+    "zm.dashboard.balance.range",
+    rangeSchema,
+    RANGE_FALLBACK,
+  );
+  const [balanceScope, setBalanceScope, balanceReady] = useLocalStorage(
+    "zm.dashboard.balance.scope",
+    scopeSchema,
+    SCOPE_FALLBACK,
+  );
+  const [forecastScope, setForecastScope, forecastReady] = useLocalStorage(
+    "zm.dashboard.forecast.scope",
+    scopeSchema,
+    SCOPE_FALLBACK,
+  );
 
   const accounts = useQuery(trpc.accounts.list.queryOptions());
 
@@ -199,20 +249,31 @@ export function DashboardView() {
   const currency =
     currencies.find((c) => c.code === state.currency) ?? currencies[0];
 
+  const currencyAccounts = useMemo(
+    () =>
+      (accounts.data ?? []).filter(
+        (account) => account.isActive && account.currencyId === currency?.id,
+      ),
+    [accounts.data, currency?.id],
+  );
+  const scopeInput = (scope: Scope) => ({
+    currencyId: currency?.id ?? "",
+    accountIds: currencyAccounts
+      .filter((account) => !scope.excluded.includes(account.id))
+      .map((account) => account.id),
+    includeDebts: scope.debts,
+  });
+
   const balance = useQuery({
     ...trpc.dashboard.balance.queryOptions({
-      currencyId: currency?.id ?? "",
-      back,
-      ahead,
+      ...scopeInput(balanceScope),
+      ...range,
     }),
-    enabled: !!currency,
+    enabled: !!currency && rangeReady && balanceReady,
   });
   const forecast = useQuery({
-    ...trpc.dashboard.forecast.queryOptions({
-      currencyId: currency?.id ?? "",
-      includeDebts: state.debts,
-    }),
-    enabled: !!currency,
+    ...trpc.dashboard.forecast.queryOptions(scopeInput(forecastScope)),
+    enabled: !!currency && forecastReady,
   });
   const nearest = useQuery(trpc.dashboard.nearest.queryOptions());
 
@@ -259,11 +320,17 @@ export function DashboardView() {
             <CardHeader>
               <CardTitle>{t("balance.title")}</CardTitle>
               <CardAction>
-                <RangePopover
-                  back={back}
-                  ahead={ahead}
-                  onChange={(value) => void setState(value)}
-                />
+                <ScopeOptions
+                  accounts={currencyAccounts}
+                  scope={balanceScope}
+                  onChange={setBalanceScope}
+                >
+                  <RangeFields
+                    back={range.back}
+                    ahead={range.ahead}
+                    onChange={setRange}
+                  />
+                </ScopeOptions>
               </CardAction>
             </CardHeader>
             <CardContent className="px-2 sm:px-6">
@@ -283,9 +350,10 @@ export function DashboardView() {
             <CardHeader>
               <CardTitle>{t("forecast.title")}</CardTitle>
               <CardAction>
-                <ForecastOptions
-                  includeDebts={state.debts}
-                  onChange={(debts) => void setState({ debts })}
+                <ScopeOptions
+                  accounts={currencyAccounts}
+                  scope={forecastScope}
+                  onChange={setForecastScope}
                 />
               </CardAction>
             </CardHeader>

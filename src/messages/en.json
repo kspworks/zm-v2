@@ -502,9 +502,12 @@
       "title": "Forecast",
       "income": "Income",
       "expense": "Expense",
-      "balance": "Balance",
-      "options": "Options",
-      "includeDebts": "Include debts in incomes/expenses"
+      "balance": "Balance"
+    },
+    "options": {
+      "title": "Options",
+      "accounts": "Accounts",
+      "debts": "Debts"
     },
     "nearest": {
       "title": "Nearest planned",

@@ -11,18 +11,20 @@ import {
 
 const days = z.number().int().min(RANGE_MIN).max(RANGE_MAX);
 
+/** The selected accounts (all when omitted) and whether debt pairs count */
+const scope = {
+  currencyId: idSchema,
+  accountIds: z.array(idSchema).max(200).optional(),
+  includeDebts: z.boolean().default(true),
+};
+
 export const dashboardRouter = createTRPCRouter({
   balance: protectedProcedure
-    .input(z.object({ currencyId: idSchema, back: days, ahead: days }))
+    .input(z.object({ ...scope, back: days, ahead: days }))
     .query(({ ctx, input }) => balanceSeries(ctx.db, ctx.user.id, input)),
 
   forecast: protectedProcedure
-    .input(
-      z.object({
-        currencyId: idSchema,
-        includeDebts: z.boolean().default(true),
-      }),
-    )
+    .input(z.object(scope))
     .query(({ ctx, input }) => forecast(ctx.db, ctx.user.id, input)),
 
   nearest: protectedProcedure.query(({ ctx }) =>

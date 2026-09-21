@@ -186,6 +186,47 @@ describe("dashboard.balance", () => {
     expect(point(points, "2026-03-15").actual).toBe(700);
   });
 
+  it("narrows to the selected accounts, ignoring ones out of reach", async () => {
+    const user = await createUser();
+    const other = await createUser();
+    const card = await makeAccount(user, { initialBalance: 1000 });
+    const cash = await makeAccount(user, {
+      type: "cash",
+      initialBalance: 50,
+    });
+    const hidden = await makeAccount(other, { initialBalance: 99_999 });
+    const c = callerFor(user);
+
+    await c.transactions.create({
+      kind: "income",
+      date: "2026-03-14",
+      amount: 300,
+      accountId: cash.id,
+    });
+    await c.transactions.create({
+      kind: "expense",
+      date: "2026-03-14",
+      amount: 200,
+      accountId: card.id,
+    });
+
+    const only = (accountIds: string[]) =>
+      c.dashboard.balance({ currencyId: CURRENCY.UAH, accountIds, ...range });
+
+    const cardOnly = await only([card.id, hidden.id]);
+    expect(point(cardOnly, "2026-03-12").actual).toBe(1000);
+    expect(point(cardOnly, "2026-03-15").actual).toBe(800);
+
+    const none = await only([]);
+    expect(none.every((p) => (p.actual ?? p.planned) === 0)).toBe(true);
+
+    const all = await c.dashboard.balance({
+      currencyId: CURRENCY.UAH,
+      ...range,
+    });
+    expect(point(all, "2026-03-15").actual).toBe(1150);
+  });
+
   it("rejects a range outside 1..90 days", async () => {
     const user = await createUser();
 
@@ -262,6 +303,61 @@ describe("dashboard.forecast", () => {
       expect(m.balance).toBe(previous + m.income + m.expense);
       previous = m.balance;
     }
+  });
+});
+
+describe("dashboard scope: debts", () => {
+  it("drops debt pairs from income, expense and balance when excluded", async () => {
+    const user = await createUser();
+    const card = await makeAccount(user, { initialBalance: 10_000 });
+    const c = callerFor(user);
+
+    await c.transactions.create({
+      kind: "expense",
+      date: "2026-03-02",
+      amount: 1000,
+      accountId: card.id,
+    });
+    await c.transactions.create({
+      kind: "debt",
+      date: "2026-03-10",
+      amount: 2500,
+      accountId: card.id,
+      direction: "gave",
+      counterparty: { name: "Alex" },
+    });
+
+    const [withDebts] = await c.dashboard.forecast({
+      currencyId: CURRENCY.UAH,
+    });
+    expect(withDebts).toEqual({
+      month: "2026-03",
+      income: 0,
+      expense: -3500,
+      balance: 6500,
+    });
+
+    const [without] = await c.dashboard.forecast({
+      currencyId: CURRENCY.UAH,
+      includeDebts: false,
+    });
+    expect(without).toEqual({
+      month: "2026-03",
+      income: 0,
+      expense: -1000,
+      balance: 9000,
+    });
+
+    const points = await c.dashboard.balance({
+      currencyId: CURRENCY.UAH,
+      includeDebts: false,
+      back: 10,
+      ahead: 1,
+    });
+    expect(point(points, "2026-03-15").actual).toBe(9000);
+    expect(points.flatMap((p) => p.items).some((i) => i.kind === "debt")).toBe(
+      false,
+    );
   });
 });
 
