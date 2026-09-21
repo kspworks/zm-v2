@@ -73,7 +73,7 @@ export default defineConfig({
     },
     {
       name: "desktop",
-      testIgnore: /(anonymous|mobile)\.spec\.ts$/,
+      testIgnore: /(anonymous|mobile|screenshots)\.spec\.ts$/,
       dependencies: ["setup"],
       use: { ...devices["Desktop Chrome"], storageState: AUTH_STATE },
     },

@@ -28,6 +28,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:db": "tsx e2e/setup-db.ts",
+    "screenshots": "playwright test -c playwright.screenshots.config.ts",
     "knip": "SKIP_ENV_VALIDATION=1 knip",
     "check-updates": "npm-check-updates"
   },
