@@ -4,7 +4,7 @@ import {
   buildReport,
   colorSlots,
   DEBTS_KEY,
-  NO_CATEGORY_KEY,
+  NONE_KEY,
   type ReportChart,
   type ReportInput,
 } from "~/lib/report";
@@ -17,11 +17,14 @@ const row = (overrides: Partial<ReportInput>): ReportInput => ({
   amount: -100,
   currencyCode: "UAH",
   currencySign: "₴",
+  accountId: "card",
+  accountName: "Card",
   categoryId: null,
   categoryName: null,
   parentId: null,
   parentName: null,
   comment: null,
+  counterpartyId: null,
   counterpartyName: null,
   debtLabel: null,
   ...overrides,
@@ -29,6 +32,7 @@ const row = (overrides: Partial<ReportInput>): ReportInput => ({
 
 const labels = {
   noCategory: "No category",
+  noCounterparty: "No counterparty",
   debts: "Debts",
   debtDescription: (r: ReportInput) =>
     `${r.debtLabel?.parts[0]?.kind ?? "?"} ${r.counterpartyName ?? ""}`,
@@ -50,6 +54,7 @@ describe("buildReport", () => {
         row({ amount: -50 }),
       ],
       "expense",
+      "category",
       labels,
     );
 
@@ -73,8 +78,10 @@ describe("buildReport", () => {
       row({ amount: 400, categoryId: "a", categoryName: "A" }),
     ];
 
-    expect(buildReport(rows, "expense", labels)[0]?.total).toBe(100);
-    expect(buildReport(rows, "income", labels)[0]?.total).toBe(400);
+    expect(buildReport(rows, "expense", "category", labels)[0]?.total).toBe(
+      100,
+    );
+    expect(buildReport(rows, "income", "category", labels)[0]?.total).toBe(400);
   });
 
   it("makes one chart per currency, largest total first, never mixing them", () => {
@@ -85,6 +92,7 @@ describe("buildReport", () => {
         row({ amount: -200, currencyCode: "USD", currencySign: "$" }),
       ],
       "expense",
+      "category",
       labels,
     );
 
@@ -95,7 +103,9 @@ describe("buildReport", () => {
   });
 
   it("returns nothing for an empty view", () => {
-    expect(buildReport([row({ amount: -1 })], "income", labels)).toEqual([]);
+    expect(
+      buildReport([row({ amount: -1 })], "income", "category", labels),
+    ).toEqual([]);
   });
 
   it("names leaves by comment, falling back to the category", () => {
@@ -110,6 +120,7 @@ describe("buildReport", () => {
         row({ amount: -2, categoryId: "f", categoryName: "Food" }),
       ],
       "expense",
+      "category",
       labels,
     );
 
@@ -138,10 +149,10 @@ describe("buildReport", () => {
       row({ amount: -50 }),
     ];
 
-    const [expense] = buildReport(rows, "expense", labels);
+    const [expense] = buildReport(rows, "expense", "category", labels);
     expect(expense?.tiles.map((t) => [t.key, t.name, t.value])).toEqual([
       [DEBTS_KEY, "Debts", 500],
-      [NO_CATEGORY_KEY, "No category", 50],
+      [NONE_KEY, "No category", 50],
     ]);
     expect(
       expense?.tiles[0]?.children.map((c) => [c.name, c.category]),
@@ -150,11 +161,64 @@ describe("buildReport", () => {
       ["for the tickets", "lent Sam"],
     ]);
 
-    const [income] = buildReport(rows, "income", labels);
+    const [income] = buildReport(rows, "income", "category", labels);
     expect(income?.tiles.map((t) => [t.name, t.value])).toEqual([
       ["Debts", 700],
     ]);
     expect(colorSlots([income as ReportChart], 8).get(DEBTS_KEY)).toBe(1);
+  });
+
+  it("groups by the account, debts on their real account", () => {
+    const [chart] = buildReport(
+      [
+        row({ amount: -300, categoryId: "food", categoryName: "Food" }),
+        row({ amount: -100, accountId: "cash", accountName: "Cash" }),
+        row({
+          kind: "debt",
+          amount: -200,
+          counterpartyId: "alex",
+          counterpartyName: "Alex",
+        }),
+      ],
+      "expense",
+      "account",
+      labels,
+    );
+
+    expect(chart?.tiles.map((t) => [t.key, t.name, t.value])).toEqual([
+      ["card", "Card", 500],
+      ["cash", "Cash", 100],
+    ]);
+    expect(chart?.tiles[0]?.children.map((c) => c.category)).toEqual([
+      "Food",
+      "? Alex",
+    ]);
+  });
+
+  it("groups by the counterparty, debts included, the rest apart", () => {
+    const [chart] = buildReport(
+      [
+        row({ amount: -300, counterpartyId: "alex", counterpartyName: "Alex" }),
+        row({
+          kind: "debt",
+          amount: -200,
+          counterpartyId: "alex",
+          counterpartyName: "Alex",
+        }),
+        row({ amount: -400, categoryId: "food", categoryName: "Food" }),
+        row({ amount: -100, counterpartyId: "sam", counterpartyName: "Sam" }),
+      ],
+      "expense",
+      "counterparty",
+      labels,
+    );
+
+    expect(chart?.tiles.map((t) => [t.key, t.name, t.value])).toEqual([
+      ["alex", "Alex", 500],
+      [NONE_KEY, "No counterparty", 400],
+      ["sam", "Sam", 100],
+    ]);
+    expect(colorSlots([chart as ReportChart], 8).has(NONE_KEY)).toBe(false);
   });
 });
 
@@ -197,14 +261,14 @@ describe("colorSlots", () => {
     const slots = colorSlots(
       [
         chart("UAH", [
-          [NO_CATEGORY_KEY, 1000],
+          [NONE_KEY, 1000],
           ["food", 10],
         ]),
       ],
       8,
     );
 
-    expect(slots.has(NO_CATEGORY_KEY)).toBe(false);
+    expect(slots.has(NONE_KEY)).toBe(false);
     expect(slots.get("food")).toBe(1);
   });
 

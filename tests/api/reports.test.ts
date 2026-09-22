@@ -55,6 +55,9 @@ describe("reports.data", () => {
     const result = await c.reports.data({ filter: range });
 
     expect(result.truncated).toBe(false);
+    // both rows sit on the real account, the debt's counterparty is exposed
+    expect(result.rows.map((r) => r.accountId)).toEqual([a.id, a.id]);
+    expect(result.rows[1]?.counterpartyId).toEqual(expect.any(String));
     expect(
       result.rows.map((r) => [
         r.kind,

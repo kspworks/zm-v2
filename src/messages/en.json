@@ -535,7 +535,14 @@
     "date": "Date",
     "comment": "Comment",
     "table": "As a table",
-    "debts": "Debts"
+    "debts": "Debts",
+    "groupBy": "Group by",
+    "byCategory": "Categories",
+    "byAccount": "Accounts",
+    "byCounterparty": "Counterparties",
+    "account": "Account",
+    "counterparty": "Counterparty",
+    "noCounterparty": "No counterparty"
   },
   "users": {
     "title": "Users",

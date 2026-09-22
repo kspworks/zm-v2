@@ -535,7 +535,14 @@
     "date": "Дата",
     "comment": "Коментар",
     "table": "Таблицею",
-    "debts": "Борги"
+    "debts": "Борги",
+    "groupBy": "Групувати за",
+    "byCategory": "Категоріями",
+    "byAccount": "Рахунками",
+    "byCounterparty": "Контрагентами",
+    "account": "Рахунок",
+    "counterparty": "Контрагент",
+    "noCounterparty": "Без контрагента"
   },
   "users": {
     "title": "Користувачі",

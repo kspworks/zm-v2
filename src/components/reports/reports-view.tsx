@@ -4,7 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { format, subMonths } from "date-fns";
 import { AlertTriangleIcon, ChartPieIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
+import { z } from "zod";
 
 import { Money } from "~/components/app/money";
 import { PageHeader } from "~/components/app/page-header";
@@ -32,6 +33,13 @@ import {
   EmptyHeader,
   EmptyMedia,
 } from "~/components/ui/empty";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 import { Skeleton } from "~/components/ui/skeleton";
 import {
   Table,
@@ -42,11 +50,26 @@ import {
   TableRow,
 } from "~/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { useLocalStorage } from "~/hooks/use-local-storage";
 import { formatMoney } from "~/lib/money";
-import { buildReport, colorSlots, type ReportInput } from "~/lib/report";
+import {
+  buildReport,
+  colorSlots,
+  type ReportGroupBy,
+  type ReportInput,
+  reportGroupBySchema,
+} from "~/lib/report";
 import { useTRPC } from "~/trpc/react";
 
 const SLOTS = 8;
+
+const viewSchema = z.enum(["expense", "income"]);
+
+const GROUP_BY_LABELS = {
+  category: "byCategory",
+  account: "byAccount",
+  counterparty: "byCounterparty",
+} as const;
 
 export function ReportsView() {
   const t = useTranslations("reports");
@@ -55,7 +78,16 @@ export function ReportsView() {
   const today = useToday();
   const debtLabelText = useDebtLabelText();
   const { state, setState, filter, reset } = useTransactionFilter();
-  const [view, setView] = useState<"expense" | "income">("expense");
+  const [view, setView] = useLocalStorage(
+    "zm.reports.view",
+    viewSchema,
+    "expense",
+  );
+  const [groupBy, setGroupBy] = useLocalStorage(
+    "zm.reports.groupBy",
+    reportGroupBySchema,
+    "category",
+  );
 
   // the range is required: default to one month ago .. today
   useEffect(() => {
@@ -96,12 +128,13 @@ export function ReportsView() {
       return debtLabelText(row.debtLabel, name, row.currencySign);
     };
 
-    return buildReport(data.data?.rows ?? [], view, {
+    return buildReport(data.data?.rows ?? [], view, groupBy, {
       noCategory: tt("noCategory"),
+      noCounterparty: t("noCounterparty"),
       debts: t("debts"),
       debtDescription,
     });
-  }, [data.data, view, t, tt, debtLabelText]);
+  }, [data.data, view, groupBy, t, tt, debtLabelText]);
 
   // slots go to the largest tiles in the view, so the blocks that dominate
   // the chart get distinct hues; the tail and "no category" are gray. Tiles
@@ -130,15 +163,35 @@ export function ReportsView() {
         }
       />
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4 sm:p-6">
-        <Tabs
-          value={view}
-          onValueChange={(value) => setView(value as typeof view)}
-        >
-          <TabsList>
-            <TabsTrigger value="expense">{t("expense")}</TabsTrigger>
-            <TabsTrigger value="income">{t("income")}</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Tabs
+            value={view}
+            onValueChange={(value) => setView(viewSchema.parse(value))}
+          >
+            <TabsList>
+              <TabsTrigger value="expense">{t("expense")}</TabsTrigger>
+              <TabsTrigger value="income">{t("income")}</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Select
+            value={groupBy}
+            onValueChange={(value) =>
+              setGroupBy(reportGroupBySchema.parse(value))
+            }
+          >
+            <SelectTrigger aria-label={t("groupBy")}>
+              <span className="text-muted-foreground">{t("groupBy")}:</span>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent align="end">
+              {reportGroupBySchema.options.map((option: ReportGroupBy) => (
+                <SelectItem key={option} value={option}>
+                  {t(GROUP_BY_LABELS[option])}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
         {data.data?.truncated ? (
           <Alert>
@@ -183,7 +236,7 @@ export function ReportsView() {
                     <Table className="mt-2">
                       <TableHeader>
                         <TableRow>
-                          <TableHead>{t("category")}</TableHead>
+                          <TableHead>{t(groupBy)}</TableHead>
                           <TableHead className="text-right">
                             {t("amount")}
                           </TableHead>

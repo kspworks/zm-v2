@@ -650,11 +650,15 @@ export type ReportRow = {
   amount: number;
   currencyCode: string;
   currencySign: string;
+  /** The real account: for a debt pair, the leg not on the debt account */
+  accountId: string;
+  accountName: string;
   categoryId: string | null;
   categoryName: string | null;
   parentId: string | null;
   parentName: string | null;
   comment: string | null;
+  counterpartyId: string | null;
   counterpartyName: string | null;
   /** Debt wording, labelled against the counterparty's whole history */
   debtLabel: DebtLabel | null;
@@ -683,6 +687,8 @@ export const reportRows = async (
         ),
       currencyCode: sql<string>`case when ${primaryIsDebtLeg} then ${lc.code} else ${pc.code} end`,
       currencySign: sql<string>`case when ${primaryIsDebtLeg} then ${lc.sign} else ${pc.sign} end`,
+      accountId: sql<string>`case when ${primaryIsDebtLeg} then ${l.accountId} else ${p.accountId} end`,
+      accountName: sql<string>`case when ${primaryIsDebtLeg} then ${la.name} else ${pa.name} end`,
       categoryId: cat.id,
       categoryName: cat.name,
       parentId: parent.id,
@@ -711,7 +717,7 @@ export const reportRows = async (
   const labels = await debtLabelsFor(db, entries);
 
   return {
-    rows: kept.map(({ debtLegId, counterpartyId: _, ...row }) => {
+    rows: kept.map(({ debtLegId, ...row }) => {
       const label = debtLegId ? labels.get(debtLegId) : undefined;
 
       return {
