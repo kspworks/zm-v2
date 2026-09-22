@@ -46,6 +46,7 @@ import {
 } from "~/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { useLocalStorage } from "~/hooks/use-local-storage";
+import { formatDisplayDate } from "~/lib/dates";
 import { formatMoney } from "~/lib/money";
 import {
   buildReport,
@@ -100,6 +101,10 @@ export function ReportsView() {
     filter.startDate && filter.endDate
       ? { ...filter, startDate: filter.startDate, endDate: filter.endDate }
       : null;
+
+  const dateRangeText = range
+    ? `${formatDisplayDate(range.startDate)} – ${formatDisplayDate(range.endDate)}`
+    : null;
 
   const data = useQuery({
     ...trpc.reports.data.queryOptions({
@@ -215,10 +220,17 @@ export function ReportsView() {
                 {charts.length > 1 ? (
                   <CardDescription>{chart.currencyCode}</CardDescription>
                 ) : null}
-                <CardTitle className="text-lg">
-                  {t("total", {
-                    amount: formatMoney(chart.total, chart.currencySign),
-                  })}
+                <CardTitle className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-lg">
+                  <span>
+                    {t("total", {
+                      amount: formatMoney(chart.total, chart.currencySign),
+                    })}
+                  </span>
+                  {dateRangeText ? (
+                    <span className="font-normal text-muted-foreground text-sm">
+                      {dateRangeText}
+                    </span>
+                  ) : null}
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
