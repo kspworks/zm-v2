@@ -542,7 +542,7 @@
     "account": "Рахунок",
     "counterparty": "Контрагент",
     "noCounterparty": "Без контрагента",
-    "more": "+{count} ще"
+    "more": "Ще +{count}"
   },
   "users": {
     "title": "Користувачі",
