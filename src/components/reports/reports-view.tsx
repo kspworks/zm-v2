@@ -23,11 +23,6 @@ import {
   CardTitle,
 } from "~/components/ui/card";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "~/components/ui/collapsible";
-import {
   Empty,
   EmptyDescription,
   EmptyHeader,
@@ -228,50 +223,41 @@ export function ReportsView() {
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
                 <ReportTreemap chart={chart} colorOf={colorOf} />
-                <Collapsible>
-                  <CollapsibleTrigger className="text-muted-foreground text-sm underline-offset-4 hover:underline">
-                    {t("table")}
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <Table className="mt-2">
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>{t(groupBy)}</TableHead>
-                          <TableHead className="text-right">
-                            {t("amount")}
-                          </TableHead>
-                          <TableHead className="text-right">
-                            {t("share")}
-                          </TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {chart.tiles.map((tile) => (
-                          <TableRow key={tile.key}>
-                            <TableCell>
-                              <span className="flex items-center gap-2">
-                                <span
-                                  className="size-2.5 shrink-0 rounded-sm"
-                                  style={{ background: colorOf(tile.key) }}
-                                />
-                                {tile.name}
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Money
-                                amount={tile.value}
-                                sign={chart.currencySign}
-                              />
-                            </TableCell>
-                            <TableCell className="text-right text-muted-foreground tabular-nums">
-                              {((tile.value / chart.total) * 100).toFixed(1)}%
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </CollapsibleContent>
-                </Collapsible>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t(groupBy)}</TableHead>
+                      <TableHead className="text-right">
+                        {t("amount")}
+                      </TableHead>
+                      <TableHead className="text-right">{t("share")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {chart.tiles.map((tile) => (
+                      <TableRow key={tile.key}>
+                        <TableCell>
+                          <span className="flex items-center gap-2">
+                            <span
+                              className="size-2.5 shrink-0 rounded-sm"
+                              style={{ background: colorOf(tile.key) }}
+                            />
+                            {tile.name}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Money
+                            amount={tile.value}
+                            sign={chart.currencySign}
+                          />
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground tabular-nums">
+                          {((tile.value / chart.total) * 100).toFixed(1)}%
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           ))
