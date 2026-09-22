@@ -542,7 +542,8 @@
     "byCounterparty": "Counterparties",
     "account": "Account",
     "counterparty": "Counterparty",
-    "noCounterparty": "No counterparty"
+    "noCounterparty": "No counterparty",
+    "more": "+{count} more"
   },
   "users": {
     "title": "Users",
