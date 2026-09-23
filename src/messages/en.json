@@ -494,14 +494,14 @@
     "title": "Dashboard",
     "balance": {
       "title": "Balance",
-      "actual": "Actual",
-      "planned": "Planned",
+      "actual": "Actual balance",
+      "planned": "Planned balance",
       "range": "Chart range",
       "back": "Days back",
       "ahead": "Days ahead",
       "rangeHint": "From {min} to {max} days",
       "more": "+{count} more",
-      "noChanges": "No changes",
+      "noChanges": "No transactions",
       "overdue": "overdue"
     },
     "forecast": {
