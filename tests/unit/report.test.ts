@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildComparison,
   buildReport,
+  type ComparisonInput,
   colorSlots,
   DEBTS_KEY,
+  deltaOf,
   NONE_KEY,
   type ReportChart,
   type ReportInput,
@@ -301,5 +304,120 @@ describe("colorSlots", () => {
 
     expect(slots.get("a")).toBe(1);
     expect(slots.get("b")).toBe(2);
+  });
+});
+
+let m = 0;
+const total = (overrides: Partial<ComparisonInput>): ComparisonInput => ({
+  currencyCode: "UAH",
+  currencySign: "₴",
+  isDebt: false,
+  categoryId: `c${++m}`,
+  categoryName: null,
+  parentId: null,
+  parentName: null,
+  incomes: 0,
+  expenses: 0,
+  ...overrides,
+});
+
+const comparisonLabels = { noCategory: "No category", debts: "Debts" };
+
+describe("buildComparison", () => {
+  it("rolls children up under their parent and lists them when expanded", () => {
+    const [table] = buildComparison(
+      [
+        total({
+          categoryId: "cafe",
+          categoryName: "Cafés",
+          parentId: "food",
+          parentName: "Food",
+          expenses: -300,
+        }),
+        total({ categoryId: "food", categoryName: "Food", expenses: -200 }),
+      ],
+      [
+        total({
+          categoryId: "cafe",
+          categoryName: "Cafés",
+          parentId: "food",
+          parentName: "Food",
+          expenses: -100,
+        }),
+      ],
+      comparisonLabels,
+    );
+
+    expect(table?.expense.rows).toEqual([
+      {
+        key: "food",
+        name: "Food",
+        a: 500,
+        b: 100,
+        children: [
+          { key: "cafe", name: "Cafés", a: 300, b: 100, children: [] },
+          { key: "food", name: "Food", a: 200, b: 0, children: [] },
+        ],
+      },
+    ]);
+    expect(table?.expense.total).toEqual({ a: 500, b: 100 });
+  });
+
+  it("puts a category in both sections, debts and no category last", () => {
+    const [table] = buildComparison(
+      [
+        total({
+          categoryId: "gift",
+          categoryName: "Gifts",
+          incomes: 50,
+          expenses: -20,
+        }),
+        total({ categoryId: null, expenses: -900 }),
+        total({ categoryId: null, isDebt: true, incomes: 1000 }),
+      ],
+      [total({ categoryId: "rent", categoryName: "Rent", expenses: -10 })],
+      comparisonLabels,
+    );
+
+    expect(table?.income.rows.map((r) => [r.key, r.a, r.b])).toEqual([
+      ["gift", 50, 0],
+      [DEBTS_KEY, 1000, 0],
+    ]);
+    expect(table?.expense.rows.map((r) => [r.key, r.name, r.a, r.b])).toEqual([
+      ["gift", "Gifts", 20, 0],
+      ["rent", "Rent", 0, 10],
+      [NONE_KEY, "No category", 900, 0],
+    ]);
+    // a row that is its own only leaf has nothing to expand
+    expect(table?.income.rows[1]?.children).toEqual([]);
+    expect(table?.remainder).toEqual({ a: 1050 - 920, b: -10 });
+  });
+
+  it("keeps currencies apart, the largest first", () => {
+    const tables = buildComparison(
+      [
+        total({ currencyCode: "USD", currencySign: "$", expenses: -10 }),
+        total({ expenses: -5000 }),
+      ],
+      [total({ currencyCode: "USD", currencySign: "$", incomes: 20 })],
+      comparisonLabels,
+    );
+
+    expect(
+      tables.map((x) => [x.currencyCode, x.income.total, x.expense.total]),
+    ).toEqual([
+      ["UAH", { a: 0, b: 0 }, { a: 5000, b: 0 }],
+      ["USD", { a: 0, b: 20 }, { a: 10, b: 0 }],
+    ]);
+  });
+});
+
+describe("deltaOf", () => {
+  it("is B minus A, relative to A, and null for a new value", () => {
+    expect(deltaOf({ a: 200, b: 150 })).toEqual({ diff: -50, percent: -0.25 });
+    expect(deltaOf({ a: 0, b: 150 })).toEqual({ diff: 150, percent: null });
+    expect(deltaOf({ a: 0, b: 0 })).toEqual({ diff: 0, percent: 0 });
+    // a negative remainder that grows is an increase
+    expect(deltaOf({ a: -100, b: 50 })).toEqual({ diff: 150, percent: 1.5 });
   });
 });

@@ -194,3 +194,177 @@ export const colorSlots = (
       .map(([key], index) => [key, index + 1]),
   );
 };
+
+/** One period's totals for one currency and leaf category (debts apart). */
+export type ComparisonInput = {
+  currencyCode: string;
+  currencySign: string;
+  isDebt: boolean;
+  categoryId: string | null;
+  categoryName: string | null;
+  parentId: string | null;
+  parentName: string | null;
+  incomes: number;
+  expenses: number;
+};
+
+export type ComparisonPair = { a: number; b: number };
+
+export type ComparisonRow = ComparisonPair & {
+  key: string;
+  name: string;
+  children: ComparisonRow[];
+};
+
+export type ComparisonSection = {
+  total: ComparisonPair;
+  rows: ComparisonRow[];
+};
+
+export type ComparisonTable = {
+  currencyCode: string;
+  currencySign: string;
+  income: ComparisonSection;
+  expense: ComparisonSection;
+  /** Income minus expense, per period */
+  remainder: ComparisonPair;
+};
+
+/** "No category" and "Debts" close their section, whatever their size */
+const pinnedLast = (key: string) => key === NONE_KEY || key === DEBTS_KEY;
+
+const byMaxDesc = (x: ComparisonRow, y: ComparisonRow) =>
+  Number(pinnedLast(x.key)) - Number(pinnedLast(y.key)) ||
+  Math.max(y.a, y.b) - Math.max(x.a, x.b) ||
+  x.name.localeCompare(y.name);
+
+/**
+ * Period A vs period B, one table per currency (never summed across
+ * currencies), largest first. Incomes and expenses are separate sections of
+ * absolute amounts, so a category used both ways appears in both. Rows roll
+ * children up under their parent, which lists them as `children` when it has
+ * any besides itself; debt pairs form one "Debts" row and rows without a
+ * category a "No category" row. Rows are sorted by the larger period, with
+ * "No category" and "Debts" last.
+ */
+export const buildComparison = (
+  a: ComparisonInput[],
+  b: ComparisonInput[],
+  labels: { noCategory: string; debts: string },
+): ComparisonTable[] => {
+  type Section = Map<
+    string,
+    ComparisonRow & { leaves: Map<string, ComparisonRow> }
+  >;
+  const tables = new Map<
+    string,
+    { sign: string; income: Section; expense: Section }
+  >();
+
+  const add = (rows: ComparisonInput[], period: "a" | "b") => {
+    for (const row of rows) {
+      const table = tables.get(row.currencyCode) ?? {
+        sign: row.currencySign,
+        income: new Map(),
+        expense: new Map(),
+      };
+      tables.set(row.currencyCode, table);
+
+      const [key, name] = row.isDebt
+        ? [DEBTS_KEY, labels.debts]
+        : [
+            row.parentId ?? row.categoryId ?? NONE_KEY,
+            row.parentName ?? row.categoryName ?? labels.noCategory,
+          ];
+      const leafKey = row.isDebt ? DEBTS_KEY : (row.categoryId ?? NONE_KEY);
+      const leafName = row.isDebt
+        ? labels.debts
+        : (row.categoryName ?? labels.noCategory);
+
+      for (const [section, value] of [
+        [table.income, row.incomes],
+        [table.expense, -row.expenses],
+      ] as const) {
+        if (value === 0) {
+          continue;
+        }
+
+        const top = section.get(key) ?? {
+          key,
+          name,
+          a: 0,
+          b: 0,
+          children: [],
+          leaves: new Map(),
+        };
+        section.set(key, top);
+        top[period] += value;
+
+        const leaf = top.leaves.get(leafKey) ?? {
+          key: leafKey,
+          name: leafName,
+          a: 0,
+          b: 0,
+          children: [],
+        };
+        top.leaves.set(leafKey, leaf);
+        leaf[period] += value;
+      }
+    }
+  };
+
+  add(a, "a");
+  add(b, "b");
+
+  const sectionOf = (section: Section): ComparisonSection => {
+    const rows = [...section.values()]
+      .map(({ leaves, ...row }) => {
+        const children = [...leaves.values()].sort(byMaxDesc);
+        const onlySelf = children.length === 1 && children[0]?.key === row.key;
+
+        return { ...row, children: onlySelf ? [] : children };
+      })
+      .sort(byMaxDesc);
+
+    return {
+      total: {
+        a: rows.reduce((sum, row) => sum + row.a, 0),
+        b: rows.reduce((sum, row) => sum + row.b, 0),
+      },
+      rows,
+    };
+  };
+
+  return [...tables.entries()]
+    .map(([currencyCode, table]) => {
+      const income = sectionOf(table.income);
+      const expense = sectionOf(table.expense);
+
+      return {
+        currencyCode,
+        currencySign: table.sign,
+        income,
+        expense,
+        remainder: {
+          a: income.total.a - expense.total.a,
+          b: income.total.b - expense.total.b,
+        },
+      };
+    })
+    .sort((x, y) => volume(y) - volume(x));
+};
+
+const volume = (table: ComparisonTable) =>
+  table.income.total.a +
+  table.income.total.b +
+  table.expense.total.a +
+  table.expense.total.b;
+
+/**
+ * B minus A, and the change relative to A as a fraction; `percent` is null
+ * when A is 0 and B isn't (a new value).
+ */
+export const deltaOf = ({ a, b }: ComparisonPair) => ({
+  diff: b - a,
+  percent: a === 0 ? (b === 0 ? 0 : null) : (b - a) / Math.abs(a),
+});

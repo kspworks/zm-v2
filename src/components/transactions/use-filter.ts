@@ -25,7 +25,7 @@ const parsers = {
   comment: parseAsString,
 };
 
-const isIsoDate = (value: string | null) =>
+export const isIsoDate = (value: string | null): value is string =>
   value !== null &&
   parseAsIsoDate.parse(value) !== null &&
   /^\d{4}-\d{2}-\d{2}$/.test(value);

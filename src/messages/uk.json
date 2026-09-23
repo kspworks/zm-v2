@@ -542,7 +542,21 @@
     "account": "Рахунок",
     "counterparty": "Контрагент",
     "noCounterparty": "Без контрагента",
-    "more": "Ще +{count}"
+    "more": "Ще +{count}",
+    "map": "Мапа",
+    "comparison": "Порівняння періодів",
+    "difference": "Різниця",
+    "remainder": "Залишок",
+    "newValue": "нове",
+    "period1": "Перший період",
+    "period2": "Другий період",
+    "previousPeriod": "Попередній період",
+    "nextPeriod": "Наступний період",
+    "previousYear": "Попередній рік",
+    "nextYear": "Наступний рік",
+    "customRange": "Довільний період",
+    "expand": "Показати підкатегорії",
+    "collapse": "Сховати підкатегорії"
   },
   "users": {
     "title": "Користувачі",

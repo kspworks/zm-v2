@@ -81,10 +81,12 @@ function FilterFields({
   state,
   setState,
   requireDates,
+  withDates,
 }: {
   state: FilterState;
   setState: SetFilterState;
   requireDates: boolean;
+  withDates: boolean;
 }) {
   const t = useTranslations("filters");
   const te = useTranslations("errors");
@@ -168,44 +170,46 @@ function FilterFields({
           onChange={(value) => void setState({ counterparties: value })}
         />
       </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field data-invalid={reversed}>
-          <FieldLabel htmlFor="filter-from">{t("from")}</FieldLabel>
-          <DatePicker
-            id="filter-from"
-            value={state.startDate}
-            clearable={!requireDates}
-            invalid={reversed}
-            placeholder="—"
-            onChange={(value) => {
-              if (value || !requireDates) {
-                void setState({ startDate: value });
-              }
-            }}
-          />
-          {reversed ? (
-            <FieldError>{te("start_date_lte_end_date")}</FieldError>
-          ) : null}
-        </Field>
-        <Field data-invalid={reversed}>
-          <FieldLabel htmlFor="filter-to">{t("to")}</FieldLabel>
-          <DatePicker
-            id="filter-to"
-            value={state.endDate}
-            clearable={!requireDates}
-            invalid={reversed}
-            placeholder="—"
-            onChange={(value) => {
-              if (value || !requireDates) {
-                void setState({ endDate: value });
-              }
-            }}
-          />
-          {reversed ? (
-            <FieldError>{te("end_date_gte_start_date")}</FieldError>
-          ) : null}
-        </Field>
-      </div>
+      {withDates ? (
+        <div className="grid grid-cols-2 gap-3">
+          <Field data-invalid={reversed}>
+            <FieldLabel htmlFor="filter-from">{t("from")}</FieldLabel>
+            <DatePicker
+              id="filter-from"
+              value={state.startDate}
+              clearable={!requireDates}
+              invalid={reversed}
+              placeholder="—"
+              onChange={(value) => {
+                if (value || !requireDates) {
+                  void setState({ startDate: value });
+                }
+              }}
+            />
+            {reversed ? (
+              <FieldError>{te("start_date_lte_end_date")}</FieldError>
+            ) : null}
+          </Field>
+          <Field data-invalid={reversed}>
+            <FieldLabel htmlFor="filter-to">{t("to")}</FieldLabel>
+            <DatePicker
+              id="filter-to"
+              value={state.endDate}
+              clearable={!requireDates}
+              invalid={reversed}
+              placeholder="—"
+              onChange={(value) => {
+                if (value || !requireDates) {
+                  void setState({ endDate: value });
+                }
+              }}
+            />
+            {reversed ? (
+              <FieldError>{te("end_date_gte_start_date")}</FieldError>
+            ) : null}
+          </Field>
+        </div>
+      ) : null}
       <Field data-invalid={amountInvalid}>
         <FieldLabel htmlFor="filter-amount">{t("amount")}</FieldLabel>
         <Input
@@ -236,17 +240,20 @@ export function FilterButton({
   setState,
   reset,
   requireDates = false,
+  withDates = true,
 }: {
   state: FilterState;
   setState: SetFilterState;
   reset: () => void;
   requireDates?: boolean;
+  /** false hides the date range, for pages that pick their own periods */
+  withDates?: boolean;
 }) {
   const t = useTranslations("filters");
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
 
-  const count = activeFilterCount(state, !requireDates);
+  const count = activeFilterCount(state, withDates && !requireDates);
 
   const trigger = (
     <Button variant="outline" size="sm">
@@ -261,6 +268,7 @@ export function FilterButton({
       state={state}
       setState={setState}
       requireDates={requireDates}
+      withDates={withDates}
     />
   );
 

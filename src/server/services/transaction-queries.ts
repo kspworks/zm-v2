@@ -641,6 +641,90 @@ export const filteredTotals = async (
     .filter((row) => row.expenses !== 0 || row.incomes !== 0);
 };
 
+export type CategoryTotal = {
+  currencyCode: string;
+  currencySign: string;
+  isDebt: boolean;
+  categoryId: string | null;
+  categoryName: string | null;
+  parentId: string | null;
+  parentName: string | null;
+  incomes: number;
+  expenses: number;
+};
+
+/**
+ * Incomes and expenses per currency and leaf category over the WHOLE
+ * filtered set of submitted rows, counted like `filteredTotals`: no
+ * own-account transfers, a debt pair by its real-account leg. Debt pairs
+ * form their own group (`isDebt`), whatever their category.
+ */
+export const categoryTotals = async (
+  db: DbOrTx,
+  userId: string,
+  filter: Partial<TransactionFilter>,
+): Promise<CategoryTotal[]> => {
+  const x = pairsQuery(
+    db,
+    {
+      amount:
+        sql<number>`case when ${primaryIsDebtLeg} then ${l.amount} else ${p.amount} end`.as(
+          "amount",
+        ),
+      currencyId:
+        sql<string>`case when ${primaryIsDebtLeg} then ${la.currencyId} else ${pa.currencyId} end`.as(
+          "currency_id",
+        ),
+      isDebt: sql<boolean>`${p.kind} = 'debt'`.as("is_debt"),
+      categoryId: sql<string | null>`${cat.id}`.as("category_id"),
+      categoryName: sql<string | null>`${cat.name}`.as("category_name"),
+      parentId: sql<string | null>`${parent.id}`.as("parent_id"),
+      parentName: sql<string | null>`${parent.name}`.as("parent_name"),
+    },
+    userId,
+    "submitted",
+    filter,
+    [notOwnTransfer],
+  ).as("x");
+
+  const rows = await db
+    .select({
+      currencyCode: currencies.code,
+      currencySign: currencies.sign,
+      isDebt: x.isDebt,
+      categoryId: x.categoryId,
+      categoryName: x.categoryName,
+      parentId: x.parentId,
+      parentName: x.parentName,
+      expenses: sql<
+        string | null
+      >`sum(${x.amount}) filter (where ${x.amount} < 0)`,
+      incomes: sql<
+        string | null
+      >`sum(${x.amount}) filter (where ${x.amount} > 0)`,
+    })
+    .from(x)
+    .innerJoin(currencies, eq(currencies.id, x.currencyId))
+    .groupBy(
+      currencies.code,
+      currencies.sign,
+      x.isDebt,
+      x.categoryId,
+      x.categoryName,
+      x.parentId,
+      x.parentName,
+    );
+
+  return rows
+    .map((row) => ({
+      ...row,
+      isDebt: Boolean(row.isDebt),
+      expenses: Number(row.expenses ?? 0),
+      incomes: Number(row.incomes ?? 0),
+    }))
+    .filter((row) => row.expenses !== 0 || row.incomes !== 0);
+};
+
 export const REPORT_LIMIT = 100_000;
 
 export type ReportRow = {

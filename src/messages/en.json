@@ -542,7 +542,21 @@
     "account": "Account",
     "counterparty": "Counterparty",
     "noCounterparty": "No counterparty",
-    "more": "+{count} more"
+    "more": "+{count} more",
+    "map": "Map",
+    "comparison": "Period comparison",
+    "difference": "Difference",
+    "remainder": "Remainder",
+    "newValue": "new",
+    "period1": "First period",
+    "period2": "Second period",
+    "previousPeriod": "Previous period",
+    "nextPeriod": "Next period",
+    "previousYear": "Previous year",
+    "nextYear": "Next year",
+    "customRange": "Custom range",
+    "expand": "Show subcategories",
+    "collapse": "Hide subcategories"
   },
   "users": {
     "title": "Users",
