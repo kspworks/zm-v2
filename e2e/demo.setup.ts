@@ -9,7 +9,8 @@ import { expect, test as setup } from "./helpers";
  * activity for the README screenshots (`pnpm screenshots`). Everything goes
  * through the app's own tRPC endpoints, so the data is exactly what the forms
  * would have written. Dates are relative to today, so the dashboard and the
- * report look lived-in whenever this runs.
+ * report look lived-in whenever this runs. A few categories get subcategories,
+ * so the nested labels and the report's roll-up have something to show.
  */
 
 type Procedure = (path: string, input?: unknown) => Promise<unknown>;
@@ -99,11 +100,35 @@ setup("seed the demo books", async ({ request }) => {
     return found?.id ?? "";
   };
 
+  const addSubcategory = async (
+    parentKey: string,
+    name: string,
+    kind: "expense" | "income" = "expense",
+  ) =>
+    (
+      (await mutate("categories.create", {
+        name,
+        parentId: category(parentKey),
+        isExpense: kind === "expense",
+        isIncome: kind === "income",
+      })) as { id: string }
+    ).id;
+
+  // the shapes the nested views must handle: a parent with only child rows
+  // (house), one with direct rows as well (groceries), a single child
+  // (recreation) and an income child
+  const rent = await addSubcategory("home", "Rent");
+  const utilities = await addSubcategory("home", "Utilities");
+  const supermarket = await addSubcategory("groceries", "Supermarket");
+  const market = await addSubcategory("groceries", "Farmers' market");
+  const restaurants = await addSubcategory("entertainment", "Restaurants");
+  const bonus = await addSubcategory("income", "Bonus", "income");
+
   const items: TransactionInputData[] = [];
   const expense = (
     offset: number,
     amount: number,
-    seedKey: string,
+    categoryId: string,
     comment: string,
     accountId = card,
   ) =>
@@ -112,7 +137,7 @@ setup("seed the demo books", async ({ request }) => {
       date: day(offset),
       amount: uah(amount),
       accountId,
-      categoryId: category(seedKey),
+      categoryId,
       comment,
     });
 
@@ -128,24 +153,32 @@ setup("seed the demo books", async ({ request }) => {
       categoryId: category("salary"),
       comment: "Salary",
     });
-    expense(start - 27, 16_500, "home", "Rent");
-    expense(start - 26, 1_840, "home", "Utilities");
-    expense(start - 25, 399, "subscriptions", "Music streaming");
-    expense(start - 24, 2_150.4, "groceries", "Weekly shop");
-    expense(start - 20, 1_720.9, "groceries", "Weekly shop");
-    expense(start - 17, 980, "commuting", "Taxi to the airport");
-    expense(start - 14, 2_430.15, "groceries", "Weekly shop");
-    expense(start - 12, 1_200, "entertainment", "Cinema and dinner");
-    expense(start - 10, 640, "animals", "Cat food", wallet);
-    expense(start - 7, 1_915.6, "groceries", "Weekly shop");
-    expense(start - 5, 850, "health", "Pharmacy");
-    expense(start - 3, 3_400, "clothing", "Running shoes");
-    expense(start - 2, 450, "self_care", "Haircut", wallet);
+    expense(start - 27, 16_500, rent, "Rent");
+    expense(start - 26, 1_840, utilities, "Utilities");
+    expense(start - 25, 399, category("subscriptions"), "Music streaming");
+    expense(start - 24, 2_150.4, category("groceries"), "Weekly shop");
+    expense(start - 20, 1_720.9, supermarket, "Weekly shop");
+    expense(start - 17, 980, category("commuting"), "Taxi to the airport");
+    expense(start - 14, 2_430.15, market, "Weekly shop");
+    expense(start - 12, 1_200, restaurants, "Cinema and dinner");
+    expense(start - 10, 640, category("animals"), "Cat food", wallet);
+    expense(start - 7, 1_915.6, supermarket, "Weekly shop");
+    expense(start - 5, 850, category("health"), "Pharmacy");
+    expense(start - 3, 3_400, category("clothing"), "Running shoes");
+    expense(start - 2, 450, category("self_care"), "Haircut", wallet);
   }
 
-  expense(-40, 14_999, "devices", "New headphones");
-  expense(-8, 2_600, "gifts", "Birthday present");
+  expense(-40, 14_999, category("devices"), "New headphones");
+  expense(-8, 2_600, category("gifts"), "Birthday present");
   items.push(
+    {
+      kind: "income",
+      date: day(-45),
+      amount: uah(8_000),
+      accountId: card,
+      categoryId: bonus,
+      comment: "Quarterly bonus",
+    },
     {
       kind: "transfer",
       date: day(-26),
@@ -204,7 +237,7 @@ setup("seed the demo books", async ({ request }) => {
       date: day(3),
       amount: uah(16_500),
       accountId: card,
-      categoryId: category("home"),
+      categoryId: rent,
       comment: "Rent",
     },
     "monthly",
@@ -237,7 +270,7 @@ setup("seed the demo books", async ({ request }) => {
       date: day(-1),
       amount: uah(1_840),
       accountId: card,
-      categoryId: category("home"),
+      categoryId: utilities,
       comment: "Utilities",
     },
     "none",
