@@ -51,7 +51,7 @@ export const transactionsRouter = createTRPCRouter({
     .input(z.object({ filter: transactionFilterSchema }))
     .query(({ ctx, input }) => listOverdue(ctx.db, ctx.user.id, input.filter)),
 
-  /** Totals over the filtered set of submitted, or with `planned`, planned rows */
+  /** Totals over the whole filtered set: submitted rows, or planned ones */
   totals: protectedProcedure
     .input(
       z.object({

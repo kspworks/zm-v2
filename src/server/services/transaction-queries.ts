@@ -135,7 +135,7 @@ const filterConditions = (filter: Partial<TransactionFilter>) => {
   return conditions;
 };
 
-/** Leaves out transfers between two real accounts, which net to zero */
+/** Leaves out transfers between two non-debt accounts, which net to zero */
 const notOwnTransfer = or(
   isNull(p.batchId),
   eq(pa.type, "debt"),
@@ -580,8 +580,9 @@ export type CurrencyTotal = {
 
 /**
  * Expenses, incomes and total per currency over the WHOLE filtered set of
- * submitted (or planned) rows. Transfers between two non-debt accounts net to zero and are
- * left out; for a debt pair the real-account leg is what counts.
+ * submitted (or planned) rows. Transfers between two non-debt accounts net
+ * to zero and are left out; for a debt pair the real-account leg is what
+ * counts.
  */
 export const filteredTotals = async (
   db: DbOrTx,

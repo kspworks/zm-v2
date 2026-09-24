@@ -297,8 +297,8 @@ export const deleteAccount = (db: DbOrTx, userId: string, id: string) =>
   db.transaction(async (tx) => {
     await requireEditableAccount(tx, userId, id);
 
-    // lock the row so a concurrent insert can't slip in between the check
-    // and the delete
+    // an uncommitted insert holds a key-share lock on this row through its
+    // foreign key, so this waits for it and the in-use check then sees it
     await tx.select().from(accounts).where(eq(accounts.id, id)).for("update");
 
     if (await accountInUse(tx, id)) {

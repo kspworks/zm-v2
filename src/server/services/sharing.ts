@@ -12,10 +12,10 @@ import {
 } from "~/server/services/access";
 
 /**
- * Sharing works through the member tables: the owner (any member with write)
- * adds another existing user as read-only or read+write, lists and revokes
- * them. The creator's own row can't be revoked, and debt accounts are never
- * shared.
+ * Sharing works through the member tables: any member with write access can
+ * add another existing user as read-only or read+write, list the members and
+ * revoke them. The creator's own row can't be revoked, and debt accounts are
+ * never shared.
  */
 
 const requireShareable = async (

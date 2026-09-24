@@ -56,7 +56,7 @@ export const plannedCreateSchema = z
 
 export const scheduleUpdateSchema = z
   .object({
-    /** Any occurrence or schedule leg id of the schedule being edited */
+    /** Either leg's id (an occurrence's plannedTransactionId) */
     scheduleId: idSchema,
     data: transactionInputSchema,
     schedule: scheduleFieldsSchema.extend({

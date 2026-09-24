@@ -255,7 +255,8 @@ export const migrateFromV1 = async (
         ),
     );
 
-    // --- categories: parents first, orphaned parents dropped
+    // --- categories: parents first; a child whose parent is missing
+    // becomes top-level
     const categoryRows = oldCategories.filter((c) =>
       userIds.has(String(c.created_by)),
     );
@@ -532,7 +533,7 @@ export const migrateFromV1 = async (
       ),
     );
 
-    // --- history logs, as-is
+    // --- history logs, as-is apart from v2's entity type names
     const entityTypes: Record<string, string> = {
       accounts: "account",
       categories: "category",

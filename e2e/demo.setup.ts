@@ -115,7 +115,7 @@ setup("seed the demo books", async ({ request }) => {
     ).id;
 
   // the shapes the nested views must handle: a parent with only child rows
-  // (house), one with direct rows as well (groceries), a single child
+  // (home), one with direct rows as well (groceries), a single child
   // (recreation) and an income child
   const rent = await addSubcategory("home", "Rent");
   const utilities = await addSubcategory("home", "Utilities");

@@ -18,10 +18,10 @@ import { appError, notFound } from "~/server/lib/errors";
 import { revokeSessions } from "~/server/services/admin";
 
 /*
- * Self-service credential changes (spec 5.1). A password change needs the
- * current password and a TOTP code; re-enrolling needs the password and a
- * TOTP or backup code, then a code from the new secret. Every successful
- * reset or re-enrolment revokes the user's other sessions and is audited.
+ * Self-service credential changes. A password change and new backup codes
+ * need the current password and a TOTP code; re-enrolling needs the password
+ * and a TOTP or backup code, then a code from the new secret. A password
+ * change or re-enrolment revokes the user's other sessions. All are audited.
  */
 
 const credentialOf = async (tx: DbOrTx, userId: string) => {

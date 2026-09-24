@@ -3,12 +3,14 @@ import { Secret, TOTP } from "otpauth";
 import { isDev } from "~/server/config";
 import { randomString } from "~/server/lib/ids";
 
-/**
+/*
  * TOTP with better-auth's conventions: the stored secret is a plain string and
  * its UTF-8 bytes are the HMAC key (authenticator apps get the base32 form),
  * SHA1, 6 digits, 30 s. A secret generated here can be copied verbatim into
  * better-auth's twoFactor row.
  */
+
+/** The issuer name authenticator apps show next to the account */
 export const TOTP_ISSUER = "ZM";
 
 /** The literal accepted in development only, so local sign-ins need no phone */

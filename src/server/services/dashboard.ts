@@ -25,7 +25,7 @@ type ScopeInput = {
   currencyId: string;
   /** Narrows the scope; omitted means every account in it */
   accountIds?: string[];
-  /** Without it debt pairs in the window count nowhere */
+  /** `false` leaves debt pairs out; omitted, they count */
   includeDebts?: boolean;
 };
 

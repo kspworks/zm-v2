@@ -111,7 +111,7 @@ export const revokeRecoveryLink = async (db: DbOrTx, id: string) => {
     .where(and(eq(recoveryLinks.id, id), isNull(recoveryLinks.usedAt)));
 };
 
-/** A usable link for a raw token, locked when inside a transaction */
+/** A usable link for a raw token; `lock` (inside a transaction) locks it */
 const findLink = async (tx: DbOrTx, token: string, lock = false) => {
   const query = tx
     .select({

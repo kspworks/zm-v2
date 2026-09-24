@@ -122,7 +122,8 @@ export const useRowDescription = () => {
 
 /**
  * The display amount: negated when the primary leg is on the debt account,
- * unsigned for a same-type, same-amount transfer between own accounts.
+ * shown without a sign when both legs sit on accounts of the same type and
+ * move the same amount (a plain transfer).
  */
 export const displayAmount = (row: TransactionRowData) => {
   const primaryOnDebt = row.account.type === "debt";

@@ -21,7 +21,7 @@ export const ERROR_KEYS = [
   "start_date_lte_end_date",
   "end_date_gte_start_date",
   "is_minor_units",
-  // added by the rewrite
+  // added in v2; the keys above carry over from v1
   "invite_invalid",
   "not_found",
   "forbidden",

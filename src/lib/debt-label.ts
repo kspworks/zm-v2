@@ -1,10 +1,3 @@
-/**
- * Debt wording. Given B, the running balance with the
- * counterparty in this currency just *before* the entry (positive: they owe
- * me), and the entry's debt-account leg (positive: "I gave"), decide between
- * lent / borrowed / repaid / repaid-to-me, splitting when the entry crosses
- * zero.
- */
 export type DebtPartKind = "lent" | "borrowed" | "repaid" | "repaidToMe";
 
 export type DebtLabel = {
@@ -13,6 +6,13 @@ export type DebtLabel = {
   settles: boolean;
 };
 
+/**
+ * Debt wording for one entry. `balanceBefore` (B) is the running balance with
+ * the counterparty in this currency just *before* the entry (positive: they
+ * owe me); `debtLegAmount` is the entry's debt-account leg (positive: "I
+ * gave"). The result is lent / borrowed / repaid / repaid-to-me, split in two
+ * when the entry crosses zero.
+ */
 export const debtLabel = (
   balanceBefore: number,
   debtLegAmount: number,

@@ -22,7 +22,10 @@ import { cn } from "~/lib/utils";
 const capitalize = (text: string) =>
   text.charAt(0).toUpperCase() + text.slice(1);
 
-/** "Вересень 2026" for a whole month, else "01.09 –" and "15.09.2026" */
+/**
+ * "Вересень 2026" for a whole month, else "01.09 –" and "15.09.2026" (the
+ * start keeps its year when the range crosses into another one)
+ */
 const periodLabel = (
   period: Period,
   locale: Locale,

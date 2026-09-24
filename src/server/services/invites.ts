@@ -173,8 +173,9 @@ export const register = async (
 
   try {
     return await db.transaction(async (tx) => {
-      // claim first: the guard on user_id makes a concurrent second claim
-      // (or a second admin bootstrap) find nothing to update
+      // the claim below is guarded on user_id and otp_secret, so a concurrent
+      // second claim (or a second admin bootstrap) finds nothing to update
+      // and rolls back this user insert with it
       const [user] = await tx
         .insert(users)
         .values({

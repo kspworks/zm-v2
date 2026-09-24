@@ -286,7 +286,7 @@ export function TransactionForm({
       ],
     });
 
-  // preselect the first account, and the first other one as the destination
+  // preselect the first account
   useEffect(() => {
     const first = accountOptions[0];
 
@@ -297,6 +297,7 @@ export function TransactionForm({
 
   const linkedOptions = accountOptions.filter((a) => a.id !== accountId);
 
+  // and for a transfer, the first other account as the destination
   useEffect(() => {
     if (kind !== "transfer") {
       return;

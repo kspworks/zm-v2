@@ -125,7 +125,8 @@ export const listCategories = async (
 
 /**
  * A parent must exist, be readable by the user and be top-level. Every one
- * of those failures gets the same answer, so ids can't be probed.
+ * of those failures gets the same answer, so ids can't be probed; only a
+ * category naming itself as parent gets its own key.
  */
 const assertParentAllowed = async (
   db: DbOrTx,

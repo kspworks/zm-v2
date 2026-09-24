@@ -24,7 +24,7 @@ type Schedule = typeof plannedTransactions.$inferSelect;
 export const occurrenceHash = (date: string, primaryScheduleId: string) =>
   createHash("md5").update(`${date}${primaryScheduleId}`).digest("hex");
 
-/** Live schedule legs of the schedule a row id belongs to, locked */
+/** A schedule's live legs, found by either leg's id, locked */
 const loadScheduleBatch = async (tx: DbOrTx, id: string) => {
   const [row] = await tx
     .select()
@@ -218,7 +218,7 @@ export const createPlanned = (
     return { ids: [], batchId: null, scheduleId, occurrences };
   });
 
-/** Every live primary schedule, for the nightly job */
+/** Generates missing occurrences for every live primary schedule (nightly) */
 export const regenerateAll = async (
   db: DbOrTx,
   today: string = todayInAppZone(),
@@ -342,7 +342,7 @@ export const deleteAllPlanned = (db: DbOrTx, userId: string, id: string) =>
     return { schedules: scheduleIds.length, occurrences: removed.length };
   });
 
-/** The schedule behind an occurrence, for the edit-schedule form */
+/** A schedule by either leg's id, for the edit-schedule form */
 export const getSchedule = async (db: DbOrTx, userId: string, id: string) => {
   const legs = await db.transaction((tx) => loadScheduleBatch(tx, id));
   await requireDeletable(db, userId, legs);

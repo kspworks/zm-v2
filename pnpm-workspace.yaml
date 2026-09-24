@@ -13,8 +13,8 @@ blockExoticSubdeps: true
 minimumReleaseAge: 1440
 
 overrides:
-  # see the old repo: Turbopack's standalone tracer misses the "module-sync"
-  # build of newer @swc/helpers, so the bundle can't load its own modules
+  # Turbopack's standalone tracer misses the "module-sync" build of newer
+  # @swc/helpers, so the bundle can't load its own modules
   "@swc/helpers": "0.5.15"
 
 minimumReleaseAgeExclude:

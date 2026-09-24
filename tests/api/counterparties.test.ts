@@ -250,7 +250,7 @@ describe("counterparties.balances", () => {
         createdBy: user.id,
       });
 
-    // I lent Alex 500 UAH, he repaid 200: he owes me 300 UAH
+    // I lent Alex 500 UAH, they repaid 200: they owe me 300 UAH
     await leg(uahDebt, 500, alex);
     await leg(uahDebt, -200, alex);
     // I borrowed 100 USD from Alex
