@@ -1,7 +1,7 @@
 "use client";
 
-import { ChevronRightIcon, PlusIcon } from "lucide-react";
-import Link from "next/link";
+import { ChevronRightIcon, type LucideIcon, PlusIcon } from "lucide-react";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { type ComponentProps, type ReactNode, Suspense, useState } from "react";
@@ -44,6 +44,7 @@ import {
   SidebarRail,
   useSidebar,
 } from "~/components/ui/sidebar";
+import { Spinner } from "~/components/ui/spinner";
 import { HOME_PATH } from "~/lib/auth-routing";
 
 const ACTIVE_BUTTON =
@@ -124,7 +125,7 @@ export function AppSidebar({
                             href={item.href}
                             onClick={() => setOpenMobile(false)}
                           >
-                            <item.icon />
+                            <NavIcon icon={item.icon} />
                             <span>{t(`nav.${item.key}`)}</span>
                           </Link>
                         </SidebarMenuButton>
@@ -212,6 +213,7 @@ function NavGroup({
               <DropdownMenuItem key={sub.href} asChild>
                 <SubLink href={sub.href} onClick={onNavigate}>
                   {t(sub.label)}
+                  <PendingHint />
                 </SubLink>
               </DropdownMenuItem>
             ))}
@@ -247,6 +249,7 @@ function NavGroup({
                 >
                   <SubLink href={sub.href} onClick={onNavigate}>
                     <span>{t(sub.label)}</span>
+                    <PendingHint />
                   </SubLink>
                 </SidebarMenuSubButton>
               </SidebarMenuSubItem>
@@ -256,6 +259,27 @@ function NavGroup({
       </SidebarMenuItem>
     </Collapsible>
   );
+}
+
+/**
+ * A nav item's icon, swapped for a spinner while its link is pending, so the
+ * click is acknowledged before the page arrives. Must render inside the Link.
+ */
+function NavIcon({ icon: Icon }: { icon: LucideIcon }) {
+  const t = useTranslations();
+  const { pending } = useLinkStatus();
+
+  return pending ? <Spinner aria-label={t("common.loading")} /> : <Icon />;
+}
+
+/** The same for a sub-page link, which has no icon: a spinner at its end */
+function PendingHint() {
+  const t = useTranslations();
+  const { pending } = useLinkStatus();
+
+  return pending ? (
+    <Spinner aria-label={t("common.loading")} className="ml-auto size-3.5" />
+  ) : null;
 }
 
 type SubLinkProps = Omit<ComponentProps<typeof Link>, "href"> & {
