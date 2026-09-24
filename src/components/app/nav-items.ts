@@ -26,10 +26,18 @@ export type QuickAddKey = Extract<
   "transactions" | "planned" | "accounts" | "categories"
 >;
 
+/** A page under a group item, labelled by a full message key */
+export type NavSubItem = {
+  href: string;
+  label: "reports.map" | "reports.comparison";
+};
+
 type NavItem = {
+  /** For a group, the prefix its sub-pages share; the item itself links nowhere */
   href: string;
   icon: LucideIcon;
   adminOnly?: boolean;
+  items?: NavSubItem[];
 } & (
   | { key: QuickAddKey; quickAdd?: true }
   | { key: Exclude<NavKey, QuickAddKey>; quickAdd?: never }
@@ -44,7 +52,15 @@ export const NAV_ITEMS: NavItem[] = [
     quickAdd: true,
   },
   { key: "planned", href: "/planned", icon: CalendarClockIcon, quickAdd: true },
-  { key: "reports", href: "/reports", icon: ChartPieIcon },
+  {
+    key: "reports",
+    href: "/reports",
+    icon: ChartPieIcon,
+    items: [
+      { href: "/reports/map", label: "reports.map" },
+      { href: "/reports/compare", label: "reports.comparison" },
+    ],
+  },
   { key: "accounts", href: "/accounts", icon: WalletIcon, quickAdd: true },
   {
     key: "categories",

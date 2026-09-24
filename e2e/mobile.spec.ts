@@ -13,16 +13,18 @@ import {
  * button and dialogs into bottom drawers.
  */
 
+/** [sidebar link, path, heading]; a sub-page link sits under its group's button */
 const PAGES = [
   ["Dashboard", "/dashboard"],
   ["Transactions", "/transactions"],
   ["Planned", "/planned"],
-  ["Reports", "/reports"],
+  ["Map", "/reports/map", "Reports / Map", "Reports"],
+  ["Period comparison", "/reports/compare", "Reports / Period comparison"],
   ["Accounts", "/accounts"],
   ["Categories", "/categories"],
   ["Counterparties", "/counterparties"],
   ["Users", "/users"],
-] as const;
+] as [string, string, string?, string?][];
 
 test.describe("signed out", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
@@ -55,11 +57,14 @@ test("the menu sheet reaches every page and each one fits", async ({
     page.getByRole("link", { name: "Accounts", exact: true }),
   ).toBeHidden();
 
-  for (const [name, path] of PAGES) {
+  for (const [link, path, name = link, group] of PAGES) {
     await test.step(name, async () => {
       await page.getByRole("button", { name: "Toggle Sidebar" }).click();
       const sheet = page.getByRole("dialog");
-      await sheet.getByRole("link", { name, exact: true }).click();
+      if (group) {
+        await sheet.getByRole("button", { name: group, exact: true }).click();
+      }
+      await sheet.getByRole("link", { name: link, exact: true }).click();
 
       // following a link closes the sheet
       await expect(sheet).toBeHidden();

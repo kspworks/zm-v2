@@ -6,9 +6,9 @@ import { ReportsView } from "~/components/reports/reports-view";
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("reports");
 
-  return { title: t("title") };
+  return { title: `${t("title")} · ${t("map")}` };
 }
 
-export default function ReportsPage() {
+export default function ReportsMapPage() {
   return <ReportsView />;
 }

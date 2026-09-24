@@ -28,6 +28,11 @@ const config: NextConfig = {
     // read from disk by the RUN_MIGRATIONS escape hatch (src/instrumentation.ts)
     "/api/trpc/[trpc]": ["./drizzle/**/*"],
   },
+  // Reports is a group of sub-pages; old links land on the first one, query
+  // string included (temporary, so /reports stays free for an overview page)
+  redirects: async () => [
+    { source: "/reports", destination: "/reports/map", permanent: false },
+  ],
 };
 
 export default withSentryConfig(withNextIntl(config), {

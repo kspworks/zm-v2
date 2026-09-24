@@ -8,16 +8,17 @@ import { expect, test } from "./helpers";
 
 const OUT = "docs/screenshots";
 
+/** [heading, path, file name] - the README links the files by name */
 const PAGES = [
-  ["Dashboard", "/dashboard"],
-  ["Transactions", "/transactions"],
-  ["Planned", "/planned"],
-  ["Reports", "/reports"],
+  ["Dashboard", "/dashboard", "dashboard"],
+  ["Transactions", "/transactions", "transactions"],
+  ["Planned", "/planned", "planned"],
+  ["Reports", "/reports/map", "reports"],
 ] as const;
 
 test.use({ colorScheme: "dark" });
 
-for (const [name, path] of PAGES) {
+for (const [name, path, file] of PAGES) {
   test(name, async ({ page, isMobile }) => {
     // the phone shots are only the two pages people open most
     test.skip(isMobile && !["/dashboard", "/transactions"].includes(path));
@@ -29,7 +30,7 @@ for (const [name, path] of PAGES) {
     await page.waitForTimeout(1_000);
 
     await page.screenshot({
-      path: `${OUT}/${isMobile ? "mobile-" : ""}${path.slice(1)}.png`,
+      path: `${OUT}/${isMobile ? "mobile-" : ""}${file}.png`,
       animations: "disabled",
     });
   });

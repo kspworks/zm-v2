@@ -30,10 +30,11 @@ test("the root and protected pages send you to sign in", async ({ page }) => {
   await expect(page).toHaveURL(/\/auth\/login/);
   await expect(page.getByText("Welcome back to ZM")).toBeVisible();
 
+  // through the /reports redirect, which keeps the query string
   await page.goto("/reports?period=month");
   await expect(page).toHaveURL(/\/auth\/login\?callbackUrl=/);
   expect(new URL(page.url()).searchParams.get("callbackUrl")).toBe(
-    "/reports?period=month",
+    "/reports/map?period=month",
   );
 });
 

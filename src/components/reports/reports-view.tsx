@@ -10,7 +10,6 @@ import { z } from "zod";
 import { Money } from "~/components/app/money";
 import { PageHeader } from "~/components/app/page-header";
 import { ReportTreemap } from "~/components/reports/report-treemap";
-import { ReportsTabs } from "~/components/reports/reports-tabs";
 import { FilterButton } from "~/components/transactions/filter-bar";
 import { useToday } from "~/components/transactions/transaction-groups";
 import { useDebtLabelText } from "~/components/transactions/transaction-item";
@@ -153,7 +152,12 @@ export function ReportsView() {
   return (
     <>
       <PageHeader
-        title={t("title")}
+        title={
+          <>
+            {t("title")}{" "}
+            <span className="text-muted-foreground">/ {t("map")}</span>
+          </>
+        }
         actions={
           <FilterButton
             state={state}
@@ -164,7 +168,6 @@ export function ReportsView() {
         }
       />
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4 sm:p-6">
-        <ReportsTabs />
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Tabs
             value={view}

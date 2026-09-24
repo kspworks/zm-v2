@@ -6,7 +6,7 @@ import { ComparisonView } from "~/components/reports/comparison-view";
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("reports");
 
-  return { title: t("comparison") };
+  return { title: `${t("title")} · ${t("comparison")}` };
 }
 
 export default function ReportsComparePage() {

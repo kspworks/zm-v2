@@ -117,7 +117,7 @@ test("records money on a new account, plans the next payment and reports it", as
   });
 
   await test.step("the report shows the spending", async () => {
-    await page.goto("/reports");
+    await page.goto("/reports/map");
     await expect(page.getByText("Groceries").first()).toBeVisible();
   });
 });

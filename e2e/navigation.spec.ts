@@ -10,7 +10,6 @@ const PAGES = [
   "Dashboard",
   "Transactions",
   "Planned",
-  "Reports",
   "Accounts",
   "Categories",
   "Counterparties",
@@ -28,6 +27,34 @@ test("the sidebar reaches every page", async ({ page }) => {
       await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
     });
   }
+});
+
+test("the sidebar's Reports item expands into its sub-pages", async ({
+  page,
+}) => {
+  await page.goto("/transactions");
+  const sidebar = page.locator("[data-slot='sidebar']");
+  const map = sidebar.getByRole("link", { name: "Map", exact: true });
+
+  await expect(map).toBeHidden();
+  await sidebar.getByRole("button", { name: "Reports", exact: true }).click();
+  await map.click();
+  await expect(page).toHaveURL(/\/reports\/map(\?.*)?$/);
+  await expect(
+    page.getByRole("heading", { name: "Reports / Map", level: 1 }),
+  ).toBeVisible();
+
+  // open on its own now that a report is showing
+  await sidebar
+    .getByRole("link", { name: "Period comparison", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/reports\/compare(\?.*)?$/);
+  await expect(
+    page.getByRole("heading", {
+      name: "Reports / Period comparison",
+      level: 1,
+    }),
+  ).toBeVisible();
 });
 
 test("the sidebar's + buttons open the create dialogs in place", async ({

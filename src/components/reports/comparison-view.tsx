@@ -10,7 +10,6 @@ import { Money } from "~/components/app/money";
 import { PageHeader } from "~/components/app/page-header";
 import { DeltaCell } from "~/components/reports/delta-cell";
 import { PeriodPicker } from "~/components/reports/period-picker";
-import { ReportsTabs } from "~/components/reports/reports-tabs";
 import { FilterButton } from "~/components/transactions/filter-bar";
 import { useToday } from "~/components/transactions/transaction-groups";
 import {
@@ -281,7 +280,12 @@ export function ComparisonView() {
   return (
     <>
       <PageHeader
-        title={t("title")}
+        title={
+          <>
+            {t("title")}{" "}
+            <span className="text-muted-foreground">/ {t("comparison")}</span>
+          </>
+        }
         actions={
           <FilterButton
             state={state}
@@ -292,7 +296,6 @@ export function ComparisonView() {
         }
       />
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4 sm:p-6">
-        <ReportsTabs />
         <Card className="py-2">
           <CardContent className="@container px-2 sm:px-4">
             <Table aria-label={t("comparison")} className="table-fixed">
