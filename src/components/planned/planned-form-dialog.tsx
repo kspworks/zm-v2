@@ -160,7 +160,7 @@ export function PlannedFormDialog({
   state: PlannedDialogState;
   onClose: () => void;
 }) {
-  const t = useTranslations("form");
+  const t = useTranslations("planned");
   const tt = useTranslations("transactions");
 
   return (

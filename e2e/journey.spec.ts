@@ -33,7 +33,11 @@ test("records money on a new account, plans the next payment and reports it", as
 }) => {
   await test.step("open an account", async () => {
     await page.goto("/accounts");
-    await page.getByRole("button", { name: "Add account" }).click();
+    // the page's own button, not the sidebar's "+" of the same name
+    await page
+      .locator("main")
+      .getByRole("button", { name: "Add account" })
+      .click();
 
     const dialog = page.getByRole("dialog", { name: "New account" });
     await dialog.getByLabel("Name").fill(ACCOUNT);
@@ -47,7 +51,10 @@ test("records money on a new account, plans the next payment and reports it", as
 
   await test.step("record an expense and an income in one sitting", async () => {
     await page.goto("/transactions");
-    await page.getByRole("button", { name: "Add transaction" }).click();
+    await page
+      .locator("main")
+      .getByRole("button", { name: "Add transaction" })
+      .click();
 
     const dialog = page.getByRole("dialog", { name: "New transaction" });
     await dialog.getByLabel("Amount").fill("250");
@@ -89,9 +96,14 @@ test("records money on a new account, plans the next payment and reports it", as
 
   await test.step("plan the next payment", async () => {
     await page.goto("/planned");
-    await page.getByRole("button", { name: "Plan a transaction" }).click();
+    await page
+      .locator("main")
+      .getByRole("button", { name: "Plan a transaction" })
+      .click();
 
-    const dialog = page.getByRole("dialog", { name: "New transaction" });
+    const dialog = page.getByRole("dialog", {
+      name: "New planned transaction",
+    });
     await dialog.getByLabel("Amount").fill("99");
     await pickCategory(page, dialog, "Subscriptions and online payments");
     await pickOption(page, dialog, "Account", new RegExp(ACCOUNT));

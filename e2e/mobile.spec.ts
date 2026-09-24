@@ -101,6 +101,22 @@ test("adds a transaction from the bottom drawer", async ({ page }) => {
   await expectNoHorizontalScroll(page);
 });
 
+test("the menu sheet's + opens a create drawer over the current page", async ({
+  page,
+}) => {
+  await page.goto("/dashboard");
+  await page.getByRole("button", { name: "Toggle Sidebar" }).click();
+  const sheet = page.getByRole("dialog");
+  await sheet.getByRole("button", { name: "Add account" }).click();
+
+  // the sheet closes and the drawer takes its place, still on the dashboard
+  const drawer = page.getByRole("dialog", { name: "New account" });
+  await expect(drawer).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(1);
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await expectNoHorizontalScroll(page);
+});
+
 test("adds a subcategory and the indented row still fits", async ({
   page,
 }, testInfo) => {

@@ -30,6 +30,31 @@ test("the sidebar reaches every page", async ({ page }) => {
   }
 });
 
+test("the sidebar's + buttons open the create dialogs in place", async ({
+  page,
+}) => {
+  await page.goto("/dashboard");
+  const sidebar = page.locator("[data-slot='sidebar']");
+
+  for (const [button, dialog] of [
+    ["Add transaction", "New transaction"],
+    ["Plan a transaction", "New planned transaction"],
+    ["Add account", "New account"],
+    ["Add category", "New category"],
+  ] as const) {
+    await test.step(button, async () => {
+      await sidebar.getByRole("button", { name: button }).click();
+
+      const opened = page.getByRole("dialog", { name: dialog });
+      await expect(opened).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(opened).toBeHidden();
+      // no navigation: the dialog opened over the page the user was on
+      await expect(page).toHaveURL(/\/dashboard$/);
+    });
+  }
+});
+
 test("settings are in the user menu", async ({ page }) => {
   await page.goto("/transactions");
 
