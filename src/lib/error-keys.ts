@@ -44,6 +44,7 @@ export const ERROR_KEYS = [
   "last_admin",
   "recovery_link_invalid",
   "import_invalid",
+  "import_accounts_in_use",
   "import_empty_row",
   "unknown_currency",
   "amount_sign",

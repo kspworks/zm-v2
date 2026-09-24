@@ -185,6 +185,7 @@
     "last_admin": "There must be at least one admin",
     "recovery_link_invalid": "This recovery link is invalid",
     "import_invalid": "The file has errors",
+    "import_accounts_in_use": "Accounts from this import have other transactions or planned ones now. Delete those, or undo later imports first",
     "import_empty_row": "A row has neither outcome nor income",
     "unknown_currency": "Unknown currency",
     "amount_sign": "The amount has the wrong sign",

@@ -2,12 +2,7 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import type { TransactionInput } from "~/lib/validators/transactions";
 import type { DbOrTx } from "~/server/db";
-import {
-  accounts,
-  categories,
-  categoryMembers,
-  users,
-} from "~/server/db/schema";
+import { categories, categoryMembers, users } from "~/server/db/schema";
 import { today } from "~/server/lib/clock";
 import { appError, forbidden } from "~/server/lib/errors";
 import { getServerTranslator } from "~/server/lib/i18n";
@@ -69,17 +64,18 @@ export const adjustBalance = (
   },
 ) =>
   db.transaction(async (tx) => {
-    const access = await requireWritableAccounts(tx, userId, [input.accountId]);
+    // an exclusive lock, so the balance read below stays current until the
+    // adjustment is inserted
+    const access = await requireWritableAccounts(
+      tx,
+      userId,
+      [input.accountId],
+      "update",
+    );
 
     if (access.get(input.accountId)?.type === "debt") {
       throw forbidden("account_is_debt");
     }
-
-    await tx
-      .select({ id: accounts.id })
-      .from(accounts)
-      .where(eq(accounts.id, input.accountId))
-      .for("update");
 
     const [current] = await balancesOf(tx, [input.accountId]);
     const difference = input.actualBalance - (current?.balance ?? 0);

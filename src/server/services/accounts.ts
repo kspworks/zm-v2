@@ -190,7 +190,9 @@ const requireEditableAccount = async (
   userId: string,
   id: string,
 ) => {
-  const access = (await accountAccess(db, userId, [id])).get(id);
+  // locked so the checks below and the caller's change see the same row, and
+  // a concurrent write into the account either finishes first or finds it gone
+  const access = (await accountAccess(db, userId, [id], "update")).get(id);
 
   if (!access?.canWrite) {
     throw forbidden();
@@ -296,10 +298,6 @@ export const setAccountActive = (
 export const deleteAccount = (db: DbOrTx, userId: string, id: string) =>
   db.transaction(async (tx) => {
     await requireEditableAccount(tx, userId, id);
-
-    // an uncommitted insert holds a key-share lock on this row through its
-    // foreign key, so this waits for it and the in-use check then sees it
-    await tx.select().from(accounts).where(eq(accounts.id, id)).for("update");
 
     if (await accountInUse(tx, id)) {
       throw appError("BAD_REQUEST", "account_has_transactions");

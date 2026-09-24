@@ -1,7 +1,18 @@
 import { gunzipSync } from "node:zlib";
 
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  ne,
+  or,
+  sql,
+} from "drizzle-orm";
 
 import { MAX_IMPORT_BYTES } from "~/lib/import-limits";
 import type { DbOrTx } from "~/server/db";
@@ -12,6 +23,7 @@ import {
   categoryMembers,
   currencies,
   imports,
+  plannedTransactions,
   transactions,
 } from "~/server/db/schema";
 import { audit } from "~/server/lib/audit";
@@ -254,7 +266,9 @@ export const uploadImport = async (
                 eq(accounts.currencyId, currencyId),
                 isNull(accounts.deletedAt),
               ),
-            );
+            )
+            // an undo of the import that created it can't delete it under us
+            .for("share");
 
           if (existing) {
             id = existing.id;
@@ -413,8 +427,49 @@ export const listImports = (db: DbOrTx, userId: string) =>
     .orderBy(desc(imports.createdAt), asc(imports.id));
 
 /**
+ * Any live transaction or schedule on the accounts that didn't come from this
+ * import: added by hand (planned occurrences included) or by a later import
+ * that reused the account by name.
+ */
+const importAccountsInUse = async (
+  tx: DbOrTx,
+  importId: string,
+  accountIds: string[],
+): Promise<boolean> => {
+  const [transaction] = await tx
+    .select({ id: transactions.id })
+    .from(transactions)
+    .where(
+      and(
+        inArray(transactions.accountId, accountIds),
+        isNull(transactions.deletedAt),
+        or(isNull(transactions.importId), ne(transactions.importId, importId)),
+      ),
+    )
+    .limit(1);
+
+  if (transaction) {
+    return true;
+  }
+
+  const [schedule] = await tx
+    .select({ id: plannedTransactions.id })
+    .from(plannedTransactions)
+    .where(
+      and(
+        inArray(plannedTransactions.accountId, accountIds),
+        isNull(plannedTransactions.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  return schedule !== undefined;
+};
+
+/**
  * Undo: soft-deletes the import and every account, category and transaction
- * it created, in one transaction.
+ * it created, in one transaction. Refused while the import's accounts hold
+ * anything else, which would otherwise stay live on a deleted account.
  */
 export const undoImport = (db: DbOrTx, userId: string, importId: string) =>
   db.transaction(async (tx) => {
@@ -440,6 +495,26 @@ export const undoImport = (db: DbOrTx, userId: string, importId: string) =>
         eq(t.importId as typeof imports.id, importId),
         isNull(t.deletedAt as typeof imports.deletedAt),
       );
+
+    // locked in id order like any account change, so writes into these
+    // accounts either finish first and are seen below, or find them gone
+    const importAccounts = await tx
+      .select({ id: accounts.id })
+      .from(accounts)
+      .where(live(accounts))
+      .orderBy(accounts.id)
+      .for("update");
+
+    if (
+      importAccounts.length > 0 &&
+      (await importAccountsInUse(
+        tx,
+        importId,
+        importAccounts.map((a) => a.id),
+      ))
+    ) {
+      throw appError("BAD_REQUEST", "import_accounts_in_use");
+    }
 
     const removedTransactions = await tx
       .update(transactions)

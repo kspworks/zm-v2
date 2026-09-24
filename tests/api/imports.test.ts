@@ -9,6 +9,7 @@ import {
   imports,
   transactions,
 } from "~/server/db/schema";
+import { createTransaction } from "~/server/services/transactions";
 import { callerFor } from "../helpers/caller";
 import {
   buildCsv,
@@ -24,6 +25,7 @@ import {
   makeAccount,
   type TestUser,
 } from "../helpers/fixtures";
+import { signal, untilBlockedOnLock } from "../helpers/locks";
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -366,6 +368,140 @@ describe("imports.list and imports.undo", () => {
       .where(and(eq(accounts.createdBy, user.id), isNull(accounts.deletedAt)));
     expect(accountsLeft.map((a) => a.id)).toEqual([kept.id]);
     expect(await callerFor(user).imports.list()).toEqual([]);
+  });
+
+  const importedAccount = async (importId: string) => {
+    const [row] = await db
+      .select({ id: accounts.id })
+      .from(accounts)
+      .where(eq(accounts.importId, importId));
+
+    if (!row) {
+      throw new Error("the import created no account");
+    }
+
+    return row.id;
+  };
+
+  const expectNothingUndone = async (user: TestUser, importId: string) => {
+    expect(await callerFor(user).imports.list()).toMatchObject([
+      { id: importId },
+    ]);
+    const [account] = await db
+      .select({ deletedAt: accounts.deletedAt })
+      .from(accounts)
+      .where(eq(accounts.importId, importId));
+    expect(account?.deletedAt).toBeNull();
+  };
+
+  it("refuses while an imported account has a transaction added by hand", async () => {
+    const user = await createUser();
+    const summary = await upload(user, [expenseRow()]);
+    const accountId = await importedAccount(summary.importId);
+    await callerFor(user).transactions.create({
+      kind: "expense",
+      date: "2026-03-14",
+      amount: 500,
+      accountId,
+    });
+
+    await expectTRPCError(
+      callerFor(user).imports.undo({ id: summary.importId }),
+      "BAD_REQUEST",
+      "import_accounts_in_use",
+    );
+    await expectNothingUndone(user, summary.importId);
+  });
+
+  it("refuses while an imported account has a schedule", async () => {
+    const user = await createUser();
+    const summary = await upload(user, [expenseRow()]);
+    await callerFor(user).planned.create({
+      data: {
+        kind: "expense",
+        date: "2026-03-20",
+        amount: 1000,
+        accountId: await importedAccount(summary.importId),
+      },
+      schedule: { repeatType: "monthly", repeatInterval: 1 },
+    });
+
+    await expectTRPCError(
+      callerFor(user).imports.undo({ id: summary.importId }),
+      "BAD_REQUEST",
+      "import_accounts_in_use",
+    );
+    await expectNothingUndone(user, summary.importId);
+  });
+
+  it("refuses while a later import uses its accounts, until that one is undone", async () => {
+    const user = await createUser();
+    const first = await upload(user, [expenseRow()], "first.csv");
+    // past the one-import-per-hour limit
+    vi.setSystemTime(new Date("2026-03-15T13:00:01Z"));
+    const second = await upload(user, [expenseRow()], "second.csv");
+
+    await expectTRPCError(
+      callerFor(user).imports.undo({ id: first.importId }),
+      "BAD_REQUEST",
+      "import_accounts_in_use",
+    );
+
+    await callerFor(user).imports.undo({ id: second.importId });
+    expect(
+      await callerFor(user).imports.undo({ id: first.importId }),
+    ).toMatchObject({ transactions: 1, accounts: 1 });
+  });
+
+  it("ignores other transactions on accounts the import only reused", async () => {
+    const user = await createUser();
+    const kept = await makeAccount(user, { name: "Card" });
+    await callerFor(user).transactions.create({
+      kind: "expense",
+      date: "2026-03-14",
+      amount: 500,
+      accountId: kept.id,
+    });
+    const summary = await upload(user, [expenseRow()]);
+
+    expect(
+      await callerFor(user).imports.undo({ id: summary.importId }),
+    ).toMatchObject({ transactions: 1, accounts: 0 });
+  });
+
+  it("refuses when a create into an imported account commits while it waits", async () => {
+    const user = await createUser();
+    const summary = await upload(user, [expenseRow()]);
+    const accountId = await importedAccount(summary.importId);
+
+    // the create has run but not committed when the undo starts
+    const created = signal();
+    const commit = signal();
+    const creating = db.transaction(async (tx) => {
+      await createTransaction(tx, user.id, {
+        kind: "expense",
+        date: "2026-03-14",
+        amount: 500,
+        accountId,
+        categoryId: null,
+        counterparty: null,
+        comment: null,
+      });
+      created.resolve();
+      await commit.promise;
+    });
+    await created.promise;
+
+    const undoing = expectTRPCError(
+      callerFor(user).imports.undo({ id: summary.importId }),
+      "BAD_REQUEST",
+      "import_accounts_in_use",
+    );
+    await untilBlockedOnLock();
+    commit.resolve();
+    await creating;
+    await undoing;
+    await expectNothingUndone(user, summary.importId);
   });
 
   it("only the owner can undo", async () => {
