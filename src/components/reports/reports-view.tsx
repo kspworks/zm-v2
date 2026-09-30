@@ -1,14 +1,15 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { format, subMonths } from "date-fns";
 import { AlertTriangleIcon, ChartPieIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { z } from "zod";
 
 import { Money } from "~/components/app/money";
 import { PageHeader } from "~/components/app/page-header";
+import { PeriodPicker } from "~/components/reports/period-picker";
 import { ReportTreemap } from "~/components/reports/report-treemap";
 import { FilterButton } from "~/components/transactions/filter-bar";
 import { useToday } from "~/components/transactions/transaction-groups";
@@ -48,6 +49,7 @@ import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { useLocalStorage } from "~/hooks/use-local-storage";
 import { formatDisplayDate } from "~/lib/dates";
 import { formatMoney } from "~/lib/money";
+import type { Period } from "~/lib/period";
 import {
   buildReport,
   colorSlots,
@@ -70,10 +72,11 @@ const GROUP_BY_LABELS = {
 export function ReportsView() {
   const t = useTranslations("reports");
   const tt = useTranslations("transactions");
+  const tf = useTranslations("filters");
   const trpc = useTRPC();
   const today = useToday();
   const debtLabelText = useDebtLabelText();
-  const { state, setState, filter, reset } = useTransactionFilter();
+  const { state, setState, filter } = useTransactionFilter();
   const [view, setView] = useLocalStorage(
     "zm.reports.view",
     viewSchema,
@@ -85,32 +88,27 @@ export function ReportsView() {
     "category",
   );
 
-  // the range is required: default to one month ago .. today
-  useEffect(() => {
-    if (!state.startDate || !state.endDate) {
-      void setState({
-        startDate:
-          state.startDate ??
-          format(subMonths(new Date(`${today}T12:00:00`), 1), "yyyy-MM-dd"),
-        endDate: state.endDate ?? today,
-      });
-    }
-  }, [state.startDate, state.endDate, today, setState]);
+  // the range is required: without a valid one in the URL, one month ago
+  // .. today
+  const period = useMemo(
+    (): Period =>
+      filter.startDate && filter.endDate
+        ? { startDate: filter.startDate, endDate: filter.endDate }
+        : {
+            startDate: format(
+              subMonths(new Date(`${today}T12:00:00`), 1),
+              "yyyy-MM-dd",
+            ),
+            endDate: today,
+          },
+    [filter.startDate, filter.endDate, today],
+  );
 
-  const range =
-    filter.startDate && filter.endDate
-      ? { ...filter, startDate: filter.startDate, endDate: filter.endDate }
-      : null;
-
-  const dateRangeText = range
-    ? `${formatDisplayDate(range.startDate)} – ${formatDisplayDate(range.endDate)}`
-    : null;
+  const dateRangeText = `${formatDisplayDate(period.startDate)} – ${formatDisplayDate(period.endDate)}`;
 
   const data = useQuery({
-    ...trpc.reports.data.queryOptions({
-      filter: range ?? { ...filter, startDate: today, endDate: today },
-    }),
-    enabled: range !== null,
+    ...trpc.reports.data.queryOptions({ filter: { ...filter, ...period } }),
+    placeholderData: keepPreviousData,
   });
 
   const charts = useMemo(() => {
@@ -162,13 +160,22 @@ export function ReportsView() {
           <FilterButton
             state={state}
             setState={setState}
-            reset={reset}
-            requireDates
+            // the period is not a filter here, so Reset keeps it
+            reset={() =>
+              void setState({
+                accounts: null,
+                categories: null,
+                counterparties: null,
+                amount: null,
+                comment: null,
+              })
+            }
+            withDates={false}
           />
         }
       />
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4 sm:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="@container flex flex-wrap items-center justify-between gap-2">
           <Tabs
             value={view}
             onValueChange={(value) => setView(viewSchema.parse(value))}
@@ -178,6 +185,17 @@ export function ReportsView() {
               <TabsTrigger value="income">{t("income")}</TabsTrigger>
             </TabsList>
           </Tabs>
+          <PeriodPicker
+            label={tf("dates")}
+            value={period}
+            onChange={(next) =>
+              void setState({
+                startDate: next.startDate,
+                endDate: next.endDate,
+              })
+            }
+            className="@4xl:w-64 w-auto"
+          />
           <Select
             value={groupBy}
             onValueChange={(value) =>
@@ -231,11 +249,9 @@ export function ReportsView() {
                       amount: formatMoney(chart.total, chart.currencySign),
                     })}
                   </span>
-                  {dateRangeText ? (
-                    <span className="font-normal text-muted-foreground text-sm">
-                      {dateRangeText}
-                    </span>
-                  ) : null}
+                  <span className="font-normal text-muted-foreground text-sm">
+                    {dateRangeText}
+                  </span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col gap-3">

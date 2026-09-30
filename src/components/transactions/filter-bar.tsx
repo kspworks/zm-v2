@@ -80,12 +80,10 @@ export const activeFilterCount = (state: FilterState, withDates = true) =>
 function FilterFields({
   state,
   setState,
-  requireDates,
   withDates,
 }: {
   state: FilterState;
   setState: SetFilterState;
-  requireDates: boolean;
   withDates: boolean;
 }) {
   const t = useTranslations("filters");
@@ -177,14 +175,10 @@ function FilterFields({
             <DatePicker
               id="filter-from"
               value={state.startDate}
-              clearable={!requireDates}
+              clearable
               invalid={reversed}
               placeholder="—"
-              onChange={(value) => {
-                if (value || !requireDates) {
-                  void setState({ startDate: value });
-                }
-              }}
+              onChange={(value) => void setState({ startDate: value })}
             />
             {reversed ? (
               <FieldError>{te("start_date_lte_end_date")}</FieldError>
@@ -195,14 +189,10 @@ function FilterFields({
             <DatePicker
               id="filter-to"
               value={state.endDate}
-              clearable={!requireDates}
+              clearable
               invalid={reversed}
               placeholder="—"
-              onChange={(value) => {
-                if (value || !requireDates) {
-                  void setState({ endDate: value });
-                }
-              }}
+              onChange={(value) => void setState({ endDate: value })}
             />
             {reversed ? (
               <FieldError>{te("end_date_gte_start_date")}</FieldError>
@@ -239,13 +229,11 @@ export function FilterButton({
   state,
   setState,
   reset,
-  requireDates = false,
   withDates = true,
 }: {
   state: FilterState;
   setState: SetFilterState;
   reset: () => void;
-  requireDates?: boolean;
   /** false hides the date range, for pages that pick their own periods */
   withDates?: boolean;
 }) {
@@ -253,7 +241,7 @@ export function FilterButton({
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
 
-  const count = activeFilterCount(state, withDates && !requireDates);
+  const count = activeFilterCount(state, withDates);
 
   const trigger = (
     <Button variant="outline" size="sm">
@@ -264,12 +252,7 @@ export function FilterButton({
   );
 
   const fields = (
-    <FilterFields
-      state={state}
-      setState={setState}
-      requireDates={requireDates}
-      withDates={withDates}
-    />
+    <FilterFields state={state} setState={setState} withDates={withDates} />
   );
 
   const resetButton = (variant: "ghost" | "outline") => (
