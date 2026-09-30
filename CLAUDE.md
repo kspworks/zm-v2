@@ -1,5 +1,12 @@
 @AGENTS.md
 
+# Worktrees
+
+Right after creating a git worktree, copy `.env` from the main checkout
+into it (`cp <main-checkout>/.env <worktree>/.env`). `.env` is gitignored,
+so a new worktree starts without it, and the dev server, Drizzle and the
+tests fail in the same repeatable ways until it is there. Don't commit it.
+
 # Commits and PRs
 
 Never add AI attribution to commits or pull requests: no `Co-Authored-By: Claude …` trailer, no "Generated with Claude Code" line, and no similar mention.
