@@ -66,6 +66,60 @@ test.describe("rejections", () => {
     await expect(page.getByText("Wrong email, password or code")).toBeVisible();
     await expect(page).toHaveURL(/\/auth\/login/);
   });
+
+  test("a wrong authenticator code is refused", async ({ page }) => {
+    const credentials = readCredentials();
+
+    await page.goto("/auth/login");
+    await submitCredentials(page, credentials.email, credentials.password);
+    await page.getByLabel("Code").fill("000000");
+
+    await expect(page.getByText("Wrong email, password or code")).toBeVisible();
+    await expect(page).toHaveURL(/\/auth\/login/);
+    await expect(page.getByLabel("Code")).toHaveValue("");
+  });
+
+  test("a wrong backup code is refused", async ({ page }) => {
+    const credentials = readCredentials();
+
+    await page.goto("/auth/login");
+    await submitCredentials(page, credentials.email, credentials.password);
+    await page
+      .getByRole("button", {
+        name: "Lost your authenticator? Use a backup code",
+      })
+      .click();
+    await page.getByLabel("Backup code").fill("wrong-code1");
+    await page.getByRole("button", { name: "Verify" }).click();
+
+    await expect(page.getByText("Wrong email, password or code")).toBeVisible();
+    await expect(page).toHaveURL(/\/auth\/login/);
+  });
+});
+
+test("the code inputs only submit a plausible code", async ({ page }) => {
+  const credentials = readCredentials();
+
+  await page.goto("/auth/login");
+  await submitCredentials(page, credentials.email, credentials.password);
+
+  // the authenticator code takes digits only
+  await page.getByLabel("Code").pressSequentially("1a2b");
+  await expect(page.getByLabel("Code")).toHaveValue("12");
+
+  await page
+    .getByRole("button", { name: "Lost your authenticator? Use a backup code" })
+    .click();
+  const backup = page.getByLabel("Backup code");
+  const verify = page.getByRole("button", { name: "Verify" });
+
+  await expect(verify).toBeDisabled();
+  await backup.fill("abc");
+  await expect(verify).toBeDisabled();
+  await backup.fill("      ");
+  await expect(verify).toBeDisabled();
+  await backup.fill("abcdef");
+  await expect(verify).toBeEnabled();
 });
 
 test("a backup code signs in and points at re-enrolment", async ({ page }) => {
@@ -78,7 +132,8 @@ test("a backup code signs in and points at re-enrolment", async ({ page }) => {
   await page
     .getByRole("button", { name: "Lost your authenticator? Use a backup code" })
     .click();
-  await page.getByLabel("Backup code").fill(code ?? "");
+  // pasted with stray spaces, which the form trims
+  await page.getByLabel("Backup code").fill(`  ${code}  `);
   await page.getByRole("button", { name: "Verify" }).click();
 
   await expect(page).toHaveURL(/\/settings\?reenrol=1$/);

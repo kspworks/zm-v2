@@ -75,6 +75,21 @@ export const createUserWithCredentials = async (
   return { user: fresh ?? user, password, secret, backupCodes };
 };
 
+/**
+ * A backup code with a letter in it, plus the same code with every letter's
+ * case swapped (codes are 10 random alphanumerics, so one has a letter)
+ */
+export const caseSwappedBackupCode = (backupCodes: string[]) => {
+  const code = backupCodes.find((candidate) => /[a-z]/i.test(candidate)) ?? "";
+  const swapped = [...code]
+    .map((char) =>
+      char === char.toUpperCase() ? char.toLowerCase() : char.toUpperCase(),
+    )
+    .join("");
+
+  return { code, swapped };
+};
+
 // ---------------------------------------------------------------------------
 // accounts, categories, sharing, raw transactions
 // ---------------------------------------------------------------------------

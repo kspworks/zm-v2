@@ -99,6 +99,22 @@ describe("password reset by email", () => {
     ).toBe(true);
   });
 
+  it("trims the code before checking it", async () => {
+    const { user, secret, backupCodes } = await createUserWithCredentials();
+    await requestReset(user.email);
+
+    const ok = await new AuthSession().post("/reset-password", {
+      token: await resetToken(),
+      newPassword: "fresh-password",
+      code: `  ${backupCodes[0]}  `,
+    });
+
+    expect(ok.status).toBe(200);
+    expect(
+      await signIn(user.email, "fresh-password", generateTotp(secret)),
+    ).toBe(true);
+  });
+
   it("limits requests to 3 per hour per email", async () => {
     const { user } = await createUserWithCredentials();
 

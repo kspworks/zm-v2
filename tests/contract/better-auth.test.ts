@@ -6,7 +6,10 @@ import { db } from "~/server/db";
 import { rateLimits, sessions, users } from "~/server/db/schema";
 import { generateTotp } from "~/server/lib/totp";
 import { AuthSession } from "../helpers/auth-http";
-import { createUserWithCredentials } from "../helpers/fixtures";
+import {
+  caseSwappedBackupCode,
+  createUserWithCredentials,
+} from "../helpers/fixtures";
 
 /**
  * Contract: better-auth's email + TOTP sign-in, driven through its public
@@ -91,6 +94,26 @@ describe("better-auth sign-in with TOTP", () => {
     const reused = await again.post("/two-factor/verify-backup-code", { code });
 
     expect(reused.status).toBe(401);
+  });
+
+  it("rejects a backup code in the wrong case", async () => {
+    const { user, password, backupCodes } = await createUserWithCredentials();
+    const { code, swapped } = caseSwappedBackupCode(backupCodes);
+
+    const browser = new AuthSession();
+    await browser.post("/sign-in/email", { email: user.email, password });
+    const wrong = await browser.post("/two-factor/verify-backup-code", {
+      code: swapped,
+    });
+
+    expect(wrong.status).toBe(401);
+    expect(await browser.session()).toBeNull();
+
+    const again = new AuthSession();
+    await again.post("/sign-in/email", { email: user.email, password });
+    const ok = await again.post("/two-factor/verify-backup-code", { code });
+
+    expect(ok.status).toBe(200);
   });
 
   it("refuses to sign in a soft-deleted user", async () => {

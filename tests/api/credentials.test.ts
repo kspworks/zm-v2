@@ -4,10 +4,15 @@ import { createCaller } from "~/server/api/root";
 import { db } from "~/server/db";
 import { recoveryLinks, sessions, twoFactors } from "~/server/db/schema";
 import { generateTotp } from "~/server/lib/totp";
+import { changePassword } from "~/server/services/credentials";
 import { AuthSession } from "../helpers/auth-http";
 import { anonymousCaller, callerFor } from "../helpers/caller";
 import { expectTRPCError } from "../helpers/errors";
-import { createAdmin, createUserWithCredentials } from "../helpers/fixtures";
+import {
+  caseSwappedBackupCode,
+  createAdmin,
+  createUserWithCredentials,
+} from "../helpers/fixtures";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -184,6 +189,96 @@ describe("settings.backupCodes", () => {
       false,
     );
     expect(await signIn(user.email, password, fresh[0] ?? "", true)).toBe(true);
+  });
+});
+
+describe("second-factor input", () => {
+  it.each([
+    [
+      "settings.changePassword",
+      (caller: ReturnType<typeof callerFor>, password: string) =>
+        caller.settings.changePassword({
+          currentPassword: password,
+          newPassword: "newsecret",
+          code: "12345",
+        }),
+    ],
+    [
+      "settings.backupCodes",
+      (caller: ReturnType<typeof callerFor>, password: string) =>
+        caller.settings.backupCodes({ password, code: "12345" }),
+    ],
+    [
+      "settings.confirmReenrol",
+      (caller: ReturnType<typeof callerFor>) =>
+        caller.settings.confirmReenrol({ code: "12345" }),
+    ],
+  ])("%s refuses a code that is not 6 digits", async (_, call) => {
+    const { user, password } = await createUserWithCredentials();
+
+    await expectTRPCError(call(callerFor(user), password), "BAD_REQUEST");
+  });
+
+  it("accepts a TOTP code with spaces around it", async () => {
+    const { user, password, secret } = await createUserWithCredentials();
+
+    const { backupCodes } = await callerFor(user).settings.backupCodes({
+      password,
+      code: `  ${generateTotp(secret)}  `,
+    });
+
+    expect(backupCodes).toHaveLength(10);
+  });
+
+  it("refuses a backup code where only a TOTP counts, without spending it", async () => {
+    const { user, password, backupCodes } = await createUserWithCredentials();
+    const code = backupCodes[0] ?? "";
+
+    await expectTRPCError(
+      callerFor(user).settings.changePassword({
+        currentPassword: password,
+        newPassword: "newsecret",
+        code,
+      }),
+      "BAD_REQUEST",
+    );
+    await expectTRPCError(
+      changePassword(
+        db,
+        { id: user.id, sessionId: null },
+        { currentPassword: password, newPassword: "newsecret", code },
+      ),
+      "BAD_REQUEST",
+      "invalid_code",
+    );
+
+    expect(await signIn(user.email, "newsecret", code, true)).toBe(false);
+    expect(await signIn(user.email, password, code, true)).toBe(true);
+  });
+
+  it("accepts a backup code with spaces around it and spends it", async () => {
+    const { user, password, backupCodes } = await createUserWithCredentials();
+    const code = backupCodes[0] ?? "";
+
+    await callerFor(user).settings.startReenrol({
+      password,
+      code: `  ${code}  `,
+    });
+
+    expect(await signIn(user.email, password, code, true)).toBe(false);
+  });
+
+  it("compares backup codes case-sensitively", async () => {
+    const { user, password, backupCodes } = await createUserWithCredentials();
+    const { code, swapped } = caseSwappedBackupCode(backupCodes);
+
+    await expectTRPCError(
+      callerFor(user).settings.startReenrol({ password, code: swapped }),
+      "BAD_REQUEST",
+      "invalid_code",
+    );
+
+    expect(await signIn(user.email, password, code, true)).toBe(true);
   });
 });
 
