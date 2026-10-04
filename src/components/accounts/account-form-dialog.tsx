@@ -121,7 +121,9 @@ export function AccountFormDialog({
   const update = useMutation(
     trpc.accounts.update.mutationOptions({ onSuccess, onError: toastError }),
   );
-  const pending = create.isPending || update.isPending;
+  // a save before the currency list arrives would fail on the still-empty
+  // currency, and the error stays once the default fills in
+  const pending = create.isPending || update.isPending || currencies.isPending;
 
   const submit = form.handleSubmit((values) => {
     const payload = {

@@ -27,6 +27,9 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["github"], ["html"]] : [["list"]],
+  // `next dev` compiles each route on its first request, and one step can
+  // wait on several (the wizard's ticket sign-in, then /dashboard: ~5s cold)
+  expect: { timeout: process.env.E2E_DEV ? 15_000 : 5_000 },
   use: {
     baseURL: BASE_URL,
     // the app defaults to Ukrainian; the specs read en.json
