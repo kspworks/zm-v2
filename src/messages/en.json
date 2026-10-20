@@ -99,6 +99,7 @@
       "useTotp": "Use the authenticator app instead",
       "startOver": "Use another account",
       "forgotPassword": "Forgot password?",
+      "setUpAdmin": "No account yet? Set up the administrator",
       "reenrolPrompt": "You signed in with a backup code. Set up your authenticator again in Settings."
     },
     "errors": {

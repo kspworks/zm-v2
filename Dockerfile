@@ -18,7 +18,6 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN corepack enable && pnpm install --frozen-lockfile
 
 COPY src ./src
-COPY public ./public
 COPY drizzle ./drizzle
 COPY next.config.ts postcss.config.mjs drizzle.config.ts tsconfig.json ./
 COPY instrumentation-client.ts sentry.server.config.ts sentry.edge.config.ts ./
@@ -49,7 +48,6 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 USER nextjs
 
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 

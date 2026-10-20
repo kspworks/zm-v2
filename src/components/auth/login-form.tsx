@@ -41,12 +41,15 @@ type Props = {
   callbackUrl: string;
   initialError: AuthErrorCode | null;
   canResetPassword: boolean;
+  /** Set while no active admin exists, i.e. on a fresh install */
+  adminInviteHref: string | null;
 };
 
 export function LoginForm({
   callbackUrl,
   initialError,
   canResetPassword,
+  adminInviteHref,
 }: Props) {
   const t = useTranslations("auth");
   const router = useRouter();
@@ -194,6 +197,14 @@ export function LoginForm({
                 {submitting ? <Spinner /> : null}
                 {t("login.submit")}
               </Button>
+              {adminInviteHref ? (
+                <Link
+                  href={adminInviteHref}
+                  className="text-center text-muted-foreground text-sm underline underline-offset-4 hover:text-foreground"
+                >
+                  {t("login.setUpAdmin")}
+                </Link>
+              ) : null}
             </FieldGroup>
           </form>
         </CardContent>

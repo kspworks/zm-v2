@@ -26,9 +26,10 @@
    (`vercel-build` = build + migrate). That covers the database attached to
    `Production` only; migrate any other one with `pnpm run db:migrate`.
 9. Open `Settings` → `Functions`, enable `Fluid Compute`, save and redeploy.
-10. Create the admin: open `https://YOUR-DOMAIN/auth/register/invite?id=admin`
-    and follow the steps (name, email, password, authenticator app, backup codes).
-    The link stops working once an admin exists.
+10. Create the admin: open `https://YOUR-DOMAIN` and follow the sign-in page's
+    link to `/auth/register/invite?id=admin` (name, email, password,
+    authenticator app, backup codes). The link disappears, and the invite
+    stops working, once an admin exists.
 11. Optional:
     - Email (insufficient-funds alerts and "forgot password"): set `MAIL_HOST`,
       `MAIL_PORT` (465 for TLS), `MAIL_USERNAME`, `MAIL_PASSWORD` and optionally

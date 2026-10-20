@@ -74,8 +74,9 @@ access control, how debts and planned transactions behave) are in
 
 ## Local development
 
-You need Node 24 (`.nvmrc`), pnpm (`corepack enable` picks the pinned
-version) and PostgreSQL 15+. `.env.example` expects
+You need Node 24.14.1 or newer on the 24 line (`.nvmrc`; `pnpm install`
+refuses older ones), pnpm (`corepack enable` picks the pinned version) and
+PostgreSQL 15+. `.env.example` expects
 `postgresql://zm:zm@127.0.0.1:5432/zm`; one way to get it:
 
 ```shell
@@ -91,11 +92,15 @@ pnpm run db:migrate
 pnpm dev
 ```
 
-Create the first (admin) user at
-[/auth/register/invite?id=admin](http://localhost:3000/auth/register/invite?id=admin).
-That link only works while there is no active admin; everyone else joins
-through an invite link from the Users page. In development the code
-`111111` is accepted in place of an authenticator code.
+[localhost:3000](http://localhost:3000) opens the sign-in page. On an
+empty database it links to
+[/auth/register/invite?id=admin](http://localhost:3000/auth/register/invite?id=admin),
+where you create the first (admin) user. That link only works while there is
+no active admin; everyone else joins through an invite link from the Users
+page. In development the code `111111` is accepted in place of an
+authenticator code. The interface follows the browser's language (English or
+Ukrainian, Ukrainian otherwise); switch it in the top corner of the sign-in
+pages, or in the user menu at the foot of the sidebar.
 
 Other everyday commands:
 
@@ -179,7 +184,8 @@ Screenshots of every page at phone width land in `test-results/`.
   `BETTER_AUTH_URL` and `CRON_SECRET`. The app refuses to start without them.
 - **Change the Postgres password**, in `docker-compose.yml` and in
   `DATABASE_URL`. The example one is public: it is in this repository.
-- `docker compose up --wait` and open [http://localhost:3333](http://localhost:3333).
+- `docker compose up --wait` and open [http://localhost:3333](http://localhost:3333);
+  the sign-in page links to the admin setup.
 
 A `migrator` service applies the migrations and must exit successfully before
 `next-app` starts, so the schema is never behind the code. The cron jobs

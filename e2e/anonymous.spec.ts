@@ -29,6 +29,12 @@ test("the root and protected pages send you to sign in", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveURL(/\/auth\/login/);
   await expect(page.getByText("Welcome back to ZM")).toBeVisible();
+  // auth.setup.ts registered the admin, so the bootstrap link is gone
+  await expect(
+    page.getByRole("link", {
+      name: "No account yet? Set up the administrator",
+    }),
+  ).toHaveCount(0);
 
   // through the /reports redirect, which keeps the query string
   await page.goto("/reports?period=month");

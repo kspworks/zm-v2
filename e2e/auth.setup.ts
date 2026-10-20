@@ -19,7 +19,13 @@ setup("bootstrap the administrator and stay signed in", async ({ page }) => {
     backupCodes: [],
   };
 
-  await page.goto("/auth/register/invite?id=admin");
+  // an empty database has nobody to sign in as, so the sign-in page links
+  // to the admin invite: the way in for someone who skipped the README
+  await page.goto("/");
+  await page
+    .getByRole("link", { name: "No account yet? Set up the administrator" })
+    .click();
+  await expect(page).toHaveURL(/\/auth\/register\/invite\?id=admin$/);
   await expect(
     page.getByText("Create the administrator account"),
   ).toBeVisible();
