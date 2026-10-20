@@ -1,22 +1,46 @@
 # ZM
 
-A self-hosted, invite-only personal budget manager:
+**ZM is a private money tracker for you and the people you share money with.**
+It helps answer three everyday questions — *where is my money, where did it
+go, and will I have enough next month?* — without handing your accounts or
+spending habits to a company. You run it yourself, on your own server or a
+hosting service you choose, and only the people you invite can get in.
 
-- accounts in several currencies; expenses, incomes, transfers and debts,
-  entered one at a time or in bulk, plus a one-step balance adjustment;
-- two-level categories, and a filterable transaction list with totals over
-  the whole filtered set;
-- planned (recurring) transactions with overdue reminders, and email alerts
-  when tomorrow's planned payments would overdraw an account;
-- per-person debt tracking (lent, borrowed, repaid);
-- a dashboard with a balance chart, a monthly forecast and the nearest
-  planned payments; treemap reports of expenses and incomes;
-- accounts and categories shared with other users, read-only or read-write;
-- ZenMoney CSV import that can be undone;
-- sign-in with a password plus a mandatory authenticator app (TOTP) and
-  backup codes, password reset by email, and admin-issued invite links.
+Most budget apps only show what has already happened. ZM cares just as much
+about what is coming: regular bills, salary, money you lent out, and whether
+an account is about to run dry.
 
-English and Ukrainian, light and dark.
+## What you can do with it
+
+- **Keep all your accounts in one place** — cards, cash, savings, in any mix
+  of currencies — and see the current balance of each at a glance.
+- **Record what happens to your money**: spending, income, moving money
+  between your own accounts, and lending or borrowing. Enter things one by one
+  or several at once, and correct a balance that drifted from reality in a
+  single step.
+- **Sort it into categories**, with sub-categories (*Food → Restaurants*),
+  then search and filter your history and see the totals for exactly what you
+  filtered.
+- **Plan ahead**: set up regular payments such as rent, salary or
+  subscriptions once, and ZM lays them out for the year ahead, reminds you of
+  the ones you missed, and emails you the day before a planned payment would
+  push an account below zero.
+- **Know who owes whom**: money lent to a friend or borrowed from family is
+  tracked per person, so you always see what is still owed and what has been
+  paid back.
+- **See the big picture**: a dashboard with your balance over time, a
+  forecast for the month and the next upcoming payments, plus visual reports
+  of which categories take the biggest share of your spending and income.
+- **Share with family or a partner**: give someone view-only or full access
+  to a particular account or category — handy for a joint household budget.
+- **Bring your history with you** from ZenMoney by importing its export file,
+  and undo the import in one click if it didn't come out right.
+- **Stay secure**: every sign-in needs your password and a code from an
+  authenticator app on your phone, with backup codes in case you lose it, and
+  a forgotten password can be reset by email.
+
+Available in English and Ukrainian, with light and dark themes, on a computer
+or a phone.
 
 ## Screenshots
 
