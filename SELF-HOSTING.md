@@ -64,6 +64,16 @@ Two other ways to migrate, if a deploy step isn't possible:
   lock (so several processes can't race) and removes the file only after a
   successful run.
 
+## Security notes
+
+- **Create the admin right after the first deploy.** Until an admin exists,
+  anyone who reaches `/auth/register/invite?id=admin` can claim the instance.
+- **Never run `pnpm dev` (`next dev`) on a reachable host.** In development
+  mode `111111` is accepted in place of an authenticator code.
+- **Change the example Postgres password** before the database is reachable
+  from anywhere. The one in `docker-compose.yml` and `.env.docker.example` is
+  public: it is in this repository.
+
 ## Running more than one process
 
 Production runs pm2 in **cluster mode with 2 processes**, and Vercel runs many

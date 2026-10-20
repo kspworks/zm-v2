@@ -224,3 +224,11 @@ row counts, balance mismatches and transactions per kind.
 
 A step-by-step Vercel guide and the pm2 setup are in
 [SELF-HOSTING.md](SELF-HOSTING.md).
+
+## License
+
+Copyright (c) 2026 kspworks. All rights reserved.
+
+The source is public for reference. No license is granted to use, copy,
+modify or distribute it. To report a vulnerability, see
+[SECURITY.md](SECURITY.md).
