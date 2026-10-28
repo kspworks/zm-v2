@@ -9,6 +9,9 @@ export const env = createEnv({
       .enum(["development", "test", "production"])
       .default("development"),
     DATABASE_URL: z.url(),
+    // full path of a Postgres Unix socket, e.g.
+    // "/var/run/postgresql/.s.PGSQL.5432"; see "~/server/db/connection"
+    DATABASE_SOCKET_PATH: z.string().startsWith("/").optional(),
     // compared to the literal "true": z.coerce.boolean() would read "false" as true
     DATABASE_LOG: z
       .string()
@@ -40,6 +43,7 @@ export const env = createEnv({
   runtimeEnv: {
     NODE_ENV: process.env.NODE_ENV,
     DATABASE_URL: process.env.DATABASE_URL,
+    DATABASE_SOCKET_PATH: process.env.DATABASE_SOCKET_PATH,
     DATABASE_LOG: process.env.DATABASE_LOG,
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,

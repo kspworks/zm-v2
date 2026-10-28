@@ -128,6 +128,7 @@ Environment variables are validated at startup by `src/env.ts`;
 | `TRANSACTIONS_PAGINATION_LIMIT` | page size of the transaction list; default 50 |
 | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` | optional SMTP (TLS) for alerts and password resets |
 | `NEXT_PUBLIC_SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_ENV`, `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN` | optional Sentry |
+| `DATABASE_SOCKET_PATH` | connect over a Unix socket, e.g. `/var/run/postgresql/.s.PGSQL.5432`; the host and port in `DATABASE_URL` are then ignored |
 | `DATABASE_LOG` | `true` logs every query |
 
 ## Tests
@@ -174,8 +175,10 @@ Screenshots of every page at phone width land in `test-results/`.
   Dependabot's: `biome ci`, `knip`, the typecheck, both test runs, the
   migration drift check, a smoke test of the standalone bundle
   (`smoke-standalone.sh`) and the browser tests against that bundle.
-- **GitLab** (`.gitlab-ci.yml`) runs lint, typecheck, tests and a build on
-  `main`, and once they pass deploys it to the pm2 server
+- **GitLab** (`.gitlab-ci.yml`) runs lint, typecheck and tests on `main`.
+  Once they pass it builds the Docker image, has it migrate an empty database
+  and render a page from a read-only filesystem, pushes it to the registry
+  and deploys it to the server
   (see [SELF-HOSTING.md](SELF-HOSTING.md)).
 
 ## Deploying with docker-compose
@@ -184,16 +187,22 @@ Screenshots of every page at phone width land in `test-results/`.
   `BETTER_AUTH_URL` and `CRON_SECRET`. The app refuses to start without them.
 - **Change the Postgres password**, in `docker-compose.yml` and in
   `DATABASE_URL`. The example one is public: it is in this repository.
-- `docker compose up --wait` and open [http://localhost:3333](http://localhost:3333);
-  the sign-in page links to the admin setup.
-
-A `migrator` service applies the migrations and must exit successfully before
-`next-app` starts, so the schema is never behind the code. The cron jobs
-(below) are plain HTTP calls; from the host, for example:
+- Build and start, then open [http://localhost:3333](http://localhost:3333);
+  the sign-in page links to the admin setup:
 
 ```shell
-curl -fsS -H "Authorization: Bearer $CRON_SECRET" http://localhost:3333/api/cron/daily-0000
+BUILD_ENV_REVISION=$(sha256sum .env.docker | cut -c1-64) docker compose up --wait --build
 ```
+
+A `migrator` service applies the migrations and must exit successfully before
+`next-app` starts, so the schema is never behind the code. A `cron` service
+calls the cron routes (below) at their local time.
+
+`.env.docker` reaches the image build as a BuildKit secret, not a copied
+file: the build reads its `NEXT_PUBLIC_*` and Sentry values, and none of it is
+left in the image. Docker's build cache can't see a secret's contents, so
+`BUILD_ENV_REVISION` (a hash of the file) is what makes a changed
+`.env.docker` rebuild.
 
 ## Cron jobs
 
@@ -203,8 +212,14 @@ curl -fsS -H "Authorization: Bearer $CRON_SECRET" http://localhost:3333/api/cron
 | `/api/cron/daily-0900` | 09:00 in `APP_TIMEZONE` | emails readers of accounts that tomorrow's planned transactions would overdraw |
 
 Both answer only `Authorization: Bearer <CRON_SECRET>` and return plain-text
-logs. Self-hosted installs call them from system cron, e.g.
-`0 0 * * *` and `0 9 * * *` in a crontab running in the app's time zone.
+logs. The Docker setups run a `cron` container (`scripts/cron.ts`) that calls
+them at those times in `APP_TIMEZONE` and holds nothing but `CRON_SECRET`;
+Vercel uses `vercel.json`. Any other install can call them from system cron,
+e.g. `0 0 * * *` and `0 9 * * *` in a crontab running in the app's time zone:
+
+```shell
+curl -fsS -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/daily-0000
+```
 
 ## Migrating from v1
 
@@ -222,7 +237,7 @@ row counts, balance mismatches and transactions per kind.
 
 ## Self-hosting
 
-A step-by-step Vercel guide and the pm2 setup are in
+A step-by-step Vercel guide and the hardened Docker setup for a VPS are in
 [SELF-HOSTING.md](SELF-HOSTING.md).
 
 ## License

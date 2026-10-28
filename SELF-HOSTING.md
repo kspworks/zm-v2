@@ -48,23 +48,127 @@ local time, shift the schedule by your offset, e.g. for `Europe/Kyiv`
 midnight job, running shortly *after* local midnight is what matters
 (`0 22 * * *` is 00:00 in Kyiv in winter).
 
-## Self-hosted with pm2 (GitLab deploy)
+## Self-hosted with Docker (GitLab deploy)
 
-On every push to `main`, the GitLab pipeline (`.gitlab-ci.yml`) first runs
-lint, typecheck, tests and a build in CI. Only when they pass does it build
-on the server with
-`pnpm run build:selfhosted`, smoke-tests the bundle, runs
-`pnpm run db:migrate`, copies `dist/` to the served directory and restarts
-pm2. See `ecosystem.config.example.cjs` for the pm2 config, and keep the
-production `.env` next to `server.js`.
+The app runs as Docker containers on a VPS, isolated from the other apps on
+the same server. Host Apache terminates TLS and proxies to
+`127.0.0.1:$APP_PORT`. Postgres stays on the host and is reached over its
+socket.
 
-Two other ways to migrate, if a deploy step isn't possible:
+On every push to `main`, the GitLab pipeline (`.gitlab-ci.yml`) runs lint,
+typecheck and tests. When they pass, it builds the image (`Dockerfile`,
+target `runner`), has it migrate a throwaway database and render a page from
+a read-only filesystem, and pushes it to the GitLab registry. The deploy job
+then:
 
-- `docker compose` runs a `migrator` service before the app;
+1. copies `compose.vps.yml` to `$PROD_OUT_PATH/compose.yml`;
+2. pulls the image and runs the migrations (`node migrate.mjs`). A failure
+   stops here, with the old containers still serving;
+3. recreates `web` and `cron`;
+4. removes this app's images older than 30 days that no container uses. It
+   finds them by the label `kspworks.zm-v2=app`, so other apps' images are
+   left alone.
+
+If the app is compromised, the attacker stays inside those containers:
+
+- They run as UID 10001, which owns nothing on the host. The filesystem is
+  read-only, with no Linux capabilities, `no-new-privileges` and no Docker
+  socket. The code is owned by root inside the image, so it can't be changed
+  either.
+- They see only this app's `.env` and the Postgres socket, and the Postgres
+  role can touch only this app's database. The `cron` container gets nothing
+  but `CRON_SECRET` and `APP_TIMEZONE`.
+- Containers share the host kernel, so keep the kernel and Docker patched
+  (unattended-upgrades).
+
+The `RUN_MIGRATIONS` escape hatch (below) can't fire in the image: the
+read-only filesystem can't hold the file.
+
+### One-time setup
+
+1. **Deploy user.** A user for CI, in the `docker` group. Membership in that
+   group is root-equivalent, so the user should hold nothing else. Restrict
+   its key in `authorized_keys` (`from="…",no-port-forwarding,no-pty`), and
+   point the `SSH_CONNECT` and `SSH_PRIVATE_KEY_BASE64` CI variables at it.
+2. **Registry login.** As that user, `docker login registry.gitlab.com`.
+   Docker keeps **one credential per registry host**, so if the user already
+   pulls other projects' images from `registry.gitlab.com`, a project deploy
+   token won't do: use a **group** deploy token (`read_registry`) that covers
+   every project the user deploys.
+3. **App directory** (`PROD_OUT_PATH`), owned by the deploy user:
+   ```bash
+   sudo install -d -o <deploy-user> -m 750 /srv/zm-v2
+   ```
+4. **A Postgres role that can touch only this app's database:**
+   ```sql
+   CREATE ROLE zm_v2 LOGIN PASSWORD '<openssl rand -hex 24>' NOSUPERUSER NOCREATEDB NOCREATEROLE;
+   ALTER DATABASE <db> OWNER TO zm_v2;
+   REVOKE CONNECT ON DATABASE <db> FROM PUBLIC;
+   ```
+   Migrations alter tables, so the role has to **own** the existing tables,
+   sequences and types too. If the old role is used by this app alone, run
+   `REASSIGN OWNED BY <old> TO zm_v2;` while connected to `<db>`. If it's
+   shared (e.g. `postgres`), don't: `REASSIGN OWNED` also hands over that
+   role's other databases. Run `ALTER TABLE/SEQUENCE/TYPE … OWNER TO zm_v2`
+   per object instead.
+5. **Let the role in over the socket, and only into its own database.** In
+   `pg_hba.conf`, put these lines **above** the generic `local all all peer`
+   line, then `sudo systemctl reload postgresql`:
+   ```
+   local   <db>   zm_v2   scram-sha-256
+   local   all    zm_v2   reject
+   ```
+   Peer authentication can't work here: UID 10001 has no user on the host.
+6. **`.env`** in `/srv/zm-v2` (`chmod 600`). Start from the old one:
+   - keep `BETTER_AUTH_SECRET` as it was, so 2FA secrets stay readable and
+     sessions stay valid;
+   - set `BETTER_AUTH_URL`, `CRON_SECRET`, `APP_TIMEZONE` and `MAIL_*`;
+   - `APP_IMAGE=registry.gitlab.com/<group>/<project>/app` (this project's
+     `$CI_REGISTRY_IMAGE/app`) and `APP_PORT` (default `8092`);
+   - `DATABASE_URL=postgresql://zm_v2:<password>@localhost/<db>` and
+     `DATABASE_SOCKET_PATH=/var/run/postgresql/.s.PGSQL.5432`. The URL's host
+     is ignored once the socket is set.
+7. **CI variables:** `PROD_OUT_PATH=/srv/zm-v2`, and optionally
+   `BUILD_DOTENV` (type **File**, protected) with the build-time values:
+   `NEXT_PUBLIC_SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_ENV`, `SENTRY_ORG`,
+   `SENTRY_PROJECT` and `SENTRY_AUTH_TOKEN`.
+8. **Check `ss -tlnp`.** Containers can reach host services listening on
+   `0.0.0.0`, so other apps' databases, Redis and admin panels should listen
+   on `127.0.0.1` or a socket.
+9. **Apache vhost** (`a2enmod proxy proxy_http headers`):
+   ```apache
+   ProxyPreserveHost On
+   RequestHeader set X-Forwarded-Proto "https"
+   ProxyPass        / http://127.0.0.1:8092/
+   ProxyPassReverse / http://127.0.0.1:8092/
+   ```
+10. **Switch over.** Run the pipeline on `main`, then check
+    `curl -I http://127.0.0.1:8092/auth/login`. Once it answers,
+    `apachectl configtest && sudo systemctl reload apache2`. Then stop the
+    old setup: remove the app from pm2 (`pm2 delete <name> && pm2 save`) and
+    the crontab entries that called the cron routes, or the jobs run twice.
+
+Day to day, in `/srv/zm-v2`:
+
+```bash
+docker compose ps
+docker compose logs -f web cron
+IMAGE_TAG=<older commit sha> docker compose up -d web cron   # roll back
+```
+
+`compose.yml` defaults to the `latest` tag, so a bare `docker compose up -d`
+runs the newest `main` build. Rolling back to a pruned image still works:
+compose pulls it from the registry again.
+
+### Other ways to migrate
+
+- `docker compose` with `docker-compose.yml` runs a `migrator` service before
+  the app;
+- outside Docker, `pnpm run db:migrate`;
 - the escape hatch: create an empty `RUN_MIGRATIONS` file next to
   `server.js`. The next boot applies the migrations under a Postgres advisory
-  lock (so several processes can't race) and removes the file only after a
-  successful run.
+  lock (the same one `migrate.mjs` takes, so nothing races) and removes the
+  file only after a successful run.
 
 ## Security notes
 
@@ -78,12 +182,13 @@ Two other ways to migrate, if a deploy step isn't possible:
 
 ## Running more than one process
 
-Production runs pm2 in **cluster mode with 2 processes**, and Vercel runs many
-serverless instances. So:
+The Docker deploy runs a single `web` container, but nothing may assume one
+process: Vercel runs many serverless instances, and the container may be
+scaled. So:
 
 - **No in-process state.** Rate limits, locks and caches live in Postgres; a
   module variable would exist once per process.
 - **No read-then-write races.** Check-then-write logic is a single
   statement, a row lock (`SELECT … FOR UPDATE`) or an advisory lock.
 - **Module top level runs once per process**, which is why the
-  `RUN_MIGRATIONS` escape hatch takes an advisory lock.
+  `RUN_MIGRATIONS` escape hatch and `migrate.mjs` take an advisory lock.

@@ -1,42 +1,27 @@
 # == variables defined in CI env ==
-# PROD_BUILD_PATH        the checkout on the server that builds
-# PROD_OUT_PATH          where the standalone bundle is served from
-# SSH_CONNECT            user@host
-# SSH_PRIVATE_KEY_BASE64
-
-image: alpine:3.21
-
-before_script:
-  - 'which ssh-agent || ( apk add --update openssh-client git )'
-  - eval $(ssh-agent -s)
-  - ssh-add <(echo "$SSH_PRIVATE_KEY_BASE64" | base64 -d)
-  - mkdir -p ~/.ssh
-  - chmod 700 ~/.ssh
-  - '[[ -f /.dockerenv ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
+# BUILD_DOTENV           File type, protected, optional: the build-time values
+#                        in dotenv format (NEXT_PUBLIC_SENTRY_DSN,
+#                        NEXT_PUBLIC_SENTRY_ENV, SENTRY_ORG, SENTRY_PROJECT,
+#                        SENTRY_AUTH_TOKEN)
+# PROD_OUT_PATH          the server directory holding compose.yml and .env,
+#                        e.g. /srv/zm-v2 (see SELF-HOSTING.md)
+# SSH_CONNECT            [deploy user]@[host]
+# SSH_PRIVATE_KEY_BASE64 the deploy user's private key, base64-encoded
 
 workflow:
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
-      variables:
-        BUILD_PATH: $PROD_BUILD_PATH
-        OUT_PATH: $PROD_OUT_PATH
       when: always
     - when: never
 
 stages:
   - test
+  - build
   - deploy
 
 test:
   stage: test
   image: node:24
-  # the global before_script is deploy-only and needs an ssh key this job has
-  # no business holding
-  before_script: []
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-      when: on_success
-    - when: never
   services:
     - name: postgres:15-alpine
       alias: postgres
@@ -55,23 +40,89 @@ test:
     - pnpm run typecheck
     - pnpm run test
     - pnpm run test:tz
-    - SKIP_ENV_VALIDATION=1 pnpm run build
 
-self-hosted:
+# The runtime image (Dockerfile target "runner"), tagged with the commit and
+# "latest". BUILD_DOTENV reaches the build as a secret mount, so none of it is
+# left in a layer of the pushed image. Before the push, the image migrates an
+# empty database and renders a page from a read-only filesystem, as it will
+# run in production.
+build:
+  stage: build
+  image: docker:29
+  services:
+    - docker:29-dind
+  needs: [test]
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+    IMAGE: "$CI_REGISTRY_IMAGE/app"
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+  script:
+    # the build-time values are optional; an empty file builds without them
+    - 'BUILD_DOTENV="${BUILD_DOTENV:-$(mktemp)}"'
+    # BUILD_ENV_REVISION ties the build cache to the secret's contents - see
+    # the Dockerfile. This job starts with an empty cache, but it keeps a cache
+    # added later from shipping old build-time values
+    - >-
+      docker build --pull --target runner
+      --secret id=dotenv,src="$BUILD_DOTENV"
+      --build-arg BUILD_ENV_REVISION="$(sha256sum "$BUILD_DOTENV" | cut -c1-64)"
+      -t "$IMAGE:$CI_COMMIT_SHA" -t "$IMAGE:latest" .
+    # a throwaway database: the sign-in page reads it
+    - docker network create smoke
+    - >-
+      docker run -d --name smoke-db --network smoke
+      -e POSTGRES_USER=zm -e POSTGRES_PASSWORD=smoke -e POSTGRES_DB=zm
+      postgres:15-alpine
+    # over TCP on purpose: the image's init server listens on the socket only,
+    # so this waits for the real one
+    - >-
+      for i in $(seq 30); do
+      docker exec smoke-db pg_isready -q -h 127.0.0.1 -U zm -d zm && break;
+      sleep 1; done
+    - >-
+      printf '%s\n'
+      "DATABASE_URL=postgresql://zm:smoke@smoke-db:5432/zm"
+      "BETTER_AUTH_SECRET=smoke-only-not-a-secret-smoke-only"
+      "BETTER_AUTH_URL=http://127.0.0.1:3999"
+      "CRON_SECRET=smoke-only-not-a-secret"
+      > smoke.env
+    - >-
+      docker run --rm --network smoke --env-file smoke.env --read-only
+      "$IMAGE:$CI_COMMIT_SHA" node migrate.mjs
+    - >-
+      docker run --rm -i --network smoke --env-file smoke.env -e SMOKE_DIR=/app
+      --read-only --tmpfs /tmp --tmpfs /app/.next/cache
+      "$IMAGE:$CI_COMMIT_SHA" sh -s < smoke-standalone.sh
+    - docker push --all-tags "$IMAGE"
+
+# Pulls the new image on the server, migrates, then recreates web and cron. A
+# failed migration stops the deploy with the old containers still serving.
+# Roll back by re-running the deploy job of an older pipeline (migrations only
+# go forward, so an older image has to cope with the newer schema). Finally
+# removes this app's images (by label) older than 30 days that no container
+# uses; a failure there is ignored.
+deploy:production:
   stage: deploy
+  image: alpine:3.21
+  needs: [build]
   environment:
     name: production
-  # never deploy what the test job hasn't passed
-  needs: [test]
   rules:
-    - if: ($CI_COMMIT_BRANCH == "main") && $BUILD_PATH && $OUT_PATH && $SSH_CONNECT
+    - if: $PROD_OUT_PATH && $SSH_CONNECT
       when: on_success
     - when: never
-  # Four steps so a failure names itself. Migrations run after the build (a
-  # failed build must not leave the schema ahead of the code) and before the
-  # swap; the smoke check loads the bundle before it reaches OUT_PATH.
+  before_script:
+    - 'which ssh-agent || ( apk add --update openssh-client )'
+    - eval $(ssh-agent -s)
+    - ssh-add <(echo "$SSH_PRIVATE_KEY_BASE64" | base64 -d)
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - '[[ -f /.dockerenv ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
+  # one step per line, so a failure names itself
   script:
-    - ssh $SSH_CONNECT "cd $BUILD_PATH && git pull && pnpm i --frozen-lockfile --silent && pnpm run build:selfhosted"
-    - ssh $SSH_CONNECT "cd $BUILD_PATH && ./smoke-standalone.sh"
-    - ssh $SSH_CONNECT "cd $BUILD_PATH && pnpm run db:migrate"
-    - ssh $SSH_CONNECT "rm -rf $OUT_PATH && mkdir -p $OUT_PATH && cp -r $BUILD_PATH/dist/. $OUT_PATH && cp $BUILD_PATH/.env $OUT_PATH/.env && cd $OUT_PATH && pm2 restart ../ecosystem.config.cjs"
+    - scp compose.vps.yml "$SSH_CONNECT:$PROD_OUT_PATH/compose.yml"
+    - ssh $SSH_CONNECT "cd $PROD_OUT_PATH && export IMAGE_TAG=$CI_COMMIT_SHA && docker compose pull web cron"
+    - ssh $SSH_CONNECT "cd $PROD_OUT_PATH && export IMAGE_TAG=$CI_COMMIT_SHA && docker compose run --rm web node migrate.mjs"
+    - ssh $SSH_CONNECT "cd $PROD_OUT_PATH && export IMAGE_TAG=$CI_COMMIT_SHA && docker compose up -d --wait web cron"
+    - ssh $SSH_CONNECT "docker image prune -af --filter label=kspworks.zm-v2=app --filter until=720h" || true

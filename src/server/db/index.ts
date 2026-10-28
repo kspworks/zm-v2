@@ -2,6 +2,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
 import { env } from "~/env";
+import { connectionOptions } from "~/server/db/connection";
 import * as schema from "~/server/db/schema";
 
 /**
@@ -15,7 +16,7 @@ const globalForDb = globalThis as unknown as {
 const conn =
   globalForDb.conn ??
   postgres(env.DATABASE_URL, {
-    onnotice: () => false,
+    ...connectionOptions(),
     // lets forked test workers and idle serverless functions exit
     idle_timeout: 20,
   });

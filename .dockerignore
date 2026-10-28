@@ -1,12 +1,21 @@
+# The build context is sent to the daemon in full, and the Dockerfile copies
+# only what it needs - everything below is either rebuilt inside the image or
+# must never enter it.
 .git
+.claude
 .next
 node_modules
+build
 dist
 coverage
-.env
-.env.*
-!.env.example
-!.env.docker.example
 tests
+e2e
+test-results
+playwright-report
 docs
 emails
+*.tsbuildinfo
+# never in the context: build-time values travel as a "--secret" (see the
+# Dockerfile), runtime ones as the compose "env_file"
+.env
+.env.*

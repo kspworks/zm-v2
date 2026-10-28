@@ -38,8 +38,8 @@ governs. Enumerations stay in code and are cited by path here, never copied.
 
 ## Multi-process safety
 
-Production runs as more than one Node process (a pm2 cluster, and serverless on
-Vercel). So: **no in-process state** — rate limits, locks and caches live in
+Production runs as more than one Node process (serverless on Vercel, and the
+Docker `web` container may be scaled). So: **no in-process state** — rate limits, locks and caches live in
 Postgres — and **no read-then-write races** — use single statements, row locks
 (`.for("update")`) or advisory locks.
 

@@ -1,11 +1,11 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["scripts/cron.ts"],
   "playwright": {
     "entry": ["e2e/**/*.{spec,setup}.ts"]
   },
   "ignore": [
     "src/components/ui/**",
-    "ecosystem.config.example.cjs",
     "tests/setup/empty.ts"
   ],
   "ignoreExportsUsedInFile": true,

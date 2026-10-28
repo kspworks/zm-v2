@@ -1,0 +1,58 @@
+# Production on a VPS. CI builds the image (Dockerfile, target "runner") and
+# copies this file to <PROD_OUT_PATH>/compose.yml, next to ".env" - see
+# SELF-HOSTING.md "Self-hosted with Docker". Host Apache terminates TLS and
+# proxies to 127.0.0.1:APP_PORT; Postgres stays on the host and is reached
+# over its socket.
+#
+# The containers are locked down so a compromise of the app stays inside them:
+# a UID that owns nothing on the host, a read-only filesystem, no capabilities,
+# and nothing mounted but the Postgres socket. The app's database role can
+# touch only this app's database.
+#
+#   docker compose up -d
+#   docker compose run --rm web node migrate.mjs   # what the deploy runs first
+name: zm-v2
+
+x-app: &app
+  image: ${APP_IMAGE:?set APP_IMAGE in .env}:${IMAGE_TAG:-latest}
+  restart: unless-stopped
+  init: true
+  user: "10001:10001"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  pids_limit: 200
+  logging:
+    driver: json-file
+    options: { max-size: 10m, max-file: "5" }
+
+services:
+  web:
+    <<: *app
+    env_file: .env
+    ports:
+      - "127.0.0.1:${APP_PORT:-8092}:3000"
+    tmpfs:
+      - /tmp:uid=10001,gid=10001,mode=0700,noexec,nosuid,size=64m
+      # Next's own cache (fetch/images) - nothing here outlives a restart
+      - /app/.next/cache:uid=10001,gid=10001,mode=0700,noexec,nosuid,size=128m
+    volumes:
+      # The host Postgres over its socket (DATABASE_SOCKET_PATH in .env): no
+      # Postgres port has to be opened to containers.
+      - /var/run/postgresql:/var/run/postgresql:ro
+    mem_limit: 768m
+
+  # Calls the cron routes at 00:00 and 09:00 in APP_TIMEZONE. It gets the two
+  # values it needs and no env_file, so it never holds the database credentials.
+  cron:
+    <<: *app
+    command: ["node", "cron.mjs"]
+    environment:
+      CRON_SECRET: ${CRON_SECRET:?set CRON_SECRET in .env}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Kyiv}
+      CRON_BASE_URL: http://web:3000
+    healthcheck: { disable: true }
+    mem_limit: 128m
+    depends_on:
+      web:
+        condition: service_healthy

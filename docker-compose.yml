@@ -1,4 +1,15 @@
+# Local / self-hosted stack with its own Postgres. Production on a VPS with the
+# host's Postgres uses compose.vps.yml instead.
+#
+# All app services share one image. ".env.docker" is handed to the build as a
+# secret (the Dockerfile reads its NEXT_PUBLIC_* and Sentry values while
+# building) and to the containers as their runtime environment - it is never
+# copied into the image.
 name: zm
+
+x-app: &app
+  image: zm-v2-app
+  env_file: .env.docker
 
 services:
   postgres:
@@ -21,23 +32,26 @@ services:
   # Runs to completion before the app starts, so the schema is never behind
   # the code; a failure here stops the deploy instead of surfacing later.
   migrator:
+    <<: *app
     restart: "no"
+    command: ["node", "migrate.mjs"]
+    # builds the image the other services reuse
     build:
       context: .
-      target: migrator
-    env_file: .env.docker
+      target: runner
+      secrets:
+        - dotenv
+      # ties the build cache to the contents of .env.docker - see the
+      # Dockerfile and README
+      args:
+        BUILD_ENV_REVISION: ${BUILD_ENV_REVISION:-}
     depends_on:
       postgres:
         condition: service_healthy
 
   next-app:
+    <<: *app
     restart: unless-stopped
-    build:
-      context: .
-      target: runner
-      args:
-        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
-    env_file: .env.docker
     ports:
       - "3333:3000"
     depends_on:
@@ -46,5 +60,21 @@ services:
       migrator:
         condition: service_completed_successfully
 
+  # Calls the cron routes at 00:00 and 09:00 in APP_TIMEZONE
+  cron:
+    <<: *app
+    restart: unless-stopped
+    command: ["node", "cron.mjs"]
+    environment:
+      CRON_BASE_URL: http://next-app:3000
+    healthcheck: { disable: true }
+    depends_on:
+      next-app:
+        condition: service_healthy
+
 volumes:
   postgres_data:
+
+secrets:
+  dotenv:
+    file: .env.docker
