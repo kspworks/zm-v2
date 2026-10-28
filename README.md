@@ -175,7 +175,7 @@ Screenshots of every page at phone width land in `test-results/`.
   migration drift check, a smoke test of the standalone bundle
   (`smoke-standalone.sh`) and the browser tests against that bundle.
 - **GitLab** (`.gitlab-ci.yml`) runs lint, typecheck, tests and a build on
-  `dev` → `main` merge requests, and deploys `main` to the pm2 server
+  `main`, and once they pass deploys it to the pm2 server
   (see [SELF-HOSTING.md](SELF-HOSTING.md)).
 
 ## Deploying with docker-compose

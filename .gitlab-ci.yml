@@ -21,12 +21,6 @@ workflow:
         BUILD_PATH: $PROD_BUILD_PATH
         OUT_PATH: $PROD_OUT_PATH
       when: always
-    # so the test stage runs before dev is merged into main
-    - if: >-
-        $CI_PIPELINE_SOURCE == "merge_request_event" &&
-        $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == "dev" &&
-        $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
-      when: always
     - when: never
 
 stages:
@@ -40,10 +34,7 @@ test:
   # no business holding
   before_script: []
   rules:
-    - if: >-
-        $CI_PIPELINE_SOURCE == "merge_request_event" &&
-        $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == "dev" &&
-        $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+    - if: $CI_COMMIT_BRANCH == "main"
       when: on_success
     - when: never
   services:
@@ -70,6 +61,8 @@ self-hosted:
   stage: deploy
   environment:
     name: production
+  # never deploy what the test job hasn't passed
+  needs: [test]
   rules:
     - if: ($CI_COMMIT_BRANCH == "main") && $BUILD_PATH && $OUT_PATH && $SSH_CONNECT
       when: on_success

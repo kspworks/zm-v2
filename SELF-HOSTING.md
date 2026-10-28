@@ -50,7 +50,9 @@ midnight job, running shortly *after* local midnight is what matters
 
 ## Self-hosted with pm2 (GitLab deploy)
 
-The GitLab pipeline (`.gitlab-ci.yml`) builds on the server with
+On every push to `main`, the GitLab pipeline (`.gitlab-ci.yml`) first runs
+lint, typecheck, tests and a build in CI. Only when they pass does it build
+on the server with
 `pnpm run build:selfhosted`, smoke-tests the bundle, runs
 `pnpm run db:migrate`, copies `dist/` to the served directory and restarts
 pm2. See `ecosystem.config.example.cjs` for the pm2 config, and keep the
