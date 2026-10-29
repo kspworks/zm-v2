@@ -23,8 +23,9 @@ x-app: &app
   security_opt: ["no-new-privileges:true"]
   pids_limit: 200
   logging:
-    driver: json-file
-    options: { max-size: 10m, max-file: "5" }
+    # The host journal keeps logs across deploys; json-file logs are deleted with the container (see pm2-logs README).
+    driver: journald
+    options: { labels: "com.docker.compose.project,com.docker.compose.service" }
 
 services:
   web:
