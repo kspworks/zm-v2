@@ -118,7 +118,7 @@ export function MultiSelect({
                   />
                   <span className="truncate">{option.label}</span>
                   {option.hint ? (
-                    <span className="ml-auto text-muted-foreground text-xs">
+                    <span className="text-muted-foreground ml-auto text-xs">
                       {option.hint}
                     </span>
                   ) : null}

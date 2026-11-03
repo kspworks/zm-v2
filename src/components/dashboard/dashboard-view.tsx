@@ -115,7 +115,7 @@ function RangeFields({
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="font-medium text-sm">{t("range")}</p>
+      <p className="text-sm font-medium">{t("range")}</p>
       <p className="text-muted-foreground text-sm">
         {t("rangeHint", { min: RANGE_MIN, max: RANGE_MAX })}
       </p>
@@ -185,7 +185,7 @@ function ScopeOptions({
           </>
         ) : null}
         <div className="flex flex-col gap-2">
-          <p className="font-medium text-sm">{t("accounts")}</p>
+          <p className="text-sm font-medium">{t("accounts")}</p>
           <div className="-mx-1 -my-2 flex max-h-72 flex-col gap-2 overflow-y-auto px-1 py-2">
             {accounts.map((account) =>
               row(

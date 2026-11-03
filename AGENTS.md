@@ -62,7 +62,7 @@ are defined in `~/lib/error-keys` — add there, don't invent inline strings.
 Per entity, through the member tables, with `canRead` / `canWrite`:
 
 - Transaction **create** needs write access to the account, the linked account
-  and the category. **Update** needs delete rights on the existing row *and*
+  and the category. **Update** needs delete rights on the existing row _and_
   create rights on the new values. **Delete** covers both legs of a batch.
 - Account write also requires the account not be of type `debt`; those are
   system-managed and cannot be shared.
@@ -71,12 +71,12 @@ Per entity, through the member tables, with `canRead` / `canWrite`:
 
 ## Transactions
 
-| Kind | Rows | Rules |
-|---|---|---|
-| expense | 1 | `amount < 0`; a category must have `isExpense` |
-| income | 1 | `amount > 0`; a category must have `isIncome` |
-| transfer | 2, shared `batchId` | leg A negative, leg B positive on a different account; no category, no counterparty |
-| debt | 2, shared `batchId` | counterparty required; leg A on the real account, leg B the negated amount on the debt account; no category |
+| Kind     | Rows                | Rules                                                                                                       |
+| -------- | ------------------- | ----------------------------------------------------------------------------------------------------------- |
+| expense  | 1                   | `amount < 0`; a category must have `isExpense`                                                              |
+| income   | 1                   | `amount > 0`; a category must have `isIncome`                                                               |
+| transfer | 2, shared `batchId` | leg A negative, leg B positive on a different account; no category, no counterparty                         |
+| debt     | 2, shared `batchId` | counterparty required; leg A on the real account, leg B the negated amount on the debt account; no category |
 
 - **Primary leg**: for lists, filters and totals a batched pair is one row — the
   leg with `amount < 0` is primary and the other attaches as `linked`.

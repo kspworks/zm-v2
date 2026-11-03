@@ -1,9 +1,9 @@
 engineStrict: true
 
 allowBuilds:
-  '@parcel/watcher': false
-  '@swc/core': false
-  '@sentry/cli': true
+  "@parcel/watcher": false
+  "@swc/core": false
+  "@sentry/cli": true
   esbuild: true
   sharp: true
   unrs-resolver: true

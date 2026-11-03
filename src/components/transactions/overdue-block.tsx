@@ -33,7 +33,7 @@ export function OverdueBlock({
 
   return (
     <section className="overflow-hidden rounded-lg border border-amber-500/40 bg-amber-500/5">
-      <h2 className="px-3 pt-3 pb-1 font-semibold text-amber-700 text-sm sm:px-4 dark:text-amber-400">
+      <h2 className="px-3 pt-3 pb-1 text-sm font-semibold text-amber-700 sm:px-4 dark:text-amber-400">
         {t("overdueTitle")}
       </h2>
       <div className="divide-y divide-amber-500/20">

@@ -83,7 +83,7 @@ export function UserMenu({ user }: { user: MenuUser }) {
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{user.name}</span>
-                <span className="truncate text-muted-foreground text-xs">
+                <span className="text-muted-foreground truncate text-xs">
                   {user.email}
                 </span>
               </div>
@@ -99,11 +99,11 @@ export function UserMenu({ user }: { user: MenuUser }) {
             <DropdownMenuLabel className="font-normal">
               <div className="grid text-sm leading-tight">
                 <span className="truncate font-medium">{user.name}</span>
-                <span className="truncate text-muted-foreground text-xs">
+                <span className="text-muted-foreground truncate text-xs">
                   {user.email}
                 </span>
                 {user.build ? (
-                  <span className="mt-1 truncate text-muted-foreground text-xs">
+                  <span className="text-muted-foreground mt-1 truncate text-xs">
                     {t("nav.build", {
                       id: user.build.id ?? t("common.dev"),
                       env: user.build.env,

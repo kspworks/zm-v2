@@ -36,12 +36,9 @@
         "useUniqueElementIds": "off"
       },
       "nursery": {
-        "useSortedClasses": {
+        "useTailwindSortedClasses": {
           "level": "warn",
-          "fix": "safe",
-          "options": {
-            "functions": ["clsx", "cva", "cn"]
-          }
+          "fix": "safe"
         }
       },
       "performance": {
@@ -89,7 +86,7 @@
         "rules": {
           "preset": "none",
           "correctness": { "noUnusedImports": "off" },
-          "nursery": { "useSortedClasses": "off" },
+          "nursery": { "useTailwindSortedClasses": "off" },
           "performance": { "noBarrelFile": "off", "noReExportAll": "off" },
           "style": {
             "noYodaExpression": "off",
@@ -110,5 +107,6 @@
     "parser": {
       "tailwindDirectives": true
     }
-  }
+  },
+  "tailwind": { "mergeFunctions": ["clsx", "cn"], "variantFunctions": ["cva"] }
 }

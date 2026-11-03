@@ -1,8 +1,8 @@
 # ZM
 
 **ZM is a private money tracker for you and the people you share money with.**
-It helps answer three everyday questions — *where is my money, where did it
-go, and will I have enough next month?* — without handing your accounts or
+It helps answer three everyday questions — _where is my money, where did it
+go, and will I have enough next month?_ — without handing your accounts or
 spending habits to a company. You run it yourself, on your own server or a
 hosting service you choose, and only the people you invite can get in.
 
@@ -18,7 +18,7 @@ an account is about to run dry.
   between your own accounts, and lending or borrowing. Enter things one by one
   or several at once, and correct a balance that drifted from reality in a
   single step.
-- **Sort it into categories**, with sub-categories (*Food → Restaurants*),
+- **Sort it into categories**, with sub-categories (_Food → Restaurants_),
   then search and filter your history and see the totals for exactly what you
   filtered.
 - **Plan ahead**: set up regular payments such as rent, salary or
@@ -48,8 +48,8 @@ or a phone.
 
 ![Transactions](docs/screenshots/transactions.png)
 
-| Planned | Reports |
-|---|---|
+| Planned                                  | Reports                                  |
+| ---------------------------------------- | ---------------------------------------- |
 | ![Planned](docs/screenshots/planned.png) | ![Reports](docs/screenshots/reports.png) |
 
 <p>
@@ -118,18 +118,18 @@ pnpm email          # preview the email templates on :3001
 Environment variables are validated at startup by `src/env.ts`;
 `.env.example` documents each one.
 
-| Variable | |
-|---|---|
-| `DATABASE_URL` | required |
-| `BETTER_AUTH_SECRET` | required, at least 32 characters (`openssl rand -base64 32`) |
-| `CRON_SECRET` | required, at least 16 characters; the bearer token for the cron routes |
-| `BETTER_AUTH_URL` | the public URL; on Vercel `VERCEL_URL` is used when empty |
-| `APP_TIMEZONE` | what "today" means for overdue checks, cron and imports; default `Europe/Kyiv` |
-| `TRANSACTIONS_PAGINATION_LIMIT` | page size of the transaction list; default 50 |
-| `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` | optional SMTP (TLS) for alerts and password resets |
-| `NEXT_PUBLIC_SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_ENV`, `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN` | optional Sentry |
-| `DATABASE_SOCKET_PATH` | connect over a Unix socket, e.g. `/var/run/postgresql/.s.PGSQL.5432`; the host and port in `DATABASE_URL` are then ignored |
-| `DATABASE_LOG` | `true` logs every query |
+| Variable                                                                                                |                                                                                                                            |
+| ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                                                                          | required                                                                                                                   |
+| `BETTER_AUTH_SECRET`                                                                                    | required, at least 32 characters (`openssl rand -base64 32`)                                                               |
+| `CRON_SECRET`                                                                                           | required, at least 16 characters; the bearer token for the cron routes                                                     |
+| `BETTER_AUTH_URL`                                                                                       | the public URL; on Vercel `VERCEL_URL` is used when empty                                                                  |
+| `APP_TIMEZONE`                                                                                          | what "today" means for overdue checks, cron and imports; default `Europe/Kyiv`                                             |
+| `TRANSACTIONS_PAGINATION_LIMIT`                                                                         | page size of the transaction list; default 50                                                                              |
+| `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM`                                 | optional SMTP (TLS) for alerts and password resets                                                                         |
+| `NEXT_PUBLIC_SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_ENV`, `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN` | optional Sentry                                                                                                            |
+| `DATABASE_SOCKET_PATH`                                                                                  | connect over a Unix socket, e.g. `/var/run/postgresql/.s.PGSQL.5432`; the host and port in `DATABASE_URL` are then ignored |
+| `DATABASE_LOG`                                                                                          | `true` logs every query                                                                                                    |
 
 ## Tests
 
@@ -206,9 +206,9 @@ left in the image. Docker's build cache can't see a secret's contents, so
 
 ## Cron jobs
 
-| Route | When | What |
-|---|---|---|
-| `/api/cron/daily-0000` | 00:00 in `APP_TIMEZONE` | rolls the one-year planned window forward, sweeps rate-limit rows |
+| Route                  | When                    | What                                                                           |
+| ---------------------- | ----------------------- | ------------------------------------------------------------------------------ |
+| `/api/cron/daily-0000` | 00:00 in `APP_TIMEZONE` | rolls the one-year planned window forward, sweeps rate-limit rows              |
 | `/api/cron/daily-0900` | 09:00 in `APP_TIMEZONE` | emails readers of accounts that tomorrow's planned transactions would overdraw |
 
 Both answer only `Authorization: Bearer <CRON_SECRET>` and return plain-text

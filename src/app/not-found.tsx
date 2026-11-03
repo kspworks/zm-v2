@@ -18,7 +18,7 @@ export default async function NotFound() {
     <main className="flex min-h-svh items-center justify-center p-4">
       <Empty>
         <EmptyHeader>
-          <p className="font-semibold text-5xl text-muted-foreground tabular-nums">
+          <p className="text-muted-foreground text-5xl font-semibold tabular-nums">
             404
           </p>
           <EmptyTitle>{t("title")}</EmptyTitle>

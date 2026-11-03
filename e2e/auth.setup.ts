@@ -39,9 +39,9 @@ setup("bootstrap the administrator and stay signed in", async ({ page }) => {
 
   await setup.step("enrol the authenticator", async () => {
     await expect(page.getByAltText("Scan the QR code")).toBeVisible();
-    credentials.manualKey = (
-      await page.locator("code").first().innerText()
-    ).replace(/\s+/g, "");
+    credentials.manualKey =
+      // biome-ignore lint/performance/useDomNodeTextContent: Playwright's Locator.innerText(), not the DOM property
+      (await page.locator("code").first().innerText()).replace(/\s+/g, "");
     expect(credentials.manualKey).toMatch(/^[A-Z2-7]+$/);
 
     // a full code submits on its own

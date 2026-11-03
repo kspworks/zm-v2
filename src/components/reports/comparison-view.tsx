@@ -69,7 +69,7 @@ const WIDE_ONLY = "@max-4xl:hidden";
 
 function Amount({ value, sign }: { value: number; sign: string }) {
   return (
-    <TableCell className="@max-4xl:pl-0 text-right">
+    <TableCell className="text-right @max-4xl:pl-0">
       {value === 0 ? (
         <span className="text-muted-foreground">—</span>
       ) : (
@@ -97,7 +97,7 @@ function Line({
   return (
     <>
       <TableRow
-        className={cn("@4xl:hidden border-0 hover:bg-transparent", className)}
+        className={cn("border-0 hover:bg-transparent @4xl:hidden", className)}
       >
         <TableCell colSpan={3} className="max-w-0 pb-0 [font-weight:inherit]">
           {name}
@@ -167,7 +167,7 @@ function Section({
         sign={sign}
         scale={scale}
         goodWhen={goodWhen}
-        className="bg-muted/50 font-medium hover:bg-muted/50"
+        className="bg-muted/50 hover:bg-muted/50 font-medium"
       />
       {section.rows.map((row) => {
         const open = expanded(row);
@@ -210,7 +210,7 @@ function Section({
                   <Line
                     key={child.key}
                     name={
-                      <span className="block truncate pl-7 text-muted-foreground">
+                      <span className="text-muted-foreground block truncate pl-7">
                         {child.name}
                       </span>
                     }
@@ -302,7 +302,7 @@ export function ComparisonView() {
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead className={WIDE_ONLY} />
-                  <TableHead className="h-auto @4xl:w-56 @max-4xl:w-[30%] py-2 @max-4xl:pl-0 font-normal">
+                  <TableHead className="h-auto py-2 font-normal @max-4xl:w-[30%] @max-4xl:pl-0 @4xl:w-56">
                     <PeriodPicker
                       label={t("period1")}
                       value={a}
@@ -314,7 +314,7 @@ export function ComparisonView() {
                       }
                     />
                   </TableHead>
-                  <TableHead className="h-auto @4xl:w-56 @max-4xl:w-[30%] py-2 @max-4xl:pl-0 font-normal">
+                  <TableHead className="h-auto py-2 font-normal @max-4xl:w-[30%] @max-4xl:pl-0 @4xl:w-56">
                     <PeriodPicker
                       label={t("period2")}
                       value={b}
@@ -326,7 +326,7 @@ export function ComparisonView() {
                       }
                     />
                   </TableHead>
-                  <TableHead className="@4xl:w-64 text-right font-normal text-muted-foreground">
+                  <TableHead className="text-muted-foreground text-right font-normal @4xl:w-64">
                     {t("difference")}
                   </TableHead>
                 </TableRow>
@@ -365,7 +365,7 @@ export function ComparisonView() {
                           >
                             <TableHead
                               colSpan={Number(span)}
-                              className="h-auto pt-4 pb-1 font-semibold text-muted-foreground text-xs"
+                              className="text-muted-foreground h-auto pt-4 pb-1 text-xs font-semibold"
                             >
                               {table.currencyCode}
                             </TableHead>

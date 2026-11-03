@@ -39,7 +39,7 @@ export function DayHeading({
 
   return (
     <div className="flex items-baseline gap-2 px-3 pt-4 pb-1.5 sm:px-4">
-      <span className="font-semibold text-sm">
+      <span className="text-sm font-semibold">
         {formatListDate(date, today, locale)}
       </span>
       <span className="text-muted-foreground text-xs first-letter:uppercase">
@@ -76,7 +76,7 @@ export function TransactionGroups({
       {groups.map((group) => (
         <section key={group.date}>
           <DayHeading date={group.date} planned={planned} />
-          <div className="divide-y overflow-hidden rounded-lg border bg-card">
+          <div className="bg-card divide-y overflow-hidden rounded-lg border">
             {group.rows.map((row) => (
               <TransactionItem key={row.id} row={row} actions={actions(row)} />
             ))}

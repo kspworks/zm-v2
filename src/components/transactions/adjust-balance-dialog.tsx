@@ -324,13 +324,13 @@ function AdjustGroup({
   return (
     <section className="flex flex-col gap-2" aria-label={title}>
       <div className="flex items-baseline justify-between">
-        <h3 className="font-medium text-sm">{title}</h3>
+        <h3 className="text-sm font-medium">{title}</h3>
         <Money
           amount={kind === "income" ? total : -total}
           sign={currencySign}
           showPlus
           colored
-          className="font-semibold text-sm"
+          className="text-sm font-semibold"
         />
       </div>
       <div className="grid grid-cols-[minmax(0,1fr)_7rem_auto] items-center gap-2">

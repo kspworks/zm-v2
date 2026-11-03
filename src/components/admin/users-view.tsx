@@ -152,7 +152,7 @@ function RecoveryDialog({
 
         {links.data?.length ? (
           <div className="flex flex-col gap-2">
-            <h3 className="font-medium text-muted-foreground text-sm">
+            <h3 className="text-muted-foreground text-sm font-medium">
               {t("activeLinks")}
             </h3>
             {links.data.map((link) => (
@@ -290,7 +290,7 @@ export function UsersView({ currentUserId }: { currentUserId: string }) {
       />
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 p-4 sm:p-6">
         <section className="flex flex-col gap-3">
-          <h2 className="font-semibold text-sm">{t("people")}</h2>
+          <h2 className="text-sm font-semibold">{t("people")}</h2>
           <ItemGroup className="gap-2">
             {users.data?.map((user) => (
               <Item
@@ -399,7 +399,7 @@ export function UsersView({ currentUserId }: { currentUserId: string }) {
         </section>
 
         <section className="flex flex-col gap-3">
-          <h2 className="font-semibold text-sm">{t("invites")}</h2>
+          <h2 className="text-sm font-semibold">{t("invites")}</h2>
           <ItemGroup className="gap-2">
             {invites.data?.map((invite) => (
               <Item key={invite.id} variant="outline" size="sm">

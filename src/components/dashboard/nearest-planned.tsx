@@ -158,7 +158,7 @@ export function NearestPlanned({
                 <TableHead key={day.date} className={cn(gap, "h-auto py-0")}>
                   <div className="border-b pb-2">
                     <div>{formatListDate(day.date, today, locale)}</div>
-                    <div className="font-normal text-muted-foreground text-xs first-letter:uppercase">
+                    <div className="text-muted-foreground text-xs font-normal first-letter:uppercase">
                       {relative(day.date)}
                     </div>
                   </div>
@@ -198,7 +198,7 @@ export function NearestPlanned({
         {days.map((day) => (
           <section key={day.date} className="flex flex-col gap-1.5">
             <div className="flex items-baseline gap-2">
-              <span className="font-semibold text-sm">
+              <span className="text-sm font-semibold">
                 {formatListDate(day.date, today, locale)}
               </span>
               <span className="text-muted-foreground text-xs first-letter:uppercase">

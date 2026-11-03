@@ -200,7 +200,7 @@ export function LoginForm({
               {adminInviteHref ? (
                 <Link
                   href={adminInviteHref}
-                  className="text-center text-muted-foreground text-sm underline underline-offset-4 hover:text-foreground"
+                  className="text-muted-foreground hover:text-foreground text-center text-sm underline underline-offset-4"
                 >
                   {t("login.setUpAdmin")}
                 </Link>

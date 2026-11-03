@@ -36,7 +36,7 @@ const sumByCurrency = (
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-1.5">
-      <h3 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+      <h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
         {title}
       </h3>
       {children}
@@ -63,7 +63,7 @@ function Totals({
           amount={row.sum}
           sign={row.sign}
           className={cn(
-            "font-semibold text-lg",
+            "text-lg font-semibold",
             tone === "good" && "text-emerald-600 dark:text-emerald-400",
             tone === "bad" && "text-destructive",
           )}
@@ -166,7 +166,7 @@ export function BalancesSidebar({
               const selected = selectedAccounts?.includes(account.id) ?? false;
               const className = cn(
                 "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm",
-                onToggleAccount && "transition-colors hover:bg-accent",
+                onToggleAccount && "hover:bg-accent transition-colors",
                 selected && "bg-accent font-medium",
               );
               const row = (

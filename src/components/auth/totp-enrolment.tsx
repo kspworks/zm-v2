@@ -37,7 +37,7 @@ export function TotpEnrolment({
       />
       <div className="w-full text-center">
         <p className="text-muted-foreground text-xs">{t("manualKey")}</p>
-        <code className="mt-1 block select-all break-all rounded-md bg-muted px-2 py-1 font-mono text-xs">
+        <code className="bg-muted mt-1 block rounded-md px-2 py-1 font-mono text-xs break-all select-all">
           {manualKey.match(/.{1,4}/g)?.join(" ")}
         </code>
       </div>

@@ -123,7 +123,7 @@ export function ShareDialog({
       </form>
 
       <div className="mt-6 flex flex-col gap-2">
-        <h3 className="font-medium text-muted-foreground text-sm">
+        <h3 className="text-muted-foreground text-sm font-medium">
           {t("members")}
         </h3>
         {members.isPending ? (

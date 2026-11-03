@@ -45,7 +45,7 @@ The jobs compute "today" and "tomorrow" in `APP_TIMEZONE`, so they are
 correct at any hour, but the email arrives at 09:00 UTC. To get it at 09:00
 local time, shift the schedule by your offset, e.g. for `Europe/Kyiv`
 (UTC+2 in winter, UTC+3 in summer) use `0 7 * * *` or `0 6 * * *`. For the
-midnight job, running shortly *after* local midnight is what matters
+midnight job, running shortly _after_ local midnight is what matters
 (`0 22 * * *` is 00:00 in Kyiv in winter).
 
 ## Self-hosted with Docker (GitLab deploy)
@@ -96,15 +96,18 @@ read-only filesystem can't hold the file.
    token won't do: use a **group** deploy token (`read_registry`) that covers
    every project the user deploys.
 3. **App directory** (`PROD_OUT_PATH`), owned by the deploy user:
+
    ```bash
    sudo install -d -o <deploy-user> -m 750 /srv/zm-v2
    ```
 4. **A Postgres role that can touch only this app's database:**
+
    ```sql
    CREATE ROLE zm_v2 LOGIN PASSWORD '<openssl rand -hex 24>' NOSUPERUSER NOCREATEDB NOCREATEROLE;
    ALTER DATABASE <db> OWNER TO zm_v2;
    REVOKE CONNECT ON DATABASE <db> FROM PUBLIC;
    ```
+
    Migrations alter tables, so the role has to **own** the existing tables,
    sequences and types too. If the old role is used by this app alone, run
    `REASSIGN OWNED BY <old> TO zm_v2;` while connected to `<db>`. If it's
@@ -114,10 +117,12 @@ read-only filesystem can't hold the file.
 5. **Let the role in over the socket, and only into its own database.** In
    `pg_hba.conf`, put these lines **above** the generic `local all all peer`
    line, then `sudo systemctl reload postgresql`:
+
    ```
    local   <db>   zm_v2   scram-sha-256
    local   all    zm_v2   reject
    ```
+
    Peer authentication can't work here: UID 10001 has no user on the host.
 6. **`.env`** in `/srv/zm-v2` (`chmod 600`). Start from the old one:
    - keep `BETTER_AUTH_SECRET` as it was, so 2FA secrets stay readable and
@@ -136,6 +141,7 @@ read-only filesystem can't hold the file.
    `0.0.0.0`, so other apps' databases, Redis and admin panels should listen
    on `127.0.0.1` or a socket.
 9. **Apache vhost** (`a2enmod proxy proxy_http headers`):
+
    ```apache
    ProxyPreserveHost On
    RequestHeader set X-Forwarded-Proto "https"

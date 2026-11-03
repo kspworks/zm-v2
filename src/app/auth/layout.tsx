@@ -3,7 +3,7 @@ import { Logo } from "~/components/app/logo";
 
 export default function AuthLayout({ children }: LayoutProps<"/auth">) {
   return (
-    <div className="relative flex min-h-svh flex-col bg-muted/40">
+    <div className="bg-muted/40 relative flex min-h-svh flex-col">
       <header className="flex items-center justify-between px-4 py-3 sm:px-6">
         <Logo />
         <LanguageSwitcher />

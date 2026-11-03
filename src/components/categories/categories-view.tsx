@@ -133,7 +133,7 @@ export function CategoriesView() {
                   <ItemTitle className="w-full flex-wrap">
                     <span className="flex min-w-0 items-center gap-2">
                       {category.parentId ? (
-                        <CornerDownRightIcon className="size-3.5 text-muted-foreground" />
+                        <CornerDownRightIcon className="text-muted-foreground size-3.5" />
                       ) : null}
                       <span className="truncate">{category.name}</span>
                     </span>

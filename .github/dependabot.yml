@@ -19,8 +19,8 @@ updates:
       # own and fast.
       all-minor-patch:
         applies-to: version-updates
-        patterns: [ "*" ]
-        update-types: [ "minor", "patch" ]
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
 
     ignore:
       # kept in sync with the "reject" list in ".ncurc.json"

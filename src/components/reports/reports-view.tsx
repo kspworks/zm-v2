@@ -194,7 +194,7 @@ export function ReportsView() {
                 endDate: next.endDate,
               })
             }
-            className="@4xl:w-64 w-auto"
+            className="w-auto @4xl:w-64"
           />
           <Select
             value={groupBy}
@@ -249,7 +249,7 @@ export function ReportsView() {
                       amount: formatMoney(chart.total, chart.currencySign),
                     })}
                   </span>
-                  <span className="font-normal text-muted-foreground text-sm">
+                  <span className="text-muted-foreground text-sm font-normal">
                     {dateRangeText}
                   </span>
                 </CardTitle>
@@ -284,7 +284,7 @@ export function ReportsView() {
                             sign={chart.currencySign}
                           />
                         </TableCell>
-                        <TableCell className="text-right text-muted-foreground tabular-nums">
+                        <TableCell className="text-muted-foreground text-right tabular-nums">
                           {((tile.value / chart.total) * 100).toFixed(1)}%
                         </TableCell>
                       </TableRow>

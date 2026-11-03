@@ -168,14 +168,14 @@ export function TransactionItem({
         <div className="flex min-w-0 items-center gap-1.5">
           <span
             className={cn(
-              "truncate font-medium text-sm",
+              "truncate text-sm font-medium",
               row.category?.deleted && "text-muted-foreground italic",
             )}
           >
             {description}
           </span>
           {counterpartyNote ? (
-            <span className="shrink-0 truncate text-muted-foreground text-sm">
+            <span className="text-muted-foreground shrink-0 truncate text-sm">
               · {counterpartyNote}
             </span>
           ) : null}
@@ -191,7 +191,7 @@ export function TransactionItem({
             <Tooltip>
               <TooltipTrigger asChild>
                 <RepeatIcon
-                  className="size-3.5 shrink-0 text-muted-foreground"
+                  className="text-muted-foreground size-3.5 shrink-0"
                   aria-label={describeSchedule(row.schedule, locale)}
                 />
               </TooltipTrigger>
@@ -205,7 +205,7 @@ export function TransactionItem({
           comment.length > 50 ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <p className="line-clamp-1 text-muted-foreground text-sm">
+                <p className="text-muted-foreground line-clamp-1 text-sm">
                   {comment}
                 </p>
               </TooltipTrigger>
@@ -214,12 +214,12 @@ export function TransactionItem({
               </TooltipContent>
             </Tooltip>
           ) : (
-            <p className="line-clamp-1 text-muted-foreground text-sm">
+            <p className="text-muted-foreground line-clamp-1 text-sm">
               {comment}
             </p>
           )
         ) : null}
-        <p className="flex min-w-0 items-center gap-1 text-muted-foreground text-xs">
+        <p className="text-muted-foreground flex min-w-0 items-center gap-1 text-xs">
           <span className="truncate">{accountName(row.account)}</span>
           {row.linked ? (
             <>
@@ -238,7 +238,7 @@ export function TransactionItem({
           showPlus={!hideSign}
           hideSign={hideSign}
           colored={!hideSign}
-          className="font-semibold text-sm"
+          className="text-sm font-semibold"
         />
         {secondLine ? (
           <Money

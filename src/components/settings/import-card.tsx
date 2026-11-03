@@ -210,7 +210,7 @@ export function ImportCard() {
             </Alert>
           ) : null}
 
-          <h3 className="font-semibold text-sm">{t("history")}</h3>
+          <h3 className="text-sm font-semibold">{t("history")}</h3>
           {history.data?.length === 0 ? (
             <Empty className="border">
               <EmptyHeader>

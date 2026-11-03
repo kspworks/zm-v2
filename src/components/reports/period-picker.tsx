@@ -111,12 +111,12 @@ export function PeriodPicker({
         <PopoverTrigger asChild>
           <Button
             variant="outline"
-            className="h-auto min-h-8 min-w-0 flex-1 flex-wrap gap-x-1 gap-y-0 px-1.5 py-1 font-normal @max-4xl:text-xs tabular-nums"
+            className="h-auto min-h-8 min-w-0 flex-1 flex-wrap gap-x-1 gap-y-0 px-1.5 py-1 font-normal tabular-nums @max-4xl:text-xs"
           >
             {"month" in text ? (
               <>
-                <span className="@max-4xl:hidden truncate">{text.month}</span>
-                <span className="@4xl:hidden truncate">{text.short}</span>
+                <span className="truncate @max-4xl:hidden">{text.month}</span>
+                <span className="truncate @4xl:hidden">{text.short}</span>
               </>
             ) : (
               <>
@@ -136,7 +136,7 @@ export function PeriodPicker({
             >
               <ChevronLeftIcon />
             </Button>
-            <span className="font-medium text-sm tabular-nums">{year}</span>
+            <span className="text-sm font-medium tabular-nums">{year}</span>
             <Button
               variant="ghost"
               size="icon-sm"
@@ -173,7 +173,7 @@ export function PeriodPicker({
             })}
           </div>
           <Separator />
-          <span className="font-medium text-sm">{t("customRange")}</span>
+          <span className="text-sm font-medium">{t("customRange")}</span>
           <div className="grid grid-cols-2 gap-2">
             <Field data-invalid={reversed}>
               <FieldLabel htmlFor={`${id}-from`}>{tf("from")}</FieldLabel>

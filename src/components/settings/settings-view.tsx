@@ -179,7 +179,7 @@ function AuthenticatorCard() {
       <CardContent className="flex flex-col gap-4">
         {codes ? (
           <>
-            <p className="font-medium text-sm">{t("newCodes")}</p>
+            <p className="text-sm font-medium">{t("newCodes")}</p>
             <BackupCodes codes={codes} />
           </>
         ) : start.data ? (

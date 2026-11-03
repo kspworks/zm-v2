@@ -658,7 +658,7 @@ export function TransactionForm({
                 />
                 <FormError error={fieldState.error} />
                 {kind === "debt" && counterparty ? (
-                  <div className="flex flex-col gap-0.5 text-muted-foreground text-sm">
+                  <div className="text-muted-foreground flex flex-col gap-0.5 text-sm">
                     {withThem.length === 0 && counterparty.id ? (
                       <span>
                         {t("balanceWith.settled", { name: counterparty.name })}
@@ -712,7 +712,7 @@ export function TransactionForm({
 
         {extraFields}
 
-        <p className={cn("hidden text-muted-foreground text-xs sm:block")}>
+        <p className={cn("text-muted-foreground hidden text-xs sm:block")}>
           {t("submitHint", { shortcut: isMac ? "⌘+Enter" : "Ctrl+Enter" })}
         </p>
       </FieldGroup>

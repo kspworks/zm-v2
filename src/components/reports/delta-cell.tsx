@@ -52,11 +52,11 @@ export function DeltaCell({
         <Money amount={diff} sign={sign} showPlus />
       </span>
       <span className="flex items-center gap-2">
-        <span className="@max-4xl:w-auto w-10 text-right text-muted-foreground text-xs tabular-nums">
+        <span className="text-muted-foreground w-10 text-right text-xs tabular-nums @max-4xl:w-auto">
           {percent === null ? t("newValue") : percentText(percent)}
         </span>
-        <span className="relative h-1.5 @max-4xl:w-12 w-16 shrink-0 rounded-full bg-muted">
-          <span className="absolute top-1/2 left-1/2 h-2.5 w-px -translate-y-1/2 bg-border" />
+        <span className="bg-muted relative h-1.5 w-16 shrink-0 rounded-full @max-4xl:w-12">
+          <span className="bg-border absolute top-1/2 left-1/2 h-2.5 w-px -translate-y-1/2" />
           {width > 0 ? (
             <span
               className={cn(

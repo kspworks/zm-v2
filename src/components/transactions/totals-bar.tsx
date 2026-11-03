@@ -32,7 +32,7 @@ export function TotalsBar({
   }
 
   return (
-    <div className="flex items-start gap-3 rounded-lg border bg-muted/40 px-3 py-2.5 text-sm sm:px-4">
+    <div className="bg-muted/40 flex items-start gap-3 rounded-lg border px-3 py-2.5 text-sm sm:px-4">
       <div className="grid flex-1 grid-cols-[auto_1fr_1fr_1fr] gap-x-4 gap-y-1">
         <span />
         <span className="text-muted-foreground text-xs">{t("expenses")}</span>
@@ -40,7 +40,7 @@ export function TotalsBar({
         <span className="text-muted-foreground text-xs">{t("total")}</span>
         {totals.data.map((row) => (
           <div key={row.currencyId} className="contents">
-            <span className="font-medium text-muted-foreground">
+            <span className="text-muted-foreground font-medium">
               {row.currencyCode}
             </span>
             {row.expenses ? (
@@ -71,7 +71,7 @@ export function TotalsBar({
       <Tooltip>
         <TooltipTrigger asChild>
           <InfoIcon
-            className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+            className="text-muted-foreground mt-0.5 size-4 shrink-0"
             aria-label={t("hint")}
           />
         </TooltipTrigger>

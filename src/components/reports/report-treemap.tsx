@@ -22,7 +22,7 @@ function LeafTooltip({ leaf, sign }: { leaf: LeafRect; sign: string }) {
     const rest = leaf.leaves.length - GROUP_ROWS;
 
     return (
-      <div className="grid min-w-52 gap-1 rounded-lg border bg-background px-3 py-2 text-xs shadow-md">
+      <div className="bg-background grid min-w-52 gap-1 rounded-lg border px-3 py-2 text-xs shadow-md">
         {leaf.leaves.slice(0, GROUP_ROWS).map((item) => (
           <div key={item.id} className="flex justify-between gap-4">
             <span className="max-w-40 truncate">
@@ -31,7 +31,7 @@ function LeafTooltip({ leaf, sign }: { leaf: LeafRect; sign: string }) {
               </span>{" "}
               {item.name}
             </span>
-            <span className="whitespace-nowrap font-medium tabular-nums">
+            <span className="font-medium whitespace-nowrap tabular-nums">
               {formatMoney(item.value, sign)}
             </span>
           </div>
@@ -43,7 +43,7 @@ function LeafTooltip({ leaf, sign }: { leaf: LeafRect; sign: string }) {
         ) : null}
         <div className="flex justify-between gap-4 border-t pt-1">
           <span className="text-muted-foreground">{t("amount")}</span>
-          <span className="whitespace-nowrap font-medium tabular-nums">
+          <span className="font-medium whitespace-nowrap tabular-nums">
             {formatMoney(leaf.value, sign)}
           </span>
         </div>
@@ -58,7 +58,7 @@ function LeafTooltip({ leaf, sign }: { leaf: LeafRect; sign: string }) {
   }
 
   return (
-    <div className="grid min-w-44 gap-1 rounded-lg border bg-background px-3 py-2 text-xs shadow-md">
+    <div className="bg-background grid min-w-44 gap-1 rounded-lg border px-3 py-2 text-xs shadow-md">
       <div className="flex justify-between gap-4">
         <span className="text-muted-foreground">{t("date")}</span>
         <span>{formatDisplayDate(item.date)}</span>
@@ -69,12 +69,12 @@ function LeafTooltip({ leaf, sign }: { leaf: LeafRect; sign: string }) {
       </div>
       <div className="flex justify-between gap-4">
         <span className="text-muted-foreground">{t("amount")}</span>
-        <span className="whitespace-nowrap font-medium tabular-nums">
+        <span className="font-medium whitespace-nowrap tabular-nums">
           {formatMoney(item.value, sign)}
         </span>
       </div>
       {item.comment ? (
-        <p className="max-w-60 text-muted-foreground">{item.comment}</p>
+        <p className="text-muted-foreground max-w-60">{item.comment}</p>
       ) : null}
     </div>
   );
@@ -120,7 +120,7 @@ export function ReportTreemap({
   );
   const sign = chart.currencySign;
 
-  const describe = (leaf: LeafRect) =>
+  const describeLeaf = (leaf: LeafRect) =>
     leaf.leaves.length > 1
       ? `${t("more", { count: leaf.leaves.length })} — ${formatMoney(leaf.value, sign)}`
       : `${leaf.leaves[0]?.name} — ${formatMoney(leaf.value, sign)}, ${formatDisplayDate(leaf.leaves[0]?.date ?? "")}`;
@@ -157,7 +157,7 @@ export function ReportTreemap({
               <g
                 key={leaf.key}
                 tabIndex={0}
-                aria-label={describe(leaf)}
+                aria-label={describeLeaf(leaf)}
                 className="outline-none"
                 onPointerEnter={(event) => pointAt(leaf, event)}
                 onPointerMove={(event) => pointAt(leaf, event)}
@@ -196,7 +196,7 @@ export function ReportTreemap({
                     height={20}
                     pointerEvents="none"
                   >
-                    <span className="inline-block max-w-full truncate rounded bg-background/70 px-1 text-[11px] text-foreground leading-4">
+                    <span className="bg-background/70 text-foreground inline-block max-w-full truncate rounded px-1 text-[11px] leading-4">
                       {label}
                     </span>
                   </foreignObject>
@@ -227,7 +227,7 @@ export function ReportTreemap({
                     width={tile.width - 8}
                     height={24}
                   >
-                    <span className="inline-block max-w-full truncate rounded bg-background/90 px-1.5 py-0.5 font-medium text-foreground text-xs shadow-sm">
+                    <span className="bg-background/90 text-foreground inline-block max-w-full truncate rounded px-1.5 py-0.5 text-xs font-medium shadow-sm">
                       {label}
                     </span>
                   </foreignObject>

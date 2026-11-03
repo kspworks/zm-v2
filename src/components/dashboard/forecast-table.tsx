@@ -70,7 +70,7 @@ export function ForecastTable({
                 })}
               </div>
               {m.month.slice(0, 4) !== year ? (
-                <div className="font-normal text-muted-foreground text-xs">
+                <div className="text-muted-foreground text-xs font-normal">
                   {m.month.slice(0, 4)}
                 </div>
               ) : null}

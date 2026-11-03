@@ -73,14 +73,14 @@ function PointTooltip({
   }
 
   return (
-    <div className="grid w-64 max-w-[80vw] gap-2 rounded-lg border bg-background px-3 py-2 text-xs shadow-xl">
+    <div className="bg-background grid w-64 max-w-[80vw] gap-2 rounded-lg border px-3 py-2 text-xs shadow-xl">
       <div className="font-medium">
         {formatListDate(point.date, today, locale)}
       </div>
       <div className="grid gap-0.5">
         {point.actual !== null ? (
           <div className="flex items-center justify-between gap-2">
-            <span className="flex items-center gap-1.5 text-muted-foreground">
+            <span className="text-muted-foreground flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-(--color-actual)" />
               {t("actual")}
             </span>
@@ -89,7 +89,7 @@ function PointTooltip({
         ) : null}
         {point.planned !== null ? (
           <div className="flex items-center justify-between gap-2">
-            <span className="flex items-center gap-1.5 text-muted-foreground">
+            <span className="text-muted-foreground flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-(--color-planned)" />
               {t("planned")}
             </span>
@@ -112,7 +112,7 @@ function PointTooltip({
               <span className="min-w-0 truncate">
                 {label(item)}
                 {item.overdue ? (
-                  <span className="ml-1 text-destructive">
+                  <span className="text-destructive ml-1">
                     · {t("overdue")}
                   </span>
                 ) : null}
