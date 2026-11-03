@@ -18,3 +18,11 @@ overrides:
   "@swc/helpers": "0.5.15"
   "fast-uri@3.1.8": "3.1.9"
   "esbuild@0.18.20": "^0.25.0"
+  # GHSA-3g3m-2fjr-6pw4 / GHSA-g3hv-75wg-m249: Sentry's bundler plugin,
+  # react-email and ts-morph still ask for glob 13 / minimatch 10, which
+  # have no patched release; they only call glob() / minimatch(), which
+  # the new majors keep
+  "glob@13": "^14.0.3"
+  "minimatch@10": "^11.0.4"
+  # deepmerge (GHSA-gcqx-w48m-w2h4) has no patched release; only the
+  # shadcn CLI uses it, never the app at runtime
