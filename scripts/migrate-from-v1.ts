@@ -7,33 +7,25 @@
  * BETTER_AUTH_SECRET must be the production one: 2FA secrets are encrypted
  * with it. Runs in one transaction and refuses a target that has users.
  */
+import { NodeRuntime } from "@effect/platform-node";
+import { Config, Effect } from "effect";
 import postgres from "postgres";
 
-import { db } from "~/server/db";
+import { Database } from "~/server/db/database";
 import { migrateFromV1 } from "~/server/migration/from-v1";
 
-const main = async () => {
-  const oldUrl = process.env.OLD_DATABASE_URL;
+const program = Effect.gen(function* () {
+  const oldUrl = yield* Config.String("OLD_DATABASE_URL");
+  yield* Config.String("DATABASE_URL");
 
-  if (!oldUrl || !process.env.DATABASE_URL) {
-    throw new Error("Set OLD_DATABASE_URL and DATABASE_URL");
-  }
+  const old = yield* Effect.acquireRelease(
+    Effect.sync(() => postgres(oldUrl, { max: 1, onnotice: () => undefined })),
+    (sql) => Effect.promise(() => sql.end({ timeout: 5 })),
+  );
 
-  const old = postgres(oldUrl, { max: 1, onnotice: () => undefined });
+  // biome-ignore lint/suspicious/noConsole: a CLI script reports to stdout
+  yield* migrateFromV1(old, (line) => console.log(line));
+}).pipe(Effect.scoped, Effect.provide(Database.layer));
 
-  try {
-    // biome-ignore lint/suspicious/noConsole: a CLI script reports to stdout
-    await migrateFromV1(old, db, (line) => console.log(line));
-  } finally {
-    await old.end({ timeout: 5 });
-  }
-};
-
-main().then(
-  () => process.exit(0),
-  (error: unknown) => {
-    // biome-ignore lint/suspicious/noConsole: a CLI script reports to stderr
-    console.error(error);
-    process.exit(1);
-  },
-);
+// exits 0 on success; a missing variable or any failure is logged, exit 1
+NodeRuntime.runMain(program);

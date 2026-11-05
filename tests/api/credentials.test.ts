@@ -56,7 +56,6 @@ const secretFromManualKey = (manualKey: string) => {
 
 const withSession = (userId: string, sessionId: string) =>
   createCaller({
-    db,
     userId,
     sessionId,
     locale: "en",

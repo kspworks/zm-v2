@@ -12,28 +12,29 @@
  * ".env" fails the deploy here, before the swap, rather than in the new
  * container.
  */
-import postgres from "postgres";
+import { NodeRuntime } from "@effect/platform-node";
+import { Clock, Effect } from "effect";
 
 import { env } from "~/env";
-import { connectionOptions } from "~/server/db/connection";
-import { applyMigrations } from "~/server/db/migrate";
+import { applyMigrations, migrationClient } from "~/server/db/migrate";
 
-const sql = postgres(env.DATABASE_URL, { ...connectionOptions(), max: 1 });
+const program = Effect.gen(function* () {
+  const started = yield* Clock.currentTimeMillis;
+  const sql = yield* migrationClient(env.DATABASE_URL);
 
-let exitCode = 0;
+  yield* applyMigrations(sql);
 
-try {
-  const started = Date.now();
+  const finished = yield* Clock.currentTimeMillis;
 
-  await applyMigrations(sql);
   // biome-ignore lint/suspicious/noConsole: a CLI script reports to stdout
-  console.log(`migrations applied in ${Date.now() - started}ms`);
-} catch (error) {
-  // biome-ignore lint/suspicious/noConsole: a CLI script reports to stderr
-  console.error("migrations failed", error);
-  exitCode = 1;
-} finally {
-  await sql.end({ timeout: 5 });
-}
+  console.log(`migrations applied in ${finished - started}ms`);
+}).pipe(
+  Effect.scoped,
+  Effect.tapError((error) =>
+    // biome-ignore lint/suspicious/noConsole: a CLI script reports to stderr
+    Effect.sync(() => console.error("migrations failed", error.cause)),
+  ),
+);
 
-process.exit(exitCode);
+// exits 0 on success and 1 on failure, closing the connection either way
+NodeRuntime.runMain(program, { disableErrorReporting: true });

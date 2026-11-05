@@ -1,10 +1,13 @@
 import { existsSync, unlinkSync } from "node:fs";
 import path from "node:path";
 
-import postgres from "postgres";
+import { Effect } from "effect";
 
-import { connectionOptions } from "~/server/db/connection";
-import { migrateFolder, withMigrationLock } from "~/server/db/migrate";
+import {
+  migrateFolder,
+  migrationClient,
+  withMigrationLock,
+} from "~/server/db/migrate";
 
 /**
  * Escape hatch for hosts without a separate migration step: drop an empty
@@ -17,31 +20,35 @@ import { migrateFolder, withMigrationLock } from "~/server/db/migrate";
  */
 const SENTINEL = "RUN_MIGRATIONS";
 
-export const migrateOnBoot = async (cwd = process.cwd()) => {
+const migrateIfRequested = Effect.fn("migrateOnBoot")(function* (cwd: string) {
   const sentinel = path.join(cwd, SENTINEL);
+  // read raw: this runs at boot, before (and without) env validation
   const url = process.env.DATABASE_URL;
 
   if (!existsSync(sentinel) || !url) {
     return false;
   }
 
-  const sql = postgres(url, { ...connectionOptions(), max: 1 });
+  const sql = yield* migrationClient(url);
 
-  try {
-    return await withMigrationLock(sql, async () => {
+  return yield* withMigrationLock(
+    sql,
+    Effect.gen(function* () {
       // another process may have finished while this one waited
       if (!existsSync(sentinel)) {
         return false;
       }
 
-      await migrateFolder(sql, cwd);
+      yield* migrateFolder(sql, cwd);
       unlinkSync(sentinel);
       // biome-ignore lint/suspicious/noConsole: boot log
       console.log("[BOOT] migrations applied, RUN_MIGRATIONS removed");
 
       return true;
-    });
-  } finally {
-    await sql.end({ timeout: 5 });
-  }
-};
+    }),
+  );
+}, Effect.scoped);
+
+/** Called from instrumentation; resolves whether migrations ran */
+export const migrateOnBoot = (cwd = process.cwd()) =>
+  Effect.runPromise(migrateIfRequested(cwd));

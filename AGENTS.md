@@ -66,8 +66,12 @@ functions.
   procedures use `runForTrpc(effect, signal)`; server components, better-auth
   hooks and cron routes use `runServer`, after handling expected errors with
   `Effect.catchTag`. The runtime holds no mutable application state.
-- **Migration interop** (temporary): `~/server/legacy/*` bridges code not yet
-  migrated. Don't add new callers.
+- **Jobs and scripts.** A cron job is an effect handed to `cronHandler`
+  (`~/server/cron`); it reports through `Effect.log`, which that handler
+  collects into the response. Standalone scripts (`scripts/*.ts`) are programs
+  run with `NodeRuntime.runMain` from `@effect/platform-node`, which owns exit
+  codes and signals; a dedicated connection or lock is an
+  `Effect.acquireRelease` resource (`~/server/db/migrate`).
 
 ## Multi-process safety
 

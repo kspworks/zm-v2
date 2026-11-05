@@ -1,6 +1,10 @@
+import { Effect, Layer, Logger } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { db } from "~/server/db";
+import type { MailConfig } from "~/server/config";
+import { Database } from "~/server/db/database";
+import { AppConfig } from "~/server/effect/app-config";
+import { Mailer, type Transporter } from "~/server/effect/mailer";
 import { collectShortages, dailyMorning } from "~/server/jobs/daily-0900";
 import {
   createUser,
@@ -8,6 +12,7 @@ import {
   insertTransactionRow,
   makeAccount,
 } from "../helpers/fixtures";
+import { run } from "../helpers/run";
 
 // tomorrow in Europe/Kyiv is 2026-03-16
 beforeEach(() => {
@@ -57,7 +62,7 @@ describe("collectShortages", () => {
       createdBy: user.id,
     });
 
-    expect(await collectShortages(db, TOMORROW)).toEqual([
+    expect(await run(collectShortages(TOMORROW))).toEqual([
       {
         userId: user.id,
         email: "me@example.com",
@@ -90,7 +95,7 @@ describe("collectShortages", () => {
       createdBy: owner.id,
     });
 
-    const recipients = await collectShortages(db, TOMORROW);
+    const recipients = await run(collectShortages(TOMORROW));
 
     expect(recipients.map((r) => r.userId).sort()).toEqual(
       [owner.id, reader.id].sort(),
@@ -111,7 +116,7 @@ describe("collectShortages", () => {
       });
     }
 
-    const [recipient] = await collectShortages(db, TOMORROW);
+    const [recipient] = await run(collectShortages(TOMORROW));
     expect(recipient?.sections.map((s) => s.accountName)).toEqual(["A", "B"]);
   });
 });
@@ -143,19 +148,51 @@ describe("dailyMorning", () => {
     }
   };
 
+  /** Runs the job on a mailer over `transporter`; returns the logged lines */
+  const runMorning = async (
+    mailConfig: MailConfig | null,
+    transporter: Transporter,
+  ) => {
+    const lines: string[] = [];
+    const logger = Logger.make(({ message }) => {
+      lines.push(
+        Array.isArray(message)
+          ? message.map(String).join(" ")
+          : String(message),
+      );
+    });
+
+    await Effect.runPromise(
+      dailyMorning().pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            Database.layer,
+            AppConfig.layer,
+            Mailer.layerWith(mailConfig, transporter),
+            Logger.layer([logger]),
+          ),
+        ),
+      ),
+    );
+
+    return lines;
+  };
+
   it("sends one mail per recipient and logs each outcome; a failure doesn't stop the rest", async () => {
     await setup();
     const sent: string[] = [];
-    const lines: string[] = [];
 
-    await dailyMorning(db, (line) => lines.push(line), {
-      config,
-      send: async (mail) => {
+    const lines = await runMorning(config, {
+      sendMail: async (mail: { to: string }) => {
         sent.push(mail.to);
 
-        return mail.to === "a@example.com" ? "failed" : "sent";
+        if (mail.to === "a@example.com") {
+          throw new Error("smtp down");
+        }
+
+        return { rejected: [] };
       },
-    });
+    } as never);
 
     expect(sent.sort()).toEqual(["a@example.com", "b@example.com"]);
     expect(lines).toContain("insufficient funds: a@example.com - failed");
@@ -164,17 +201,15 @@ describe("dailyMorning", () => {
 
   it("skips everything without SMTP settings", async () => {
     await setup();
-    const lines: string[] = [];
     let calls = 0;
 
-    await dailyMorning(db, (line) => lines.push(line), {
-      config: null,
-      send: async () => {
+    const lines = await runMorning(null, {
+      sendMail: async () => {
         calls += 1;
 
-        return "sent";
+        return { rejected: [] };
       },
-    });
+    } as never);
 
     expect(calls).toBe(0);
     expect(lines).toEqual([

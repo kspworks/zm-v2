@@ -7,7 +7,6 @@ import { ZodError, z } from "zod";
 import { type Locale, resolveLocale } from "~/i18n/config";
 import { auth } from "~/server/auth";
 import { isDev } from "~/server/config";
-import { type Db, db } from "~/server/db";
 import { query } from "~/server/db/database";
 import { users } from "~/server/db/schema";
 import { runForTrpc } from "~/server/effect/runtime";
@@ -23,7 +22,6 @@ export type CurrentUser = {
 };
 
 export type Context = {
-  db: Db;
   /** The session's user id; the user row itself is re-read per procedure */
   userId: string | null;
   /** The current session, kept when "other sessions" are revoked */
@@ -50,7 +48,6 @@ export const createTRPCContext = async ({
   const proto = headers.get("x-forwarded-proto") ?? "http";
 
   return {
-    db,
     userId: session?.user.id ?? null,
     sessionId: session?.session.id ?? null,
     locale: resolveLocale({

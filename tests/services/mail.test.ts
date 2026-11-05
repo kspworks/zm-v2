@@ -1,14 +1,11 @@
+import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
-
+import { Mailer } from "~/server/effect/mailer";
 import {
   insufficientFundsEmail,
   passwordResetEmail,
 } from "~/server/mail/templates";
-import {
-  fromAddress,
-  sendMail,
-  transportOptions,
-} from "~/server/mail/transport";
+import { fromAddress, transportOptions } from "~/server/mail/transport";
 
 const config = {
   host: "smtp.example.org",
@@ -42,7 +39,7 @@ describe("transportOptions", () => {
   });
 });
 
-describe("sendMail", () => {
+describe("Mailer.send", () => {
   const mail = {
     to: "a@example.com",
     subject: "s",
@@ -61,16 +58,15 @@ describe("sendMail", () => {
       },
     };
 
-    expect(await sendMail(mail, { config, transporter: ok as never })).toBe(
-      "sent",
-    );
-    expect(
-      await sendMail(mail, { config, transporter: rejected as never }),
-    ).toBe("rejected");
-    expect(await sendMail(mail, { config, transporter: broken as never })).toBe(
-      "failed",
-    );
-    expect(await sendMail(mail, { config: null })).toBe("skipped");
+    const send = (mailConfig: typeof config | null, transporter?: typeof ok) =>
+      Effect.runPromise(
+        Mailer.make(mailConfig, transporter as never).send(mail),
+      );
+
+    expect(await send(config, ok)).toBe("sent");
+    expect(await send(config, rejected as never)).toBe("rejected");
+    expect(await send(config, broken as never)).toBe("failed");
+    expect(await send(null)).toBe("skipped");
   });
 });
 

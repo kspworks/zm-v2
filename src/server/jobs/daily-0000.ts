@@ -1,7 +1,6 @@
 import { lt } from "drizzle-orm";
 import { Effect } from "effect";
 
-import type { CronLog } from "~/server/cron";
 import { query } from "~/server/db/database";
 import { authRateLimits } from "~/server/db/schema";
 import { now, today } from "~/server/lib/clock";
@@ -9,12 +8,10 @@ import { sweepRateLimits } from "~/server/lib/rate-limit";
 import { regenerateAll } from "~/server/services/planned";
 
 /** Midnight: roll the one-year planned window forward, sweep old limits */
-export const dailyMidnight = Effect.fn("jobs.dailyMidnight")(function* (
-  log: CronLog,
-) {
+export const dailyMidnight = Effect.fn("jobs.dailyMidnight")(function* () {
   const day = yield* today;
   const generated = yield* regenerateAll(day);
-  log(
+  yield* Effect.log(
     `planned: ${generated.occurrences} occurrences for ${generated.schedules} schedules (today ${day})`,
   );
 
@@ -26,5 +23,7 @@ export const dailyMidnight = Effect.fn("jobs.dailyMidnight")(function* (
       .where(lt(authRateLimits.lastRequest, cutoff))
       .returning({ id: authRateLimits.id }),
   );
-  log(`rate limits: swept ${swept} app and ${sweptAuth.length} auth windows`);
+  yield* Effect.log(
+    `rate limits: swept ${swept} app and ${sweptAuth.length} auth windows`,
+  );
 });

@@ -16,6 +16,7 @@ import {
   transactions,
   users,
 } from "~/server/db/schema";
+import { runServer } from "~/server/effect/runtime";
 import { migrateFromV1 } from "~/server/migration/from-v1";
 import { AuthSession } from "../helpers/auth-http";
 import { callerFor } from "../helpers/caller";
@@ -106,7 +107,7 @@ beforeEach(async () => {
 
 describe("migrateFromV1", () => {
   it("copies users with their bcrypt password and base32 authenticator", async () => {
-    await migrateFromV1(old, db);
+    await runServer(migrateFromV1(old));
 
     const olena = await db.query.users.findFirst({ where: eq(users.id, "u1") });
     expect(olena).toMatchObject({
@@ -134,7 +135,7 @@ describe("migrateFromV1", () => {
   });
 
   it("moves a deleted user's email aside and fills a missing name", async () => {
-    await migrateFromV1(old, db);
+    await runServer(migrateFromV1(old));
 
     const gone = await db.query.users.findFirst({ where: eq(users.id, "u2") });
     expect(gone).toMatchObject({
@@ -147,7 +148,9 @@ describe("migrateFromV1", () => {
 
   it("derives kinds, merges payees and reports what changed", async () => {
     const lines: string[] = [];
-    const report = await migrateFromV1(old, db, (line) => lines.push(line));
+    const report = await runServer(
+      migrateFromV1(old, (line) => lines.push(line)),
+    );
 
     expect(report.kinds).toEqual({
       debt: 4,
@@ -194,7 +197,7 @@ describe("migrateFromV1", () => {
   });
 
   it("keeps the app working on the migrated data", async () => {
-    await migrateFromV1(old, db);
+    await runServer(migrateFromV1(old));
     const olena = await db.query.users.findFirst({ where: eq(users.id, "u1") });
 
     const list = await callerFor(olena ?? { id: "u1" }).accounts.list();
@@ -215,7 +218,7 @@ describe("migrateFromV1", () => {
   });
 
   it("copies invites; an unclaimed one still registers with its old secret", async () => {
-    await migrateFromV1(old, db);
+    await runServer(migrateFromV1(old));
 
     const rows = await db.select().from(invites);
     expect(rows.find((i) => i.id === "admin")).toMatchObject({
@@ -228,8 +231,10 @@ describe("migrateFromV1", () => {
   });
 
   it("refuses a target that already has users", async () => {
-    await migrateFromV1(old, db);
+    await runServer(migrateFromV1(old));
 
-    await expect(migrateFromV1(old, db)).rejects.toThrow(/already has users/);
+    await expect(runServer(migrateFromV1(old))).rejects.toThrow(
+      /already has users/,
+    );
   });
 });

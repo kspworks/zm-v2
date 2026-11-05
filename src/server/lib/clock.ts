@@ -1,5 +1,5 @@
 import { TZDate } from "@date-fns/tz";
-import { format } from "date-fns";
+import { addDays, format } from "date-fns";
 import { Clock, Effect } from "effect";
 
 import { appTimezone } from "~/server/config";
@@ -26,6 +26,16 @@ export const today: Effect.Effect<string, never, AppConfig> = Effect.gen(
     const { timezone } = yield* AppConfig;
 
     return calendarDateAt(yield* now, timezone);
+  },
+);
+
+/** Tomorrow in APP_TIMEZONE, as "yyyy-MM-dd" */
+export const tomorrow: Effect.Effect<string, never, AppConfig> = Effect.gen(
+  function* () {
+    const { timezone } = yield* AppConfig;
+    const instant = yield* now;
+
+    return format(addDays(new TZDate(instant, timezone), 1), "yyyy-MM-dd");
   },
 );
 

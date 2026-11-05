@@ -7,96 +7,138 @@
  * the bearer header "~/server/cron" checks. Bundled into "build/cron.mjs" by
  * "pnpm build:scripts".
  */
+import { NodeRuntime } from "@effect/platform-node";
+import { Clock, Config, Effect, Schedule, Schema } from "effect";
+
 import { calendarDateIn } from "~/lib/dates";
 
 import { CRON_JOBS, type CronJob, dueJobs } from "./cron-schedule";
 
-const { CRON_SECRET, CRON_BASE_URL } = process.env;
-const timeZone = process.env.APP_TIMEZONE || "Europe/Kyiv";
-
 // the handlers can take a while; this only stops a hung request from holding
 // the next run back forever
-const REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
+const REQUEST_TIMEOUT = "5 minutes";
 
 // a network error means the request never reached a handler - typically the
 // app container being swapped by a deploy - so it is safe to try again. An
 // HTTP error is not retried: the handler may already have done part of its work
 const NETWORK_RETRIES = 3;
-const NETWORK_RETRY_DELAY_MS = 30 * 1000;
+const NETWORK_RETRY_DELAY = "30 seconds";
 
-const log = (path: string, text: string) => {
-  // biome-ignore lint/suspicious/noConsole: system logs
-  console.log(`[CRON] [${path}] ${new Date().toISOString()} - ${text}`);
-};
+class StartupError extends Schema.TaggedError<StartupError>()("StartupError", {
+  message: Schema.String,
+}) {}
 
-const logError = (path: string, text: string) => {
-  // biome-ignore lint/suspicious/noConsole: system logs
-  console.error(`[CRON] [${path}] ${new Date().toISOString()} - ${text}`);
-};
+const line = (path: string, text: string) =>
+  Effect.map(
+    Clock.currentTimeMillis,
+    (millis) => `[CRON] [${path}] ${new Date(millis).toISOString()} - ${text}`,
+  );
 
-const sleep = (ms: number) =>
-  new Promise((resolve) => {
-    setTimeout(resolve, ms);
+const print = (stream: "log" | "error", text: string) =>
+  Effect.sync(() => {
+    // biome-ignore lint/suspicious/noConsole: system logs
+    console[stream](text);
   });
 
-const trigger = async ({ path }: CronJob) => {
-  for (let attempt = 1; attempt <= NETWORK_RETRIES; attempt += 1) {
-    try {
-      const response = await fetch(`${CRON_BASE_URL}${path}`, {
-        headers: { authorization: `Bearer ${CRON_SECRET}` },
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      });
-      const body = (await response.text()).trim();
+const log = (path: string, text: string) =>
+  Effect.flatMap(line(path, text), (out) => print("log", out));
 
-      if (response.ok) {
-        log(path, `${response.status}\n${body}`);
-      } else {
-        logError(path, `${response.status}\n${body}`);
-      }
+const logError = (path: string, text: string) =>
+  Effect.flatMap(line(path, text), (out) => print("error", out));
 
-      return;
-    } catch (error) {
-      logError(path, `attempt ${attempt}/${NETWORK_RETRIES} failed: ${error}`);
+const settings = Effect.gen(function* () {
+  const secret = yield* Config.String("CRON_SECRET").pipe(
+    Config.withDefault(""),
+  );
+  const baseUrl = yield* Config.String("CRON_BASE_URL").pipe(
+    Config.withDefault(""),
+  );
+  const timeZone =
+    (yield* Config.String("APP_TIMEZONE").pipe(Config.withDefault(""))) ||
+    "Europe/Kyiv";
 
-      if (attempt < NETWORK_RETRIES) {
-        await sleep(NETWORK_RETRY_DELAY_MS);
-      }
-    }
-  }
-};
-
-const lastRun = new Map<string, string>();
-
-const tick = () => {
-  const now = new Date();
-
-  for (const job of dueJobs(now, timeZone, lastRun)) {
-    lastRun.set(job.path, calendarDateIn(now, timeZone));
-    void trigger(job);
+  if (!secret || !baseUrl) {
+    return yield* new StartupError({
+      message: "CRON_SECRET and CRON_BASE_URL must both be set",
+    });
   }
 
-  // a second into the next minute, so a timer that fires a little early still
-  // lands inside it; scheduling from "now" each time means no drift
-  setTimeout(tick, 60_000 - (Date.now() % 60_000) + 1000);
-};
-
-if (!CRON_SECRET || !CRON_BASE_URL) {
-  // biome-ignore lint/suspicious/noConsole: system logs
-  console.error("CRON_SECRET and CRON_BASE_URL must both be set");
-  process.exit(1);
-}
-
-try {
   // throws on a zone Intl doesn't know, instead of never firing
-  new Intl.DateTimeFormat("en", { timeZone });
-} catch {
-  // biome-ignore lint/suspicious/noConsole: system logs
-  console.error(`APP_TIMEZONE "${timeZone}" is not a known time zone`);
-  process.exit(1);
-}
+  yield* Effect.try({
+    try: () => new Intl.DateTimeFormat("en", { timeZone }),
+    catch: () =>
+      new StartupError({
+        message: `APP_TIMEZONE "${timeZone}" is not a known time zone`,
+      }),
+  });
 
-for (const job of CRON_JOBS) {
-  log(job.path, `runs daily at ${job.at} ${timeZone}`);
-}
+  return { secret, baseUrl, timeZone };
+});
 
-tick();
+const trigger = (
+  { path }: CronJob,
+  { secret, baseUrl }: { secret: string; baseUrl: string },
+) => {
+  let attempt = 0;
+
+  return Effect.tryPromise((signal) =>
+    fetch(`${baseUrl}${path}`, {
+      headers: { authorization: `Bearer ${secret}` },
+      signal,
+    }).then(async (response) => ({
+      ok: response.ok,
+      status: response.status,
+      body: (await response.text()).trim(),
+    })),
+  ).pipe(
+    Effect.timeout(REQUEST_TIMEOUT),
+    Effect.tapError((error) => {
+      attempt += 1;
+
+      return logError(
+        path,
+        `attempt ${attempt}/${NETWORK_RETRIES} failed: ${error}`,
+      );
+    }),
+    Effect.retry(
+      Schedule.spaced(NETWORK_RETRY_DELAY).pipe(
+        Schedule.upTo({ times: NETWORK_RETRIES - 1 }),
+      ),
+    ),
+    Effect.flatMap(({ ok, status, body }) =>
+      ok
+        ? log(path, `${status}\n${body}`)
+        : logError(path, `${status}\n${body}`),
+    ),
+    Effect.ignore,
+  );
+};
+
+const program = Effect.gen(function* () {
+  const config = yield* settings;
+  // the local day each job last ran on; a restart forgets it, which is fine
+  // because only the exact minute ever fires (see dueJobs)
+  const lastRun = new Map<string, string>();
+
+  for (const job of CRON_JOBS) {
+    yield* log(job.path, `runs daily at ${job.at} ${config.timeZone}`);
+  }
+
+  const tick = Effect.gen(function* () {
+    const now = new Date(yield* Clock.currentTimeMillis);
+
+    for (const job of dueJobs(now, config.timeZone, lastRun)) {
+      lastRun.set(job.path, calendarDateIn(now, config.timeZone));
+      yield* Effect.forkDetach(trigger(job, config));
+    }
+
+    // a second into the next minute, so a timer that fires a little early
+    // still lands inside it; sleeping from "now" each time means no drift
+    yield* Effect.sleep(60_000 - (now.getTime() % 60_000) + 1000);
+  });
+
+  return yield* Effect.forever(tick);
+}).pipe(Effect.tapError((error) => print("error", error.message)));
+
+// SIGTERM from Docker interrupts the loop; a startup error exits with 1
+NodeRuntime.runMain(program, { disableErrorReporting: true });
