@@ -1,7 +1,8 @@
 /**
- * Stable snake_case message keys for business-rule violations. The server
- * throws them as the TRPCError message and the client translates them
- * (messages: "errors.<key>").
+ * Stable snake_case message keys for business-rule violations and validation
+ * failures. The server fails with them as tagged errors (sent as the
+ * TRPCError message), schema checks carry them as their message, and the
+ * client translates them (messages: "errors.<key>").
  */
 export const ERROR_KEYS = [
   "type_change_not_supported",
@@ -51,6 +52,13 @@ export const ERROR_KEYS = [
   "not_planned",
   "not_recurring",
   "adjust_balance_changed",
+  // validation messages carried by the Effect Schema checks
+  "name_too_short",
+  "password_too_short",
+  "too_long",
+  "invalid_email",
+  "invalid_date",
+  "invalid_value",
 ] as const;
 
 export type ErrorKey = (typeof ERROR_KEYS)[number];

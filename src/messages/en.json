@@ -192,7 +192,13 @@
     "amount_sign": "The amount has the wrong sign",
     "not_planned": "This transaction is not planned",
     "adjust_balance_changed": "The balance has changed since you opened the form, check the amounts and try again",
-    "not_recurring": "This transaction doesn't repeat"
+    "not_recurring": "This transaction doesn't repeat",
+    "name_too_short": "At least 3 characters",
+    "password_too_short": "At least 6 characters",
+    "too_long": "Too long",
+    "invalid_email": "Enter a valid email",
+    "invalid_date": "Enter a valid date",
+    "invalid_value": "Invalid value"
   },
   "notFound": {
     "title": "Page not found",

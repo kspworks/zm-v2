@@ -1,11 +1,15 @@
-import { z } from "zod";
+import { Schema } from "effect";
 
 import {
   accountInputSchema,
   accountUpdateSchema,
 } from "~/lib/validators/accounts";
 import { idSchema } from "~/lib/validators/common";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  validate,
+} from "~/server/api/trpc";
 import { runForTrpc } from "~/server/effect/runtime";
 import {
   createAccount,
@@ -26,25 +30,25 @@ export const accountsRouter = createTRPCRouter({
   ),
 
   create: protectedProcedure
-    .input(accountInputSchema)
+    .input(validate(accountInputSchema))
     .mutation(({ ctx, input, signal }) =>
       runForTrpc(createAccount(ctx.user.id, input), signal),
     ),
 
   update: protectedProcedure
-    .input(accountUpdateSchema)
+    .input(validate(accountUpdateSchema))
     .mutation(({ ctx, input, signal }) =>
       runForTrpc(updateAccount(ctx.user.id, input), signal),
     ),
 
   setActive: protectedProcedure
-    .input(z.object({ id: idSchema, isActive: z.boolean() }))
+    .input(validate(Schema.Struct({ id: idSchema, isActive: Schema.Boolean })))
     .mutation(({ ctx, input, signal }) =>
       runForTrpc(setAccountActive(ctx.user.id, input), signal),
     ),
 
   delete: protectedProcedure
-    .input(z.object({ id: idSchema }))
+    .input(validate(Schema.Struct({ id: idSchema })))
     .mutation(({ ctx, input, signal }) =>
       runForTrpc(deleteAccount(ctx.user.id, input.id), signal),
     ),

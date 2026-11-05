@@ -1,11 +1,16 @@
-import { z } from "zod";
+import { Schema } from "effect";
 
 import {
   otpSchema,
   passwordSchema,
   secondFactorSchema,
 } from "~/lib/validators/auth";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { maxLength, message } from "~/lib/validators/common";
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  validate,
+} from "~/server/api/trpc";
 import { runForTrpc } from "~/server/effect/runtime";
 import {
   changePassword,
@@ -14,16 +19,21 @@ import {
   startReenrol,
 } from "~/server/services/credentials";
 
-const current = z.string().min(1).max(128);
+const current = Schema.String.check(
+  Schema.isMinLength(1, message("is_nonempty")),
+  maxLength(128),
+);
 
 export const settingsRouter = createTRPCRouter({
   changePassword: protectedProcedure
     .input(
-      z.object({
-        currentPassword: current,
-        newPassword: passwordSchema,
-        code: otpSchema,
-      }),
+      validate(
+        Schema.Struct({
+          currentPassword: current,
+          newPassword: passwordSchema,
+          code: otpSchema,
+        }),
+      ),
     )
     .mutation(({ ctx, input, signal }) =>
       runForTrpc(
@@ -36,13 +46,15 @@ export const settingsRouter = createTRPCRouter({
     ),
 
   startReenrol: protectedProcedure
-    .input(z.object({ password: current, code: secondFactorSchema }))
+    .input(
+      validate(Schema.Struct({ password: current, code: secondFactorSchema })),
+    )
     .mutation(({ ctx, input, signal }) =>
       runForTrpc(startReenrol(ctx.user.id, input), signal),
     ),
 
   confirmReenrol: protectedProcedure
-    .input(z.object({ code: otpSchema }))
+    .input(validate(Schema.Struct({ code: otpSchema })))
     .mutation(({ ctx, input, signal }) =>
       runForTrpc(
         confirmReenrol(
@@ -54,7 +66,7 @@ export const settingsRouter = createTRPCRouter({
     ),
 
   backupCodes: protectedProcedure
-    .input(z.object({ password: current, code: otpSchema }))
+    .input(validate(Schema.Struct({ password: current, code: otpSchema })))
     .mutation(({ ctx, input, signal }) =>
       runForTrpc(newBackupCodes(ctx.user.id, input), signal),
     ),

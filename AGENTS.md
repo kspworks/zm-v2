@@ -66,6 +66,14 @@ functions.
   procedures use `runForTrpc(effect, signal)`; server components, better-auth
   hooks and cron routes use `runServer`, after handling expected errors with
   `Effect.catchTag`. The runtime holds no mutable application state.
+- **Validation** is Effect Schema everywhere, never Zod: the shared input
+  schemas in `~/lib/validators` (procedures wrap them with `validate(…)` from
+  `~/server/api/trpc`, forms with `effectTsResolver`), env vars in `~/env`
+  (through Standard Schema), CSV cells in `~/server/lib/csv-import`. Every
+  check carries an app error key as its message (`message(key)` and the
+  helpers in `~/lib/validators/common`), so forms show `errors.<key>` and no
+  UI text comes from Schema. Use `Predicate` helpers instead of hand-written
+  type guards.
 - **Jobs and scripts.** A cron job is an effect handed to `cronHandler`
   (`~/server/cron`); it reports through `Effect.log`, which that handler
   collects into the response. Standalone scripts (`scripts/*.ts`) are programs
@@ -229,8 +237,8 @@ and not on harmless library changes.
   HTTP handler. Effect-native tests use `@effect/vitest` (`it.effect`) with
   `AppLayer` provided. Never reach into library internals.
 - **Assert on stable app-level values**: the error `code` plus the app's message
-  key, returned data, and DB state. Never on a library's error text, Zod's issue
-  wording, SQL strings, or third-party rendered markup.
+  key, returned data, and DB state. Never on a library's error text, Schema's
+  issue wording, SQL strings, or third-party rendered markup.
 - **No snapshot tests** of library-rendered output. For emails, assert the key
   facts are present, not the markup.
 - **Inject time.** Never depend on the wall clock or the machine timezone.

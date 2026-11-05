@@ -1,7 +1,8 @@
-import { z } from "zod";
+import { Schema } from "effect";
 
 import { otpSchema, passwordSchema } from "~/lib/validators/auth";
-import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
+import { maxLength, nullish, trimmedString } from "~/lib/validators/common";
+import { createTRPCRouter, publicProcedure, validate } from "~/server/api/trpc";
 import { runForTrpc } from "~/server/effect/runtime";
 import {
   completeRecovery,
@@ -9,29 +10,31 @@ import {
   validateRecoveryLink,
 } from "~/server/services/recovery";
 
-const token = z.string().trim().min(1).max(128);
+const token = trimmedString(128);
 
 export const recoveryRouter = createTRPCRouter({
   validate: publicProcedure
-    .input(z.object({ token }))
+    .input(validate(Schema.Struct({ token })))
     .query(({ input, signal }) =>
       runForTrpc(validateRecoveryLink(input.token), signal),
     ),
 
   startEnrolment: publicProcedure
-    .input(z.object({ token }))
+    .input(validate(Schema.Struct({ token })))
     .mutation(({ input, signal }) =>
       runForTrpc(startRecoveryEnrolment(input.token), signal),
     ),
 
   complete: publicProcedure
     .input(
-      z.object({
-        token,
-        newPassword: passwordSchema.nullish(),
-        currentPassword: z.string().max(128).nullish(),
-        code: otpSchema.nullish(),
-      }),
+      validate(
+        Schema.Struct({
+          token,
+          newPassword: nullish(passwordSchema),
+          currentPassword: nullish(Schema.String.check(maxLength(128))),
+          code: nullish(otpSchema),
+        }),
+      ),
     )
     .mutation(({ input, signal }) =>
       runForTrpc(completeRecovery(input), signal),

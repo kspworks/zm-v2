@@ -1,18 +1,27 @@
-import { z } from "zod";
+import { Schema } from "effect";
 
 import {
   calendarDateSchema,
   idSchema,
+  magnitudeSchema,
+  maxLength,
+  message,
   minorUnitsSchema,
+  nullable,
+  nullish,
+  withDefault,
 } from "~/lib/validators/common";
 import {
   listInputSchema,
-  magnitudeSchema,
   transactionFilterSchema,
   transactionInputSchema,
   transactionUpdateSchema,
 } from "~/lib/validators/transactions";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  validate,
+} from "~/server/api/trpc";
 import { runForTrpc } from "~/server/effect/runtime";
 import { adjustBalance, bulkCreate } from "~/server/services/bulk";
 import {
@@ -29,7 +38,7 @@ import {
 export const transactionsRouter = createTRPCRouter({
   /** Submitted rows, newest first */
   list: protectedProcedure
-    .input(listInputSchema)
+    .input(validate(listInputSchema))
     .query(({ ctx, input, signal }) =>
       runForTrpc(
         listTransactionsPage(ctx.user.id, {
@@ -43,7 +52,7 @@ export const transactionsRouter = createTRPCRouter({
 
   /** Planned rows, oldest first, each with its schedule */
   planned: protectedProcedure
-    .input(listInputSchema)
+    .input(validate(listInputSchema))
     .query(({ ctx, input, signal }) =>
       runForTrpc(
         listTransactionsPage(ctx.user.id, {
@@ -56,7 +65,7 @@ export const transactionsRouter = createTRPCRouter({
     ),
 
   overdue: protectedProcedure
-    .input(z.object({ filter: transactionFilterSchema }))
+    .input(validate(Schema.Struct({ filter: transactionFilterSchema })))
     .query(({ ctx, input, signal }) =>
       runForTrpc(listOverdue(ctx.user.id, input.filter), signal),
     ),
@@ -64,10 +73,12 @@ export const transactionsRouter = createTRPCRouter({
   /** Totals over the whole filtered set: submitted rows, or planned ones */
   totals: protectedProcedure
     .input(
-      z.object({
-        filter: transactionFilterSchema,
-        planned: z.boolean().default(false),
-      }),
+      validate(
+        Schema.Struct({
+          filter: transactionFilterSchema,
+          planned: Schema.Boolean.pipe(withDefault(false)),
+        }),
+      ),
     )
     .query(({ ctx, input, signal }) =>
       runForTrpc(
@@ -81,26 +92,34 @@ export const transactionsRouter = createTRPCRouter({
     ),
 
   create: protectedProcedure
-    .input(transactionInputSchema)
+    .input(validate(transactionInputSchema))
     .mutation(({ ctx, input, signal }) =>
       runForTrpc(createTransaction(ctx.user.id, input), signal),
     ),
 
   update: protectedProcedure
-    .input(transactionUpdateSchema)
+    .input(validate(transactionUpdateSchema))
     .mutation(({ ctx, input, signal }) =>
       runForTrpc(updateTransaction(ctx.user.id, input), signal),
     ),
 
   delete: protectedProcedure
-    .input(z.object({ id: idSchema }))
+    .input(validate(Schema.Struct({ id: idSchema })))
     .mutation(({ ctx, input, signal }) =>
       runForTrpc(deleteTransaction(ctx.user.id, input.id), signal),
     ),
 
   /** Several transactions in one call and one DB transaction */
   bulkCreate: protectedProcedure
-    .input(z.object({ items: z.array(transactionInputSchema).min(1).max(100) }))
+    .input(
+      validate(
+        Schema.Struct({
+          items: Schema.Array(transactionInputSchema).check(
+            Schema.isBetweenLength(1, 100, message("invalid_value")),
+          ),
+        }),
+      ),
+    )
     .mutation(({ ctx, input, signal }) =>
       runForTrpc(bulkCreate(ctx.user.id, input.items), signal),
     ),
@@ -108,23 +127,22 @@ export const transactionsRouter = createTRPCRouter({
   /** Records the difference between the actual and the derived balance */
   adjustBalance: protectedProcedure
     .input(
-      z.object({
-        accountId: idSchema,
-        actualBalance: minorUnitsSchema,
-        date: calendarDateSchema.nullish(),
-        splits: z
-          .array(
-            z.object({
-              kind: z.enum(["expense", "income"]),
-              amount: magnitudeSchema,
-              categoryId: idSchema
-                .nullish()
-                .transform((value) => value ?? null),
-            }),
-          )
-          .max(100)
-          .nullish(),
-      }),
+      validate(
+        Schema.Struct({
+          accountId: idSchema,
+          actualBalance: minorUnitsSchema,
+          date: nullish(calendarDateSchema),
+          splits: nullish(
+            Schema.Array(
+              Schema.Struct({
+                kind: Schema.Literals(["expense", "income"]),
+                amount: magnitudeSchema,
+                categoryId: nullable(idSchema),
+              }),
+            ).check(maxLength(100)),
+          ),
+        }),
+      ),
     )
     .mutation(({ ctx, input, signal }) =>
       runForTrpc(adjustBalance(ctx.user.id, input), signal),

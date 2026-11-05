@@ -1,12 +1,12 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
+import { effectTsResolver } from "@hookform/resolvers/effect-ts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Schema } from "effect";
 import { useTranslations } from "next-intl";
 import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { z } from "zod";
 
 import { FormError } from "~/components/app/form-error";
 import { ResponsiveDialog } from "~/components/app/responsive-dialog";
@@ -31,24 +31,25 @@ import { Switch } from "~/components/ui/switch";
 import { useToastError } from "~/hooks/use-toast-error";
 import { minorToInput, parseAmountInput } from "~/lib/money";
 import { USER_ACCOUNT_TYPES } from "~/lib/validators/accounts";
+import { message, nonEmpty, trimmedString } from "~/lib/validators/common";
 import { useTRPC } from "~/trpc/react";
 
-const formSchema = z.object({
-  name: z.string().trim().min(1).max(255),
-  currencyId: z.string().min(1),
-  type: z.enum(USER_ACCOUNT_TYPES),
-  initialBalance: z
-    .string()
-    .refine(
-      (value) =>
+const formSchema = Schema.Struct({
+  name: trimmedString(255),
+  currencyId: Schema.String.check(nonEmpty),
+  type: Schema.Literals(USER_ACCOUNT_TYPES),
+  initialBalance: Schema.String.check(
+    Schema.makeFilter(
+      (value: string) =>
         value.trim() === "" ||
         parseAmountInput(value, { allowSign: true }) !== null,
-      { error: "is_minor_units" },
+      message("is_minor_units"),
     ),
-  isActive: z.boolean(),
+  ),
+  isActive: Schema.Boolean,
 });
 
-type FormValues = z.infer<typeof formSchema>;
+type FormValues = typeof formSchema.Type;
 
 export type EditableAccount = {
   id: string;
@@ -88,7 +89,7 @@ export function AccountFormDialog({
   });
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: effectTsResolver(formSchema),
     defaultValues: defaults(),
   });
 

@@ -1,13 +1,13 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
+import { effectTsResolver } from "@hookform/resolvers/effect-ts";
+import { Schema } from "effect";
 import { AlertCircleIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { z } from "zod";
 
 import { FormError } from "~/components/app/form-error";
 import { Alert, AlertDescription } from "~/components/ui/alert";
@@ -29,10 +29,12 @@ import {
 import { Spinner } from "~/components/ui/spinner";
 import { authClient } from "~/lib/auth/client";
 import { type AuthErrorCode, authErrorFromStatus } from "~/lib/auth-routing";
+import { isEmail } from "~/lib/validators/auth";
+import { nonEmpty } from "~/lib/validators/common";
 
-const credentialsSchema = z.object({
-  email: z.email(),
-  password: z.string().min(1),
+const credentialsSchema = Schema.Struct({
+  email: Schema.String.check(isEmail),
+  password: Schema.String.check(nonEmpty),
 });
 
 type Step = "credentials" | "totp" | "backup";
@@ -59,7 +61,7 @@ export function LoginForm({
   const [submitting, setSubmitting] = useState(false);
 
   const form = useForm({
-    resolver: zodResolver(credentialsSchema),
+    resolver: effectTsResolver(credentialsSchema),
     defaultValues: { email: "", password: "" },
   });
 

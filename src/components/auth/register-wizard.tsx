@@ -1,13 +1,12 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
+import { effectTsResolver } from "@hookform/resolvers/effect-ts";
 import { useMutation } from "@tanstack/react-query";
 import { AlertCircleIcon, CheckIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import type { z } from "zod";
 import { FormError } from "~/components/app/form-error";
 import { BackupCodes } from "~/components/auth/backup-codes";
 import { TotpEnrolment } from "~/components/auth/totp-enrolment";
@@ -32,7 +31,7 @@ import { cn } from "~/lib/utils";
 import { registrationDetailsSchema } from "~/lib/validators/auth";
 import { useTRPC } from "~/trpc/react";
 
-type Details = z.infer<typeof registrationDetailsSchema>;
+type Details = typeof registrationDetailsSchema.Type;
 
 const STEPS = ["stepDetails", "stepAuthenticator", "stepBackup"] as const;
 
@@ -89,7 +88,7 @@ export function RegisterWizard({
   const [finishing, setFinishing] = useState(false);
 
   const form = useForm<Details>({
-    resolver: zodResolver(registrationDetailsSchema),
+    resolver: effectTsResolver(registrationDetailsSchema),
     defaultValues: { name: "", email: "", password: "" },
   });
 

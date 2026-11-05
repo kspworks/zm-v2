@@ -1,5 +1,5 @@
+import { Option, Schema } from "effect";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
-import type { z } from "zod";
 
 /** Same-tab writes; the `storage` event only fires in other tabs */
 const LOCAL_EVENT = "zm:local-storage";
@@ -33,7 +33,7 @@ const subscribe = (onChange: () => void) => {
  */
 export function useLocalStorage<T>(
   key: string,
-  schema: z.ZodType<T>,
+  schema: Schema.Decoder<T>,
   fallback: T,
 ): [value: T, setValue: (value: T) => void, ready: boolean] {
   const raw = useSyncExternalStore(
@@ -50,9 +50,10 @@ export function useLocalStorage<T>(
     }
 
     try {
-      const parsed = schema.safeParse(JSON.parse(raw));
-
-      return parsed.success ? parsed.data : fallback;
+      return Option.getOrElse(
+        Schema.decodeUnknownOption(schema)(JSON.parse(raw)),
+        () => fallback,
+      );
     } catch {
       return fallback;
     }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { Schema, SchemaTransformation } from "effect";
 import {
   CalendarClockIcon,
   LayoutDashboardIcon,
@@ -10,7 +11,6 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { parseAsString, useQueryStates } from "nuqs";
 import { type ReactNode, useId, useMemo } from "react";
-import { z } from "zod";
 
 import { BalancesSidebar } from "~/components/app/balances-sidebar";
 import { LedgerLayout } from "~/components/app/ledger-layout";
@@ -58,18 +58,24 @@ import { useTRPC } from "~/trpc/react";
 
 const parsers = { currency: parseAsString };
 
-const rangeSchema = z.object({
-  back: z.number().transform(clampRange),
-  ahead: z.number().transform(clampRange),
-});
+const clampedRange = Schema.Finite.pipe(
+  Schema.decodeTo(
+    Schema.Finite,
+    SchemaTransformation.transform({
+      decode: clampRange,
+      encode: (value: number) => value,
+    }),
+  ),
+);
+const rangeSchema = Schema.Struct({ back: clampedRange, ahead: clampedRange });
 const RANGE_FALLBACK = { back: RANGE_DEFAULT, ahead: RANGE_DEFAULT };
 
 /** Accounts switched off (so new ones start on) and whether debts count */
-const scopeSchema = z.object({
-  excluded: z.array(z.string()),
-  debts: z.boolean(),
+const scopeSchema = Schema.Struct({
+  excluded: Schema.Array(Schema.String),
+  debts: Schema.Boolean,
 });
-type Scope = z.infer<typeof scopeSchema>;
+type Scope = typeof scopeSchema.Type;
 const SCOPE_FALLBACK: Scope = { excluded: [], debts: true };
 
 function RangeFields({

@@ -1,11 +1,15 @@
-import { z } from "zod";
+import { Schema } from "effect";
 
 import {
   categoryInputSchema,
   categoryUpdateSchema,
 } from "~/lib/validators/categories";
 import { idSchema } from "~/lib/validators/common";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  validate,
+} from "~/server/api/trpc";
 import { runForTrpc } from "~/server/effect/runtime";
 import {
   createCategory,
@@ -20,19 +24,19 @@ export const categoriesRouter = createTRPCRouter({
   ),
 
   create: protectedProcedure
-    .input(categoryInputSchema)
+    .input(validate(categoryInputSchema))
     .mutation(({ ctx, input, signal }) =>
       runForTrpc(createCategory(ctx.user.id, input), signal),
     ),
 
   update: protectedProcedure
-    .input(categoryUpdateSchema)
+    .input(validate(categoryUpdateSchema))
     .mutation(({ ctx, input, signal }) =>
       runForTrpc(updateCategory(ctx.user.id, input), signal),
     ),
 
   delete: protectedProcedure
-    .input(z.object({ id: idSchema }))
+    .input(validate(Schema.Struct({ id: idSchema })))
     .mutation(({ ctx, input, signal }) =>
       runForTrpc(deleteCategory(ctx.user.id, input.id), signal),
     ),

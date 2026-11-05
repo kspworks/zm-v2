@@ -1,7 +1,11 @@
-import { z } from "zod";
+import { Schema } from "effect";
 
 import { idSchema, trimmedName } from "~/lib/validators/common";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  validate,
+} from "~/server/api/trpc";
 import { runForTrpc } from "~/server/effect/runtime";
 import {
   counterpartyBalances,
@@ -21,19 +25,19 @@ export const counterpartiesRouter = createTRPCRouter({
   ),
 
   rename: protectedProcedure
-    .input(z.object({ id: idSchema, name: trimmedName }))
+    .input(validate(Schema.Struct({ id: idSchema, name: trimmedName })))
     .mutation(({ ctx, input, signal }) =>
       runForTrpc(renameCounterparty(ctx.user.id, input), signal),
     ),
 
   merge: protectedProcedure
-    .input(z.object({ sourceId: idSchema, targetId: idSchema }))
+    .input(validate(Schema.Struct({ sourceId: idSchema, targetId: idSchema })))
     .mutation(({ ctx, input, signal }) =>
       runForTrpc(mergeCounterparties(ctx.user.id, input), signal),
     ),
 
   delete: protectedProcedure
-    .input(z.object({ id: idSchema }))
+    .input(validate(Schema.Struct({ id: idSchema })))
     .mutation(({ ctx, input, signal }) =>
       runForTrpc(deleteCounterparty(ctx.user.id, input.id), signal),
     ),

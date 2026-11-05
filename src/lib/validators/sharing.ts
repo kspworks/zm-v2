@@ -1,22 +1,23 @@
-import { z } from "zod";
+import { Schema } from "effect";
 
 import { emailSchema } from "~/lib/validators/auth";
-import { idSchema } from "~/lib/validators/common";
+import { idSchema, withDefault } from "~/lib/validators/common";
 
-export const shareEntitySchema = z.enum(["account", "category"]);
+export const shareEntitySchema = Schema.Literals(["account", "category"]);
 
-export type ShareEntity = z.infer<typeof shareEntitySchema>;
+export type ShareEntity = typeof shareEntitySchema.Type;
 
-export const shareTargetSchema = z.object({
-  entity: shareEntitySchema,
-  id: idSchema,
-});
+const targetFields = { entity: shareEntitySchema, id: idSchema };
 
-export const shareAddSchema = shareTargetSchema.extend({
+export const shareTargetSchema = Schema.Struct(targetFields);
+
+export const shareAddSchema = Schema.Struct({
+  ...targetFields,
   email: emailSchema,
-  canWrite: z.boolean().default(false),
+  canWrite: Schema.Boolean.pipe(withDefault(false)),
 });
 
-export const shareRevokeSchema = shareTargetSchema.extend({
+export const shareRevokeSchema = Schema.Struct({
+  ...targetFields,
   userId: idSchema,
 });

@@ -1,15 +1,15 @@
-import { z } from "zod";
+import { Schema } from "effect";
 
 import type { DebtLabel } from "~/lib/debt-label";
 
 /** What the top-level tiles stand for. */
-export const reportGroupBySchema = z.enum([
+export const reportGroupBySchema = Schema.Literals([
   "category",
   "account",
   "counterparty",
 ]);
 
-export type ReportGroupBy = z.infer<typeof reportGroupBySchema>;
+export type ReportGroupBy = typeof reportGroupBySchema.Type;
 
 /** Tile key of the "No category" / "No counterparty" tile. */
 export const NONE_KEY = "__none__";

@@ -39,7 +39,7 @@ describe("tRPC + superjson", () => {
     });
   });
 
-  it("flattens zod errors into data.zodError", async () => {
+  it("flattens input validation issues into data.validationError", async () => {
     const error = await client.invites.validate
       .query({ id: "" })
       .catch((caught: unknown) => caught);
@@ -47,7 +47,7 @@ describe("tRPC + superjson", () => {
     expect(error).toMatchObject({
       data: {
         code: "BAD_REQUEST",
-        zodError: { fieldErrors: { id: expect.any(Array) } },
+        validationError: { fieldErrors: { id: ["is_nonempty"] } },
       },
     });
   });

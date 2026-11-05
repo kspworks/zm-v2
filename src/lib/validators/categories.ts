@@ -1,22 +1,34 @@
-import { z } from "zod";
+import { Schema } from "effect";
 
-import { idSchema, trimmedName } from "~/lib/validators/common";
+import {
+  idSchema,
+  message,
+  nullable,
+  trimmedName,
+  withDefault,
+} from "~/lib/validators/common";
 
-export const categoryInputSchema = z
-  .object({
-    name: trimmedName,
-    parentId: idSchema.nullish().transform((value) => value ?? null),
-    isExpense: z.boolean().default(true),
-    isIncome: z.boolean().default(false),
-  })
-  .refine((value) => value.isExpense || value.isIncome, {
-    error: "category_kind_required",
-    path: ["isExpense"],
-  });
+const categoryFields = {
+  name: trimmedName,
+  parentId: nullable(idSchema),
+  isExpense: Schema.Boolean.pipe(withDefault(true)),
+  isIncome: Schema.Boolean.pipe(withDefault(false)),
+};
 
-export const categoryUpdateSchema = z.intersection(
-  categoryInputSchema,
-  z.object({ id: idSchema }),
+const kindRequired = Schema.makeFilter(
+  (value: { isExpense: boolean; isIncome: boolean }) =>
+    value.isExpense || value.isIncome
+      ? undefined
+      : { path: ["isExpense"], issue: "category_kind_required" },
+  message("category_kind_required"),
 );
 
-export type CategoryInput = z.infer<typeof categoryInputSchema>;
+export const categoryInputSchema =
+  Schema.Struct(categoryFields).check(kindRequired);
+
+export const categoryUpdateSchema = Schema.Struct({
+  ...categoryFields,
+  id: idSchema,
+}).check(kindRequired);
+
+export type CategoryInput = typeof categoryInputSchema.Type;

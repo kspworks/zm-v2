@@ -2,10 +2,10 @@
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { format, subMonths } from "date-fns";
+import { Schema } from "effect";
 import { AlertTriangleIcon, ChartPieIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useMemo } from "react";
-import { z } from "zod";
 
 import { Money } from "~/components/app/money";
 import { PageHeader } from "~/components/app/page-header";
@@ -61,7 +61,7 @@ import { useTRPC } from "~/trpc/react";
 
 const SLOTS = 8;
 
-const viewSchema = z.enum(["expense", "income"]);
+const viewSchema = Schema.Literals(["expense", "income"]);
 
 const GROUP_BY_LABELS = {
   category: "byCategory",
@@ -178,7 +178,9 @@ export function ReportsView() {
         <div className="@container flex flex-wrap items-center justify-between gap-2">
           <Tabs
             value={view}
-            onValueChange={(value) => setView(viewSchema.parse(value))}
+            onValueChange={(value) =>
+              setView(Schema.decodeUnknownSync(viewSchema)(value))
+            }
           >
             <TabsList>
               <TabsTrigger value="expense">{t("expense")}</TabsTrigger>
@@ -199,7 +201,7 @@ export function ReportsView() {
           <Select
             value={groupBy}
             onValueChange={(value) =>
-              setGroupBy(reportGroupBySchema.parse(value))
+              setGroupBy(Schema.decodeUnknownSync(reportGroupBySchema)(value))
             }
           >
             <SelectTrigger aria-label={t("groupBy")}>
@@ -207,7 +209,7 @@ export function ReportsView() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent align="end">
-              {reportGroupBySchema.options.map((option: ReportGroupBy) => (
+              {reportGroupBySchema.literals.map((option: ReportGroupBy) => (
                 <SelectItem key={option} value={option}>
                   {t(GROUP_BY_LABELS[option])}
                 </SelectItem>

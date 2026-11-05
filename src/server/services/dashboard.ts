@@ -26,7 +26,7 @@ import {
 type ScopeInput = {
   currencyId: string;
   /** Narrows the scope; omitted means every account in it */
-  accountIds?: string[];
+  accountIds?: readonly string[];
   /** `false` leaves debt pairs out; omitted, they count */
   includeDebts?: boolean;
 };

@@ -16,9 +16,10 @@ import {
 import { nextCookies } from "better-auth/next-js";
 import { admin, twoFactor } from "better-auth/plugins";
 import type { BetterAuthPlugin } from "better-auth/types";
-import { z } from "zod";
+import { Schema } from "effect";
 
 import { env } from "~/env";
+import { trimmedString } from "~/lib/validators/common";
 import {
   isLiveUser,
   rehashLegacyPassword,
@@ -69,7 +70,9 @@ const zm = () =>
         "/zm/ticket-sign-in",
         {
           method: "POST",
-          body: z.object({ ticket: z.string().min(1).max(128) }),
+          body: Schema.toStandardSchemaV1(
+            Schema.Struct({ ticket: trimmedString(128) }),
+          ),
         },
         async (ctx) => {
           const consumed =

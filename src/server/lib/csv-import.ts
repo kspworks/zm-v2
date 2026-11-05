@@ -1,6 +1,8 @@
 import { parse as parseCsvSync } from "csv-parse/sync";
+import { Cause, Exit, Schema, SchemaIssue, SchemaTransformation } from "effect";
 
-import type { ErrorKey } from "~/lib/error-keys";
+import { type ErrorKey, isErrorKey } from "~/lib/error-keys";
+import { message } from "~/lib/validators/common";
 
 /**
  * The ZenMoney export: a title on line 1, the header on line 2, comma
@@ -77,94 +79,178 @@ const blank = (value: string | undefined): string | null => {
   return trimmed === "" ? null : trimmed;
 };
 
+/** A cell: absent or whitespace-only reads as null, anything else trimmed */
+const Cell = Schema.UndefinedOr(Schema.String).pipe(
+  Schema.decodeTo(
+    Schema.NullOr(Schema.String),
+    SchemaTransformation.transform<string | null, string | undefined>({
+      decode: blank,
+      encode: (value) => value ?? undefined,
+    }),
+  ),
+);
+
+/** A cell that is empty or passes `test`, else fails with `key` */
+const checkedCell = (test: (value: string) => boolean, key: ErrorKey) =>
+  Cell.check(
+    Schema.makeFilter(
+      (value: string | null) => value === null || test(value),
+      message(key),
+    ),
+  );
+
+/** A required cell matching `pattern` */
+const requiredCell = (
+  pattern: RegExp,
+  key: ErrorKey,
+  extra: (value: string) => boolean = () => true,
+) =>
+  Cell.check(
+    Schema.makeFilter(
+      (value: string | null) =>
+        value !== null && pattern.test(value) && extra(value),
+      message(key),
+    ),
+  ).pipe(
+    Schema.decodeTo(
+      Schema.String,
+      SchemaTransformation.transform<string, string | null>({
+        decode: (value) => value ?? "",
+        encode: (value) => value,
+      }),
+    ),
+  );
+
+const DateCell = requiredCell(
+  /^\d{4}-\d{2}-\d{2}$/,
+  "import_invalid",
+  (value) => !Number.isNaN(Date.parse(value)),
+);
+
+const DateTimeCell = requiredCell(
+  /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
+  "import_invalid",
+);
+
 /**
- * "3000,00" → 300000. Stripping the comma must leave a whole number: a
- * dot-decimal file would otherwise land 100× too small, so it's rejected.
+ * "3000,00" → 300000; an empty cell is null. Stripping the comma must leave a
+ * whole number: a dot-decimal file would otherwise land 100× too small, so
+ * it's rejected.
  */
-const parseAmount = (value: string | undefined): number | null | "invalid" => {
-  const text = blank(value);
+const AmountCell = checkedCell(
+  (value) =>
+    /^\d+,\d{2}$/.test(value) &&
+    Number.isSafeInteger(Number(value.replace(",", ""))),
+  "is_minor_units",
+).pipe(
+  Schema.decodeTo(
+    Schema.NullOr(Schema.Int),
+    SchemaTransformation.transform<number | null, string | null>({
+      decode: (value) =>
+        value === null ? null : Number(value.replace(",", "")),
+      encode: (value) =>
+        value === null ? null : (value / 100).toFixed(2).replace(".", ","),
+    }),
+  ),
+);
 
-  if (text === null) {
-    return null;
+const CommentCell = checkedCell(
+  (value) => value.length <= 500,
+  "import_invalid",
+);
+
+const currencyCell = (codes: ReadonlySet<string>) =>
+  checkedCell((value) => codes.has(value), "unknown_currency");
+
+/** Decodes one cell; on failure, the app error key its schema carries */
+const decodeCell = <T>(
+  schema: Schema.Decoder<T>,
+  value: string | undefined,
+): { value: T } | { key: ErrorKey } => {
+  const exit = Schema.decodeUnknownExit(schema)(value);
+
+  if (Exit.isSuccess(exit)) {
+    return { value: exit.value };
   }
 
-  if (!/^\d+,\d{2}$/.test(text)) {
-    return "invalid";
-  }
+  const error = Cause.squash(exit.cause);
+  const issue = Schema.isSchemaError(error)
+    ? formatIssue(error.issue).issues[0]
+    : undefined;
 
-  const minor = Number(text.replace(",", ""));
-
-  return Number.isSafeInteger(minor) ? minor : "invalid";
+  return { key: isErrorKey(issue?.message) ? issue.message : "import_invalid" };
 };
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
-const DATE_TIME = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
+const formatIssue = SchemaIssue.makeFormatterStandardSchemaV1();
 
 /**
  * Validates the whole file before anything is written and returns every
- * row-level error at once. Also applies the debt currency fix.
+ * row-level error at once. Each cell is decoded by its own schema, so a row
+ * reports every bad cell; the rules across cells follow. Also applies the
+ * debt currency fix.
  */
 export const validateRows = (
   raw: RawRow[],
   currencyCodes: string[],
 ): { rows: ImportRow[]; errors: ImportRowError[] } => {
-  const codes = new Set(currencyCodes);
+  const CurrencyCell = currencyCell(new Set(currencyCodes));
   const rows: ImportRow[] = [];
   const errors: ImportRowError[] = [];
 
   for (const [index, source] of raw.entries()) {
     const line = index + FIRST_DATA_LINE;
-    const fail = (field: string, key: ErrorKey) =>
-      errors.push({ line, field, key });
+    const cell = <T>(
+      field: (typeof CSV_COLUMNS)[number],
+      schema: Schema.Decoder<T>,
+      fallback: T,
+    ): { ok: boolean; value: T } => {
+      const result = decodeCell(schema, source[field]);
 
-    const date = blank(source.date) ?? "";
-    if (!DATE.test(date) || Number.isNaN(Date.parse(date))) {
-      fail("date", "import_invalid");
-    }
+      if ("key" in result) {
+        errors.push({ line, field, key: result.key });
 
-    const createdDate = blank(source.createdDate) ?? "";
-    if (!DATE_TIME.test(createdDate)) {
-      fail("createdDate", "import_invalid");
-    }
+        return { ok: false, value: fallback };
+      }
 
-    const outcome = parseAmount(source.outcome);
-    const income = parseAmount(source.income);
-    if (outcome === "invalid") {
-      fail("outcome", "is_minor_units");
-    }
-    if (income === "invalid") {
-      fail("income", "is_minor_units");
-    }
+      return { ok: true, value: result.value };
+    };
 
-    const comment = blank(source.comment);
-    if (comment && comment.length > 500) {
-      fail("comment", "import_invalid");
-    }
+    const date = cell("date", DateCell, blank(source.date) ?? "").value;
+    const createdDate = cell(
+      "createdDate",
+      DateTimeCell,
+      blank(source.createdDate) ?? "",
+    ).value;
+    const outcome = cell("outcome", AmountCell, null);
+    const income = cell("income", AmountCell, null);
+    const comment = cell("comment", CommentCell, blank(source.comment)).value;
+    const outcomeCurrency = cell(
+      "outcomeCurrencyShortTitle",
+      CurrencyCell,
+      blank(source.outcomeCurrencyShortTitle),
+    ).value;
+    const incomeCurrency = cell(
+      "incomeCurrencyShortTitle",
+      CurrencyCell,
+      blank(source.incomeCurrencyShortTitle),
+    ).value;
 
-    const outcomeCurrency = blank(source.outcomeCurrencyShortTitle);
-    const incomeCurrency = blank(source.incomeCurrencyShortTitle);
-    if (outcomeCurrency && !codes.has(outcomeCurrency)) {
-      fail("outcomeCurrencyShortTitle", "unknown_currency");
-    }
-    if (incomeCurrency && !codes.has(incomeCurrency)) {
-      fail("incomeCurrencyShortTitle", "unknown_currency");
-    }
-
-    const out = typeof outcome === "number" && outcome > 0 ? outcome : null;
-    const inc = typeof income === "number" && income > 0 ? income : null;
+    const out =
+      outcome.value !== null && outcome.value > 0 ? outcome.value : null;
+    const inc = income.value !== null && income.value > 0 ? income.value : null;
     const outcomeAccountName = blank(source.outcomeAccountName);
     const incomeAccountName = blank(source.incomeAccountName);
 
-    if (outcome !== "invalid" && income !== "invalid" && !out && !inc) {
-      fail("outcome", "import_empty_row");
+    if (outcome.ok && income.ok && !out && !inc) {
+      errors.push({ line, field: "outcome", key: "import_empty_row" });
     }
 
     if (out && (!outcomeAccountName || !outcomeCurrency)) {
-      fail("outcomeAccountName", "import_invalid");
+      errors.push({ line, field: "outcomeAccountName", key: "import_invalid" });
     }
 
     if (inc && (!incomeAccountName || !incomeCurrency)) {
-      fail("incomeAccountName", "import_invalid");
+      errors.push({ line, field: "incomeAccountName", key: "import_invalid" });
     }
 
     rows.push({

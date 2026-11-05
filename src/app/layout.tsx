@@ -5,7 +5,6 @@ import { getLocale } from "next-intl/server";
 import { ThemeProvider } from "next-themes";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 
-import { ZodLocale } from "~/components/app/zod-locale";
 import { Toaster } from "~/components/ui/sonner";
 import { TooltipProvider } from "~/components/ui/tooltip";
 import { TRPCReactProvider } from "~/trpc/react";
@@ -53,7 +52,6 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           disableTransitionOnChange
         >
           <NextIntlClientProvider>
-            <ZodLocale />
             <TRPCReactProvider>
               <NuqsAdapter>
                 <TooltipProvider>

@@ -1,14 +1,14 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
+import { effectTsResolver } from "@hookform/resolvers/effect-ts";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Schema } from "effect";
 import { MinusIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
-import { z } from "zod";
 
 import { DatePicker } from "~/components/app/date-picker";
 import { FormError } from "~/components/app/form-error";
@@ -43,8 +43,10 @@ import { useToastError } from "~/hooks/use-toast-error";
 import { categoryOptions } from "~/lib/category-options";
 import { formatDisplayDate } from "~/lib/dates";
 import { debtLabel } from "~/lib/debt-label";
+import type { ErrorKey } from "~/lib/error-keys";
 import { formatMoney, minorToInput, parseAmountInput } from "~/lib/money";
 import { cn } from "~/lib/utils";
+import { maxLength, message, nonEmpty } from "~/lib/validators/common";
 import type {
   TransactionInputData,
   TransactionKind,
@@ -53,64 +55,64 @@ import { useTRPC } from "~/trpc/react";
 
 const KINDS = ["expense", "income", "transfer", "debt"] as const;
 
-const amountField = z
-  .string()
-  .refine((value) => value.trim() !== "", { error: "is_nonempty" })
-  .refine(
-    (value) => value.trim() === "" || (parseAmountInput(value) ?? 0) > 0,
-    { error: "is_minor_units" },
-  );
+const amountField = Schema.String.check(
+  Schema.makeFilter(
+    (value: string) => value.trim() !== "",
+    message("is_nonempty"),
+  ),
+  Schema.makeFilter(
+    (value: string) =>
+      value.trim() === "" || (parseAmountInput(value) ?? 0) > 0,
+    message("is_minor_units"),
+  ),
+);
 
-export const transactionFormSchema = z
-  .object({
-    kind: z.enum(KINDS),
-    date: z.string().min(1, { error: "is_nonempty" }),
-    amount: amountField,
-    linkedAmount: z.string(),
-    accountId: z.string().min(1, { error: "is_nonempty" }),
-    linkedAccountId: z.string(),
-    categoryId: z.string().nullable(),
-    counterparty: z
-      .object({ id: z.string().optional(), name: z.string() })
-      .nullable(),
-    direction: z.enum(["gave", "took"]),
-    comment: z.string().max(500),
-  })
-  .superRefine((value, ctx) => {
-    if (value.kind === "transfer") {
-      if (!value.linkedAccountId) {
-        ctx.addIssue({
-          code: "custom",
-          message: "is_nonempty",
-          path: ["linkedAccountId"],
-        });
-      } else if (value.linkedAccountId === value.accountId) {
-        ctx.addIssue({
-          code: "custom",
-          message: "fields_integrity_same_account_transfer",
-          path: ["linkedAccountId"],
-        });
-      }
+const formFields = Schema.Struct({
+  kind: Schema.Literals(KINDS),
+  date: Schema.String.check(nonEmpty),
+  amount: amountField,
+  linkedAmount: Schema.String,
+  accountId: Schema.String.check(nonEmpty),
+  linkedAccountId: Schema.String,
+  categoryId: Schema.NullOr(Schema.String),
+  counterparty: Schema.NullOr(
+    Schema.Struct({ id: Schema.optional(Schema.String), name: Schema.String }),
+  ),
+  direction: Schema.Literals(["gave", "took"]),
+  comment: Schema.String.check(maxLength(500)),
+});
 
-      if (!((parseAmountInput(value.linkedAmount) ?? 0) > 0)) {
-        ctx.addIssue({
-          code: "custom",
-          message: "is_minor_units",
-          path: ["linkedAmount"],
-        });
-      }
-    }
+/** The rules that depend on the kind, reported on the field they concern */
+const kindRules = (value: typeof formFields.Type) => {
+  const issues: { path: string[]; issue: ErrorKey }[] = [];
 
-    if (value.kind === "debt" && !value.counterparty?.name.trim()) {
-      ctx.addIssue({
-        code: "custom",
-        message: "counterparty_required",
-        path: ["counterparty"],
+  if (value.kind === "transfer") {
+    if (!value.linkedAccountId) {
+      issues.push({ path: ["linkedAccountId"], issue: "is_nonempty" });
+    } else if (value.linkedAccountId === value.accountId) {
+      issues.push({
+        path: ["linkedAccountId"],
+        issue: "fields_integrity_same_account_transfer",
       });
     }
-  });
 
-export type TransactionFormValues = z.infer<typeof transactionFormSchema>;
+    if (!((parseAmountInput(value.linkedAmount) ?? 0) > 0)) {
+      issues.push({ path: ["linkedAmount"], issue: "is_minor_units" });
+    }
+  }
+
+  if (value.kind === "debt" && !value.counterparty?.name.trim()) {
+    issues.push({ path: ["counterparty"], issue: "counterparty_required" });
+  }
+
+  return issues.length > 0 ? issues : undefined;
+};
+
+export const transactionFormSchema = formFields.check(
+  Schema.makeFilter(kindRules),
+);
+
+export type TransactionFormValues = typeof transactionFormSchema.Type;
 
 /** Form values → the API input (amounts as positive minor units) */
 export const toTransactionInput = (
@@ -258,7 +260,7 @@ export function TransactionForm({
   );
 
   const form = useForm<TransactionFormValues>({
-    resolver: zodResolver(transactionFormSchema),
+    resolver: effectTsResolver(transactionFormSchema),
     defaultValues: initial ?? {
       kind: "expense",
       date: today,

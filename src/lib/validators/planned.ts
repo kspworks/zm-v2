@@ -1,68 +1,79 @@
-import { z } from "zod";
+import { Schema } from "effect";
 
 import { REPEAT_TYPES } from "~/lib/schedule";
-import { calendarDateSchema, idSchema } from "~/lib/validators/common";
+import {
+  calendarDateSchema,
+  idSchema,
+  maxLength,
+  message,
+  nullable,
+  withDefault,
+} from "~/lib/validators/common";
 import { transactionInputSchema } from "~/lib/validators/transactions";
 
 export const REPEAT_OPTIONS = ["none", ...REPEAT_TYPES] as const;
 
-export const scheduleFieldsSchema = z.object({
-  repeatType: z.enum(REPEAT_OPTIONS),
-  repeatInterval: z.number().int().min(1).max(31).default(1),
-  repeatWeekdays: z.array(z.number().int()).max(7).default([]),
-  endDate: calendarDateSchema.nullish().transform((value) => value ?? null),
-});
+const scheduleFields = {
+  repeatType: Schema.Literals(REPEAT_OPTIONS),
+  repeatInterval: Schema.Int.check(
+    Schema.isBetween({ minimum: 1, maximum: 31 }, message("invalid_value")),
+  ).pipe(withDefault(1)),
+  repeatWeekdays: Schema.Array(Schema.Int)
+    .check(maxLength(7))
+    .pipe(withDefault([])),
+  endDate: nullable(calendarDateSchema),
+};
 
-export type ScheduleFields = z.infer<typeof scheduleFieldsSchema>;
+export const scheduleFieldsSchema = Schema.Struct(scheduleFields);
+
+export type ScheduleFields = typeof scheduleFieldsSchema.Type;
+
+type ScheduleInput = {
+  data: { date: string };
+  schedule: Pick<ScheduleFields, "repeatType" | "repeatWeekdays" | "endDate">;
+};
 
 /** Weekdays and the end date checked against the start (the form's date) */
-const checkSchedule = (
-  schedule: ScheduleFields,
-  startDate: string,
-  ctx: z.RefinementCtx,
-) => {
+const checkSchedule = Schema.makeFilter(({ data, schedule }: ScheduleInput) => {
+  const issues: { path: string[]; issue: string }[] = [];
+
   if (schedule.repeatType === "weekly") {
     if (schedule.repeatWeekdays.length === 0) {
-      ctx.addIssue({
-        code: "custom",
-        message: "weekdays_required",
+      issues.push({
         path: ["schedule", "repeatWeekdays"],
+        issue: "weekdays_required",
       });
     }
 
     if (schedule.repeatWeekdays.some((day) => day < 1 || day > 7)) {
-      ctx.addIssue({
-        code: "custom",
-        message: "incorrect_weekday",
+      issues.push({
         path: ["schedule", "repeatWeekdays"],
+        issue: "incorrect_weekday",
       });
     }
   }
 
-  if (schedule.endDate && schedule.endDate < startDate) {
-    ctx.addIssue({
-      code: "custom",
-      message: "end_date_gte_start_date",
+  if (schedule.endDate && schedule.endDate < data.date) {
+    issues.push({
       path: ["schedule", "endDate"],
+      issue: "end_date_gte_start_date",
     });
   }
-};
 
-export const plannedCreateSchema = z
-  .object({ data: transactionInputSchema, schedule: scheduleFieldsSchema })
-  .superRefine((value, ctx) =>
-    checkSchedule(value.schedule, value.data.date, ctx),
-  );
+  return issues.length > 0 ? issues : undefined;
+});
 
-export const scheduleUpdateSchema = z
-  .object({
-    /** Either leg's id (an occurrence's plannedTransactionId) */
-    scheduleId: idSchema,
-    data: transactionInputSchema,
-    schedule: scheduleFieldsSchema.extend({
-      repeatType: z.enum(REPEAT_TYPES),
-    }),
-  })
-  .superRefine((value, ctx) =>
-    checkSchedule(value.schedule, value.data.date, ctx),
-  );
+export const plannedCreateSchema = Schema.Struct({
+  data: transactionInputSchema,
+  schedule: scheduleFieldsSchema,
+}).check(checkSchedule);
+
+export const scheduleUpdateSchema = Schema.Struct({
+  /** Either leg's id (an occurrence's plannedTransactionId) */
+  scheduleId: idSchema,
+  data: transactionInputSchema,
+  schedule: Schema.Struct({
+    ...scheduleFields,
+    repeatType: Schema.Literals(REPEAT_TYPES),
+  }),
+}).check(checkSchedule);

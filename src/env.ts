@@ -1,34 +1,72 @@
 import { createEnv } from "@t3-oss/env-nextjs";
-import { z } from "zod";
+import { Schema, SchemaTransformation } from "effect";
 
-const optionalString = z.string().optional();
+/*
+ * Each variable is an Effect Schema handed to t3-env as a Standard Schema.
+ * Variables arrive as strings or undefined (empty strings become undefined).
+ */
+
+const env$ = <S extends Schema.Decoder<unknown>>(schema: S) =>
+  Schema.toStandardSchemaV1(schema);
+
+const optionalString = env$(Schema.UndefinedOr(Schema.String));
+
+/** Undefined decodes to `fallback` */
+const orDefault = <T>(schema: Schema.Codec<T, string>, fallback: T) =>
+  Schema.UndefinedOr(schema).pipe(
+    Schema.decodeTo(
+      Schema.toType(schema),
+      SchemaTransformation.transform<T, T | undefined>({
+        decode: (value) => value ?? fallback,
+        encode: (value: T) => value,
+      }),
+    ),
+  );
+
+const url = Schema.String.check(
+  Schema.makeFilter((value: string) => URL.canParse(value)),
+);
+
+const positiveInt = Schema.NumberFromString.check(
+  Schema.isInt(),
+  Schema.isGreaterThan(0),
+);
 
 export const env = createEnv({
   server: {
-    NODE_ENV: z
-      .enum(["development", "test", "production"])
-      .default("development"),
-    DATABASE_URL: z.url(),
+    NODE_ENV: env$(
+      orDefault(
+        Schema.Literals(["development", "test", "production"]),
+        "development",
+      ),
+    ),
+    DATABASE_URL: env$(url),
     // full path of a Postgres Unix socket, e.g.
     // "/var/run/postgresql/.s.PGSQL.5432"; see "~/server/db/connection"
-    DATABASE_SOCKET_PATH: z.string().startsWith("/").optional(),
-    // compared to the literal "true": z.coerce.boolean() would read "false" as true
-    DATABASE_LOG: z
-      .string()
-      .optional()
-      .transform((value) => value === "true"),
-    BETTER_AUTH_SECRET: z.string().min(32),
-    BETTER_AUTH_URL: z.url().optional(),
+    DATABASE_SOCKET_PATH: env$(
+      Schema.UndefinedOr(Schema.String.check(Schema.isStartingWith("/"))),
+    ),
+    // compared to the literal "true": a boolean coercion would read "false"
+    // as true
+    DATABASE_LOG: env$(
+      Schema.UndefinedOr(Schema.String).pipe(
+        Schema.decodeTo(
+          Schema.Boolean,
+          SchemaTransformation.transform<boolean, string | undefined>({
+            decode: (value) => value === "true",
+            encode: (value: boolean) => String(value),
+          }),
+        ),
+      ),
+    ),
+    BETTER_AUTH_SECRET: env$(Schema.String.check(Schema.isMinLength(32))),
+    BETTER_AUTH_URL: env$(Schema.UndefinedOr(url)),
     VERCEL_URL: optionalString,
-    CRON_SECRET: z.string().min(16),
-    TRANSACTIONS_PAGINATION_LIMIT: z.coerce
-      .number()
-      .int()
-      .positive()
-      .default(50),
-    APP_TIMEZONE: z.string().default("Europe/Kyiv"),
+    CRON_SECRET: env$(Schema.String.check(Schema.isMinLength(16))),
+    TRANSACTIONS_PAGINATION_LIMIT: env$(orDefault(positiveInt, 50)),
+    APP_TIMEZONE: env$(orDefault(Schema.String, "Europe/Kyiv")),
     MAIL_HOST: optionalString,
-    MAIL_PORT: z.coerce.number().int().positive().optional(),
+    MAIL_PORT: env$(Schema.UndefinedOr(positiveInt)),
     MAIL_USERNAME: optionalString,
     MAIL_PASSWORD: optionalString,
     MAIL_FROM: optionalString,

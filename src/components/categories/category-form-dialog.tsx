@@ -1,12 +1,12 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
+import { effectTsResolver } from "@hookform/resolvers/effect-ts";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Schema } from "effect";
 import { useTranslations } from "next-intl";
 import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { z } from "zod";
 
 import { FormError } from "~/components/app/form-error";
 import { ResponsiveDialog } from "~/components/app/responsive-dialog";
@@ -29,6 +29,7 @@ import {
 } from "~/components/ui/select";
 import { Spinner } from "~/components/ui/spinner";
 import { useToastError } from "~/hooks/use-toast-error";
+import { trimmedString } from "~/lib/validators/common";
 import { useTRPC } from "~/trpc/react";
 import type { RouterOutputs } from "~/trpc/types";
 
@@ -36,19 +37,20 @@ type Category = RouterOutputs["categories"]["list"][number];
 
 const NO_PARENT = "__none__";
 
-const formSchema = z
-  .object({
-    name: z.string().trim().min(1).max(255),
-    parentId: z.string(),
-    isExpense: z.boolean(),
-    isIncome: z.boolean(),
-  })
-  .refine((value) => value.isExpense || value.isIncome, {
-    error: "category_kind_required",
-    path: ["isIncome"],
-  });
+const formSchema = Schema.Struct({
+  name: trimmedString(255),
+  parentId: Schema.String,
+  isExpense: Schema.Boolean,
+  isIncome: Schema.Boolean,
+}).check(
+  Schema.makeFilter((value: { isExpense: boolean; isIncome: boolean }) =>
+    value.isExpense || value.isIncome
+      ? undefined
+      : { path: ["isIncome"], issue: "category_kind_required" },
+  ),
+);
 
-type FormValues = z.infer<typeof formSchema>;
+type FormValues = typeof formSchema.Type;
 
 export function CategoryFormDialog({
   open,
@@ -71,7 +73,7 @@ export function CategoryFormDialog({
   const toastError = useToastError();
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: effectTsResolver(formSchema),
     defaultValues: {
       name: "",
       parentId: NO_PARENT,

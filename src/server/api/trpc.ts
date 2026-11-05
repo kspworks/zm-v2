@@ -1,8 +1,7 @@
-import { initTRPC, TRPCError } from "@trpc/server";
+import { initTRPC, StandardSchemaV1Error, TRPCError } from "@trpc/server";
 import { and, eq, isNull } from "drizzle-orm";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 import superjson from "superjson";
-import { ZodError, z } from "zod";
 
 import { type Locale, resolveLocale } from "~/i18n/config";
 import { auth } from "~/server/auth";
@@ -58,6 +57,33 @@ export const createTRPCContext = async ({
   };
 };
 
+type Issue = StandardSchemaV1Error["issues"][number];
+
+/**
+ * Input validation issues as `{ formErrors, fieldErrors }`: messages without a
+ * path, and messages per top-level field (the app's error keys)
+ */
+const flattenIssues = (issues: readonly Issue[]) => {
+  const formErrors: string[] = [];
+  const fieldErrors: Record<string, string[]> = {};
+
+  for (const issue of issues) {
+    const [first] = issue.path ?? [];
+    const key = typeof first === "object" ? first.key : first;
+
+    if (key === undefined) {
+      formErrors.push(issue.message);
+    } else {
+      fieldErrors[String(key)] = [
+        ...(fieldErrors[String(key)] ?? []),
+        issue.message,
+      ];
+    }
+  }
+
+  return { formErrors, fieldErrors };
+};
+
 const t = initTRPC.context<Context>().create({
   transformer: superjson,
   errorFormatter({ shape, error }) {
@@ -65,8 +91,10 @@ const t = initTRPC.context<Context>().create({
       ...shape,
       data: {
         ...shape.data,
-        zodError:
-          error.cause instanceof ZodError ? z.flattenError(error.cause) : null,
+        validationError:
+          error.cause instanceof StandardSchemaV1Error
+            ? flattenIssues(error.cause.issues)
+            : null,
         importErrors:
           error.cause instanceof ImportRowsError ? error.cause.rows : null,
       },
@@ -75,6 +103,10 @@ const t = initTRPC.context<Context>().create({
 });
 
 export const createCallerFactory = t.createCallerFactory;
+
+/** A procedure input validated (and decoded) by an Effect Schema */
+export const validate = <S extends Schema.Decoder<unknown>>(schema: S) =>
+  Schema.toStandardSchemaV1(schema);
 export const createTRPCRouter = t.router;
 
 /** Development only: a random 100-500 ms delay and a timing log line */
