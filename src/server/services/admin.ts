@@ -3,8 +3,8 @@ import { alias } from "drizzle-orm/pg-core";
 
 import type { DbOrTx } from "~/server/db";
 import { invites, sessions, users } from "~/server/db/schema";
-import { audit } from "~/server/lib/audit";
-import { appError, notFound } from "~/server/lib/errors";
+import { audit } from "~/server/legacy/audit";
+import { appError, notFound } from "~/server/legacy/errors";
 import { randomString } from "~/server/lib/ids";
 import { generateTotpSecret } from "~/server/lib/totp";
 import { ADMIN_INVITE_ID } from "~/server/services/invites";

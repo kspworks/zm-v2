@@ -4,10 +4,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { db } from "~/server/db";
 import { rateLimits } from "~/server/db/schema";
 import {
-  hitRateLimit,
-  resetRateLimit,
-  sweepRateLimits,
+  hitRateLimit as hitEffect,
+  resetRateLimit as resetEffect,
+  sweepRateLimits as sweepEffect,
 } from "~/server/lib/rate-limit";
+
+import { run } from "../helpers/run";
+
+const hitRateLimit = (key: string, rule: { limit: number; windowMs: number }) =>
+  run(hitEffect(key, rule));
+const resetRateLimit = (key: string) => run(resetEffect(key));
+const sweepRateLimits = () => run(sweepEffect());
 
 const rule = { limit: 3, windowMs: 60_000 };
 

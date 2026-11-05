@@ -6,12 +6,10 @@ import { issueSignInTicket } from "~/server/auth/sign-in-ticket";
 import { enrolTwoFactor, hashPassword } from "~/server/auth/two-factor";
 import { type DbOrTx, db as defaultDb } from "~/server/db";
 import { authAccounts, invites, users } from "~/server/db/schema";
-import { appError, forbidden, isUniqueViolation } from "~/server/lib/errors";
-import {
-  hitRateLimit,
-  RATE_LIMITS,
-  rateLimitKeys,
-} from "~/server/lib/rate-limit";
+import { runWith } from "~/server/effect/runtime";
+import { appError, forbidden, isUniqueViolation } from "~/server/legacy/errors";
+import { hitRateLimit } from "~/server/legacy/rate-limit";
+import { RATE_LIMITS, rateLimitKeys } from "~/server/lib/rate-limit";
 import {
   generateTotpSecret,
   totpManualKey,
@@ -220,7 +218,7 @@ export const register = async (
 
       const backupCodes = await enrolTwoFactor(tx, user.id, secret);
 
-      await seedUserData(tx, user.id, input.locale);
+      await runWith(tx, seedUserData(user.id, input.locale));
 
       const ticket = await issueSignInTicket(tx, user.id);
 

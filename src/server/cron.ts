@@ -2,7 +2,7 @@ import { TZDate } from "@date-fns/tz";
 import { format } from "date-fns";
 
 import { appTimezone, cronSecret } from "~/server/config";
-import { now } from "~/server/lib/clock";
+import { now } from "~/server/legacy/clock";
 import { reportError } from "~/server/lib/report";
 import { safeEqual } from "~/server/lib/tokens";
 

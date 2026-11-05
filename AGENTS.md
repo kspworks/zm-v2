@@ -32,9 +32,42 @@ governs. Enumerations stay in code and are cited by path here, never copied.
   `delete`, `.for("update")`, `onConflictDoUpdate` …) whenever it can express
   the statement. Reach for the `sql` template only for an expression the
   builder lacks, embedded in a builder call, and for a whole raw statement
-  (``tx.execute(sql`…`)``) only when no builder form exists — advisory locks,
-  for example. Never build SQL with string concatenation or `sql.raw` on
+  (``db.execute(sql`…`)`` inside `query`) only when no builder form exists —
+  advisory locks, for example. Never build SQL with string concatenation or `sql.raw` on
   input.
+
+## Effect
+
+Server code is written with **Effect v4** (`effect`). Keep every `effect` and
+`@effect/*` package on the same version. The library ships its own guide in
+`node_modules/effect/AGENTS.md` and `ai-docs/`; prefer it over memory, since
+v4 renamed much of v3. Pure, client-shared helpers in `~/lib` stay plain
+functions.
+
+- **Shape.** An exported service function is `Effect.fn("module.name")(function* (…) {…})`;
+  a private hot helper is `Effect.fnUntraced`. Domain logic stays as
+  module-level functions whose requirements are only infrastructure services,
+  not a class per domain. Never `async`/`await` or `throw` in server domain
+  code. Combinators go as extra arguments to `Effect.fn` (`transaction`,
+  `catchUniqueViolation(…)`), never `.pipe` on it.
+- **Data access** only through `query((db) => db.…)` from `~/server/db/database`,
+  which runs a Drizzle statement on the current handle and fails with
+  `SqlError`. Services never take a handle parameter. A builder that other
+  queries compose (`readableAccounts`) may take `db` and is called inside
+  `query`.
+- **Dependencies** are services provided by `AppLayer` (`~/server/effect/runtime`):
+  `Database` (the current Drizzle handle), `AppConfig` (env-derived config) and
+  `Mailer`. Domain code never reads `process.env`, the global `db` or
+  `~/server/config` directly. Time comes only from `now` / `today` in
+  `~/server/lib/clock` (Effect's `Clock`), never `new Date()` or `Date.now()`.
+- **Concurrency**: independent reads go through `Effect.all(…, { concurrency: "unbounded" })`;
+  inside a transaction they still share its one connection.
+- **Boundaries** run effects on the one per-process `ManagedRuntime`:
+  procedures use `runForTrpc(effect, signal)`; server components, better-auth
+  hooks and cron routes use `runServer`, after handling expected errors with
+  `Effect.catchTag`. The runtime holds no mutable application state.
+- **Migration interop** (temporary): `~/server/legacy/*` and `runWith(tx, effect)`
+  bridge code not yet migrated. Don't add new callers.
 
 ## Multi-process safety
 
@@ -46,16 +79,27 @@ Postgres — and **no read-then-write races** — use single statements, row loc
 ## Atomicity and the audit log
 
 Every mutation and all of its side effects (paired legs, the auto-created debt
-account, the audit row) run in **one DB transaction**. Services take a `DbOrTx`
-handle (`~/server/db`) so they compose; Drizzle nests with SAVEPOINTs. Every
-create, update, delete or restore of an account, category, transaction or
-schedule writes a `history_logs` row in that same transaction (`~/server/lib/audit`).
+account, the audit row) run in **one DB transaction**: the entry point passes
+`transaction` (`~/server/db/database`) to its `Effect.fn`, and every helper it
+calls runs on that handle through `query`. A typed failure, defect or
+interruption rolls back and propagates unchanged; a nested `transaction` is a
+SAVEPOINT, so services compose. Helpers that need the caller's transaction
+(`getOrCreateDebtAccount`, `generateOccurrences`: their advisory locks are
+transaction-scoped) don't open one. Every create, update, delete or restore of
+an account, category, transaction or schedule writes a `history_logs` row in
+that same transaction (`audit` in `~/server/lib/audit`).
 
 ## Errors
 
-A business-rule violation throws `BAD_REQUEST` or `FORBIDDEN` whose message is
-a stable snake_case key that the client translates as `errors.<key>`. The keys
-are defined in `~/lib/error-keys` — add there, don't invent inline strings.
+A business-rule violation fails with one of the tagged errors in
+`~/server/lib/errors` (`badRequest(key)`, `forbidden(key)`, `notFound()` …,
+raised as `return yield* …`) carrying a stable snake_case key that the client
+translates as `errors.<key>`. The keys are defined in `~/lib/error-keys` — add
+there, don't invent inline strings. `toTRPCError` (`~/server/effect/to-trpc-error`)
+is the only place an Effect failure becomes a `TRPCError`: the tag picks the
+code and the key is the message; `SqlError` and defects are 500s. A broken
+invariant is `Effect.die`; never `Effect.orDie` an expected error. A unique
+violation becomes a business error with `catchUniqueViolation(constraint, …)`.
 
 ## Access control
 
@@ -175,11 +219,17 @@ The suite is the gate for dependency PRs, so it must fail on real regressions
 and not on harmless library changes.
 
 - **Test through the app's own contracts**: tRPC procedures via `createCaller`,
-  service functions, route handlers invoked with a `Request`, better-auth
-  through `auth.api.*` or its HTTP handler. Never reach into library internals.
+  service effects through `run(...)` (`tests/helpers/run`, which maps failures
+  like a procedure, so `expectTRPCError(run(…), code, key)` works), route
+  handlers invoked with a `Request`, better-auth through `auth.api.*` or its
+  HTTP handler. Effect-native tests use `@effect/vitest` (`it.effect`) with
+  `AppLayer` provided. Never reach into library internals.
 - **Assert on stable app-level values**: the error `code` plus the app's message
   key, returned data, and DB state. Never on a library's error text, Zod's issue
   wording, SQL strings, or third-party rendered markup.
 - **No snapshot tests** of library-rendered output. For emails, assert the key
   facts are present, not the markup.
 - **Inject time.** Never depend on the wall clock or the machine timezone.
+  Effect's live `Clock` reads `Date.now()`, so `vi.useFakeTimers({ toFake: ["Date"] })`
+  controls it; `it.effect` tests get `TestClock`. Doubles are layers
+  (`Mailer.layerWith`, `AppConfig.layerWith`), never optional parameters.

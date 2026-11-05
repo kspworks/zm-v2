@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-
 import { db } from "~/server/db";
+import { transaction } from "~/server/db/database";
 import {
   counterparties,
   plannedTransactions,
@@ -18,9 +18,10 @@ import {
   insertTransactionRow,
   makeAccount,
 } from "../helpers/fixtures";
+import { run } from "../helpers/run";
 
 const resolve = (userId: string, name: string) =>
-  db.transaction((tx) => resolveCounterparty(tx, userId, name));
+  run(transaction(resolveCounterparty(userId, name)));
 
 describe("resolveCounterparty", () => {
   it("creates a new counterparty, trimmed", async () => {
@@ -231,11 +232,11 @@ describe("counterparties.delete", () => {
 describe("counterparties.balances", () => {
   it("sums debt-account legs per counterparty and currency", async () => {
     const user = await createUser();
-    const uahDebt = await db.transaction((tx) =>
-      getOrCreateDebtAccount(tx, user.id, CURRENCY.UAH),
+    const uahDebt = await run(
+      transaction(getOrCreateDebtAccount(user.id, CURRENCY.UAH)),
     );
-    const usdDebt = await db.transaction((tx) =>
-      getOrCreateDebtAccount(tx, user.id, CURRENCY.USD),
+    const usdDebt = await run(
+      transaction(getOrCreateDebtAccount(user.id, CURRENCY.USD)),
     );
     const cash = await makeAccount(user);
     const alex = await resolve(user.id, "Alex");
@@ -287,8 +288,8 @@ describe("counterparties.balances", () => {
 
   it("hides settled balances", async () => {
     const user = await createUser();
-    const debt = await db.transaction((tx) =>
-      getOrCreateDebtAccount(tx, user.id, CURRENCY.UAH),
+    const debt = await run(
+      transaction(getOrCreateDebtAccount(user.id, CURRENCY.UAH)),
     );
     const alex = await resolve(user.id, "Alex");
 
@@ -308,8 +309,8 @@ describe("counterparties.balances", () => {
   it("covers debt accounts shared with the user", async () => {
     const owner = await createUser();
     const reader = await createUser();
-    const debt = await db.transaction((tx) =>
-      getOrCreateDebtAccount(tx, owner.id, CURRENCY.UAH),
+    const debt = await run(
+      transaction(getOrCreateDebtAccount(owner.id, CURRENCY.UAH)),
     );
     await grant("account", debt, reader);
     await insertTransactionRow({

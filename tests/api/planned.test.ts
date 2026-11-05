@@ -13,6 +13,7 @@ import {
   makeCategory,
   type TestUser,
 } from "../helpers/fixtures";
+import { run } from "../helpers/run";
 
 // "today" is 2026-03-15 in APP_TIMEZONE for every test here
 beforeEach(() => {
@@ -275,7 +276,7 @@ describe("generation", () => {
     const account = await makeAccount(user);
     await monthlyExpense(user, account.id);
 
-    const again = await regenerateAll(db);
+    const again = await run(regenerateAll());
 
     expect(again.occurrences).toBe(0);
     expect(await plannedDates()).toHaveLength(4);
@@ -298,7 +299,7 @@ describe("generation", () => {
     });
     await callerFor(user).transactions.delete({ id: second?.id ?? "" });
 
-    await regenerateAll(db);
+    await run(regenerateAll());
 
     expect(await plannedDates()).toEqual(["2026-05-20", "2026-06-20"]);
   });
@@ -310,7 +311,7 @@ describe("generation", () => {
     expect((await plannedDates()).at(-1)).toBe("2027-02-20");
 
     vi.setSystemTime(new Date("2026-04-25T09:00:00Z"));
-    const result = await regenerateAll(db);
+    const result = await run(regenerateAll());
 
     expect(result.occurrences).toBe(2);
     expect((await plannedDates()).at(-1)).toBe("2027-04-20");
@@ -366,7 +367,7 @@ describe("planned.deleteAll", () => {
     expect(live.every((row) => !row.isPlanned)).toBe(true);
 
     // and nothing comes back
-    await regenerateAll(db);
+    await run(regenerateAll());
     expect(await plannedDates()).toEqual([]);
   });
 
@@ -529,7 +530,7 @@ describe("planned.updateSchedule", () => {
     expect(rows.find((row) => row.accountId === cash.id)?.amount).toBe(100);
 
     // idempotent afterwards
-    expect((await regenerateAll(db)).occurrences).toBe(0);
+    expect((await run(regenerateAll())).occurrences).toBe(0);
   });
 
   it("refuses a kind change", async () => {

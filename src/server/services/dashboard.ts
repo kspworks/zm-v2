@@ -1,5 +1,6 @@
 import { addDays, format, parseISO } from "date-fns";
 import { and, eq, inArray, isNull, lt, ne, sql } from "drizzle-orm";
+import { Effect } from "effect";
 
 import {
   type BalancePoint,
@@ -11,8 +12,9 @@ import {
   forecastWindow,
   NEAREST_DAYS,
 } from "~/lib/dashboard";
-import type { DbOrTx } from "~/server/db";
+import { type Database, query, type SqlError } from "~/server/db/database";
 import { accounts, transactions } from "~/server/db/schema";
+import type { AppConfig } from "~/server/effect/app-config";
 import { today as todayInAppZone } from "~/server/lib/clock";
 import { readableAccounts } from "~/server/services/accounts";
 import {
@@ -34,23 +36,24 @@ type ScopeInput = {
  * non-debt accounts in one currency, narrowed to `accountIds` when given.
  * IDs outside that set are ignored.
  */
-const scopeAccounts = async (
-  db: DbOrTx,
+const scopeAccounts = Effect.fnUntraced(function* (
   userId: string,
   { currencyId, accountIds }: ScopeInput,
-) => {
+) {
   if (accountIds?.length === 0) {
     return { ids: [], initial: 0 };
   }
 
-  const rows = await readableAccounts(
-    db,
-    userId,
-    and(
-      eq(accounts.currencyId, currencyId),
-      eq(accounts.isActive, true),
-      ne(accounts.type, "debt"),
-      accountIds ? inArray(accounts.id, accountIds) : undefined,
+  const rows = yield* query((db) =>
+    readableAccounts(
+      db,
+      userId,
+      and(
+        eq(accounts.currencyId, currencyId),
+        eq(accounts.isActive, true),
+        ne(accounts.type, "debt"),
+        accountIds ? inArray(accounts.id, accountIds) : undefined,
+      ),
     ),
   );
 
@@ -58,36 +61,37 @@ const scopeAccounts = async (
     ids: rows.map((row) => row.id),
     initial: rows.reduce((sum, row) => sum + row.initialBalance, 0),
   };
-};
+});
 
 /** Initial balances plus every submitted leg on the accounts before `date` */
-const balanceBefore = async (
-  db: DbOrTx,
+const balanceBefore = Effect.fnUntraced(function* (
   scope: { ids: string[]; initial: number },
   date: string,
-): Promise<number> => {
+) {
   if (scope.ids.length === 0) {
     return 0;
   }
 
-  const [row] = await db
-    .select({
-      sum: sql<number>`coalesce(sum(${transactions.amount}), 0)`.mapWith(
-        Number,
+  const [row] = yield* query((db) =>
+    db
+      .select({
+        sum: sql<number>`coalesce(sum(${transactions.amount}), 0)`.mapWith(
+          Number,
+        ),
+      })
+      .from(transactions)
+      .where(
+        and(
+          inArray(transactions.accountId, scope.ids),
+          isNull(transactions.deletedAt),
+          eq(transactions.isPlanned, false),
+          lt(transactions.date, date),
+        ),
       ),
-    })
-    .from(transactions)
-    .where(
-      and(
-        inArray(transactions.accountId, scope.ids),
-        isNull(transactions.deletedAt),
-        eq(transactions.isPlanned, false),
-        lt(transactions.date, date),
-      ),
-    );
+  );
 
   return scope.initial + (row?.sum ?? 0);
-};
+});
 
 const categoryLabel = (row: DashboardPairRow) =>
   row.categoryName
@@ -132,69 +136,77 @@ const netEntries = (
 };
 
 /** Submitted pairs in [start, end] plus planned pairs up to end (overdue too) */
-const windowEntries = async (
-  db: DbOrTx,
+const windowEntries = Effect.fnUntraced(function* (
   userId: string,
   ids: string[],
   start: string,
   end: string,
   includeDebts = true,
-) => {
+) {
   if (ids.length === 0) {
     return [];
   }
 
-  const [submitted, planned] = await Promise.all([
-    dashboardPairs(db, userId, "submitted", {
-      accountIds: ids,
-      startDate: start,
-      endDate: end,
-    }),
-    dashboardPairs(db, userId, "planned", { accountIds: ids, endDate: end }),
-  ]);
+  const [submitted, planned] = yield* Effect.all(
+    [
+      dashboardPairs(userId, "submitted", {
+        accountIds: ids,
+        startDate: start,
+        endDate: end,
+      }),
+      dashboardPairs(userId, "planned", { accountIds: ids, endDate: end }),
+    ],
+    { concurrency: "unbounded" },
+  );
 
   const entries = netEntries([...submitted, ...planned], ids);
 
   return includeDebts
     ? entries
     : entries.filter((entry) => entry.kind !== "debt");
-};
+});
 
 const shift = (date: string, days: number) =>
   format(addDays(parseISO(date), days), "yyyy-MM-dd");
 
-export const balanceSeries = async (
-  db: DbOrTx,
+export const balanceSeries = Effect.fn("dashboard.balanceSeries")(function* (
   userId: string,
   input: ScopeInput & { back: number; ahead: number },
-  today: string = todayInAppZone(),
-): Promise<BalancePoint[]> => {
+  todayOverride?: string,
+): Effect.fn.Return<BalancePoint[], SqlError, Database | AppConfig> {
+  const today = todayOverride ?? (yield* todayInAppZone);
   const start = shift(today, -input.back);
   const end = shift(today, input.ahead);
-  const scope = await scopeAccounts(db, userId, input);
-  const [opening, entries] = await Promise.all([
-    balanceBefore(db, scope, start),
-    windowEntries(db, userId, scope.ids, start, end, input.includeDebts),
-  ]);
+  const scope = yield* scopeAccounts(userId, input);
+  const [opening, entries] = yield* Effect.all(
+    [
+      balanceBefore(scope, start),
+      windowEntries(userId, scope.ids, start, end, input.includeDebts),
+    ],
+    { concurrency: "unbounded" },
+  );
 
   return buildBalanceSeries({ opening, entries, start, end, today });
-};
+});
 
-export const forecast = async (
-  db: DbOrTx,
+export const forecast = Effect.fn("dashboard.forecast")(function* (
   userId: string,
   input: ScopeInput,
-  today: string = todayInAppZone(),
-): Promise<ForecastMonth[]> => {
+  todayOverride?: string,
+): Effect.fn.Return<ForecastMonth[], SqlError, Database | AppConfig> {
+  const today = todayOverride ?? (yield* todayInAppZone);
   const { start, end } = forecastWindow(today);
-  const scope = await scopeAccounts(db, userId, input);
-  const [opening, entries] = await Promise.all([
-    balanceBefore(db, scope, start),
-    windowEntries(db, userId, scope.ids, start, end, input.includeDebts),
-  ]);
+  const scope = yield* scopeAccounts(userId, input);
+  const [opening, entries] = yield* Effect.all(
+    [
+      balanceBefore(scope, start),
+      windowEntries(userId, scope.ids, start, end, input.includeDebts),
+    ],
+    { concurrency: "unbounded" },
+  );
 
   return buildForecast({ opening, entries, today });
-};
+});
 
 export type NearestItem = DashboardEntry & {
   overdue: boolean;
@@ -208,19 +220,23 @@ export type NearestItem = DashboardEntry & {
  * currency. A pair shows its display amount: the real-account leg for debts,
  * the outgoing leg otherwise.
  */
-export const nearestPlanned = async (
-  db: DbOrTx,
+export const nearestPlanned = Effect.fn("dashboard.nearestPlanned")(function* (
   userId: string,
-  today: string = todayInAppZone(),
-): Promise<{ date: string; items: NearestItem[] }[]> => {
-  const dates = await nearestPlannedDates(db, userId, today, NEAREST_DAYS);
+  todayOverride?: string,
+): Effect.fn.Return<
+  { date: string; items: NearestItem[] }[],
+  SqlError,
+  Database | AppConfig
+> {
+  const today = todayOverride ?? (yield* todayInAppZone);
+  const dates = yield* nearestPlannedDates(userId, today, NEAREST_DAYS);
   const last = dates.at(-1);
 
   if (!last) {
     return [];
   }
 
-  const rows = await dashboardPairs(db, userId, "planned", { endDate: last });
+  const rows = yield* dashboardPairs(userId, "planned", { endDate: last });
   const days = new Map<string, NearestItem[]>(dates.map((d) => [d, []]));
 
   for (const row of rows) {
@@ -242,4 +258,4 @@ export const nearestPlanned = async (
   }
 
   return dates.map((date) => ({ date, items: days.get(date) ?? [] }));
-};
+});

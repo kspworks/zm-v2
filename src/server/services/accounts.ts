@@ -12,9 +12,11 @@ import {
   sql,
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import { Effect } from "effect";
 
 import type { AccountInput } from "~/lib/validators/accounts";
 import type { DbOrTx } from "~/server/db";
+import { catchUniqueViolation, query, transaction } from "~/server/db/database";
 import {
   accountMembers,
   accounts,
@@ -24,8 +26,9 @@ import {
   users,
 } from "~/server/db/schema";
 import { audit } from "~/server/lib/audit";
-import { appError, forbidden, isUniqueViolation } from "~/server/lib/errors";
-import { getServerTranslator } from "~/server/lib/i18n";
+import { now } from "~/server/lib/clock";
+import { badRequest, forbidden } from "~/server/lib/errors";
+import { serverTranslator } from "~/server/lib/i18n";
 import { accountAccess } from "~/server/services/access";
 
 export type AccountType = (typeof accounts.$inferSelect)["type"];
@@ -44,27 +47,34 @@ export type AccountInsert = {
  * without one would be invisible to everyone) and the audit row. Pass the
  * caller's transaction handle.
  */
-export const insertAccount = async (
-  tx: DbOrTx,
-  { userId, values }: { userId: string; values: AccountInsert },
-) => {
-  const [account] = await tx
-    .insert(accounts)
-    .values({ ...values, name: values.name.trim(), createdBy: userId })
-    .returning();
+export const insertAccount = Effect.fn("accounts.insert")(function* ({
+  userId,
+  values,
+}: {
+  userId: string;
+  values: AccountInsert;
+}) {
+  const [account] = yield* query((db) =>
+    db
+      .insert(accounts)
+      .values({ ...values, name: values.name.trim(), createdBy: userId })
+      .returning(),
+  );
 
   if (!account) {
-    throw new Error("Account insert returned no row");
+    return yield* Effect.die(new Error("Account insert returned no row"));
   }
 
-  await tx.insert(accountMembers).values({
-    accountId: account.id,
-    userId,
-    canRead: true,
-    canWrite: true,
-  });
+  yield* query((db) =>
+    db.insert(accountMembers).values({
+      accountId: account.id,
+      userId,
+      canRead: true,
+      canWrite: true,
+    }),
+  );
 
-  await audit(tx, {
+  yield* audit({
     entityType: "account",
     entityId: account.id,
     action: "create",
@@ -73,7 +83,7 @@ export const insertAccount = async (
   });
 
   return account;
-};
+});
 
 /**
  * Balance and usage are derived, never stored: initialBalance plus the sum
@@ -154,228 +164,235 @@ const present = (userId: string) => (row: AccountRow) => ({
 });
 
 /** The Accounts page and selects: every readable non-debt account */
-export const listAccounts = async (db: DbOrTx, userId: string) =>
-  (await readableAccounts(db, userId, ne(accounts.type, "debt"))).map(
-    present(userId),
+export const listAccounts = Effect.fn("accounts.list")(function* (
+  userId: string,
+) {
+  const rows = yield* query((db) =>
+    readableAccounts(db, userId, ne(accounts.type, "debt")),
   );
 
-export const listCurrencies = (db: DbOrTx) =>
-  db.select().from(currencies).orderBy(asc(currencies.code));
+  return rows.map(present(userId));
+});
 
-const friendlyUniqueError = (error: unknown) => {
-  if (isUniqueViolation(error, "accounts_name_currency_owner_live_uq")) {
-    return appError("BAD_REQUEST", "account_name_not_unique", error);
-  }
-
-  return error;
-};
-
-export const createAccount = async (
-  db: DbOrTx,
-  userId: string,
-  input: AccountInput,
-) => {
-  try {
-    return await db.transaction((tx) =>
-      insertAccount(tx, { userId, values: input }),
+export const listCurrencies = Effect.fn("accounts.listCurrencies")(
+  function* () {
+    return yield* query((db) =>
+      db.select().from(currencies).orderBy(asc(currencies.code)),
     );
-  } catch (error) {
-    throw friendlyUniqueError(error);
-  }
-};
+  },
+);
+
+const friendlyUniqueError = catchUniqueViolation(
+  "accounts_name_currency_owner_live_uq",
+  () => badRequest("account_name_not_unique"),
+);
+
+export const createAccount = Effect.fn("accounts.create")(
+  function* (userId: string, input: AccountInput) {
+    return yield* insertAccount({ userId, values: input });
+  },
+  transaction,
+  friendlyUniqueError,
+);
 
 /** Writable, not a debt account (those are system-managed) */
-const requireEditableAccount = async (
-  db: DbOrTx,
+const requireEditableAccount = Effect.fnUntraced(function* (
   userId: string,
   id: string,
-) => {
+) {
   // locked so the checks below and the caller's change see the same row, and
   // a concurrent write into the account either finishes first or finds it gone
-  const access = (await accountAccess(db, userId, [id], "update")).get(id);
+  const access = (yield* accountAccess(userId, [id], "update")).get(id);
 
   if (!access?.canWrite) {
-    throw forbidden();
+    return yield* forbidden();
   }
 
   if (access.type === "debt") {
-    throw forbidden("account_is_debt");
+    return yield* forbidden("account_is_debt");
   }
 
   return access;
-};
+});
 
 /** Any live transaction (submitted or planned) or live schedule */
-const accountInUse = async (db: DbOrTx, id: string): Promise<boolean> => {
-  const [transaction] = await db
-    .select({ id: transactions.id })
-    .from(transactions)
-    .where(and(eq(transactions.accountId, id), isNull(transactions.deletedAt)))
-    .limit(1);
+const accountInUse = Effect.fnUntraced(function* (id: string) {
+  const [row] = yield* query((db) =>
+    db
+      .select({ id: transactions.id })
+      .from(transactions)
+      .where(
+        and(eq(transactions.accountId, id), isNull(transactions.deletedAt)),
+      )
+      .limit(1),
+  );
 
-  if (transaction) {
+  if (row) {
     return true;
   }
 
-  const [schedule] = await db
-    .select({ id: plannedTransactions.id })
-    .from(plannedTransactions)
-    .where(
-      and(
-        eq(plannedTransactions.accountId, id),
-        isNull(plannedTransactions.deletedAt),
-      ),
-    )
-    .limit(1);
+  const [schedule] = yield* query((db) =>
+    db
+      .select({ id: plannedTransactions.id })
+      .from(plannedTransactions)
+      .where(
+        and(
+          eq(plannedTransactions.accountId, id),
+          isNull(plannedTransactions.deletedAt),
+        ),
+      )
+      .limit(1),
+  );
 
   return schedule !== undefined;
-};
+});
 
-export const updateAccount = async (
-  db: DbOrTx,
-  userId: string,
-  input: AccountInput & { id: string },
-) => {
-  try {
-    return await db.transaction(async (tx) => {
-      const current = await requireEditableAccount(tx, userId, input.id);
+export const updateAccount = Effect.fn("accounts.update")(
+  function* (userId: string, input: AccountInput & { id: string }) {
+    const current = yield* requireEditableAccount(userId, input.id);
 
-      if (
-        current.currencyId !== input.currencyId &&
-        (await accountInUse(tx, input.id))
-      ) {
-        throw appError("BAD_REQUEST", "account_currency_locked");
-      }
+    if (
+      current.currencyId !== input.currencyId &&
+      (yield* accountInUse(input.id))
+    ) {
+      return yield* badRequest("account_currency_locked");
+    }
 
-      const { id, ...values } = input;
-      const [updated] = await tx
+    const { id, ...values } = input;
+    const [updated] = yield* query((db) =>
+      db
         .update(accounts)
         .set({ ...values, name: values.name.trim() })
         .where(eq(accounts.id, id))
-        .returning();
+        .returning(),
+    );
 
-      await audit(tx, {
-        entityType: "account",
-        entityId: id,
-        action: "update",
-        userId,
-        payload: input,
-      });
-
-      return updated;
-    });
-  } catch (error) {
-    throw friendlyUniqueError(error);
-  }
-};
-
-export const setAccountActive = (
-  db: DbOrTx,
-  userId: string,
-  input: { id: string; isActive: boolean },
-) =>
-  db.transaction(async (tx) => {
-    await requireEditableAccount(tx, userId, input.id);
-
-    await tx
-      .update(accounts)
-      .set({ isActive: input.isActive })
-      .where(eq(accounts.id, input.id));
-
-    await audit(tx, {
+    yield* audit({
       entityType: "account",
-      entityId: input.id,
+      entityId: id,
       action: "update",
       userId,
       payload: input,
     });
+
+    return updated;
+  },
+  transaction,
+  friendlyUniqueError,
+);
+
+export const setAccountActive = Effect.fn("accounts.setActive")(function* (
+  userId: string,
+  input: { id: string; isActive: boolean },
+) {
+  yield* requireEditableAccount(userId, input.id);
+
+  yield* query((db) =>
+    db
+      .update(accounts)
+      .set({ isActive: input.isActive })
+      .where(eq(accounts.id, input.id)),
+  );
+
+  yield* audit({
+    entityType: "account",
+    entityId: input.id,
+    action: "update",
+    userId,
+    payload: input,
   });
+}, transaction);
 
 /**
  * Soft delete, allowed only for an unused account: deleting one with
  * transactions would silently hide them, so the user is told to deactivate.
  */
-export const deleteAccount = (db: DbOrTx, userId: string, id: string) =>
-  db.transaction(async (tx) => {
-    await requireEditableAccount(tx, userId, id);
+export const deleteAccount = Effect.fn("accounts.delete")(function* (
+  userId: string,
+  id: string,
+) {
+  yield* requireEditableAccount(userId, id);
 
-    if (await accountInUse(tx, id)) {
-      throw appError("BAD_REQUEST", "account_has_transactions");
-    }
+  if (yield* accountInUse(id)) {
+    return yield* badRequest("account_has_transactions");
+  }
 
-    const at = new Date();
+  const at = yield* now;
 
-    await tx.update(accounts).set({ deletedAt: at }).where(eq(accounts.id, id));
-    await tx
+  yield* query((db) =>
+    db.update(accounts).set({ deletedAt: at }).where(eq(accounts.id, id)),
+  );
+  yield* query((db) =>
+    db
       .update(accountMembers)
       .set({ deletedAt: at })
       .where(
         and(eq(accountMembers.accountId, id), isNull(accountMembers.deletedAt)),
-      );
+      ),
+  );
 
-    await audit(tx, {
-      entityType: "account",
-      entityId: id,
-      action: "delete",
-      userId,
-      payload: { id },
-    });
+  yield* audit({
+    entityType: "account",
+    entityId: id,
+    action: "delete",
+    userId,
+    payload: { id },
   });
+}, transaction);
 
 /**
  * The user's debt account for a currency, created on first use and named
  * "Debts" in the user's stored locale. An advisory lock serialises concurrent
- * first debts, and the partial unique index backs it up.
+ * first debts, and the partial unique index backs it up. Runs inside the
+ * caller's transaction (the lock is transaction-scoped).
  */
-export const getOrCreateDebtAccount = async (
-  tx: DbOrTx,
-  userId: string,
-  currencyId: string,
-): Promise<string> => {
-  const find = async () => {
-    const [row] = await tx
-      .select({ id: accounts.id })
-      .from(accounts)
-      .where(
-        and(
-          eq(accounts.createdBy, userId),
-          eq(accounts.currencyId, currencyId),
-          eq(accounts.type, "debt"),
-          isNull(accounts.deletedAt),
+export const getOrCreateDebtAccount = Effect.fn("accounts.getOrCreateDebt")(
+  function* (userId: string, currencyId: string) {
+    const find = query((db) =>
+      db
+        .select({ id: accounts.id })
+        .from(accounts)
+        .where(
+          and(
+            eq(accounts.createdBy, userId),
+            eq(accounts.currencyId, currencyId),
+            eq(accounts.type, "debt"),
+            isNull(accounts.deletedAt),
+          ),
         ),
-      );
+    ).pipe(Effect.map(([row]) => row?.id));
 
-    return row?.id;
-  };
+    const existing = yield* find;
 
-  const existing = await find();
+    if (existing) {
+      return existing;
+    }
 
-  if (existing) {
-    return existing;
-  }
+    yield* query((db) =>
+      db.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtext(${`debt-account:${userId}:${currencyId}`}))`,
+      ),
+    );
 
-  await tx.execute(
-    sql`SELECT pg_advisory_xact_lock(hashtext(${`debt-account:${userId}:${currencyId}`}))`,
-  );
+    const raced = yield* find;
 
-  const raced = await find();
+    if (raced) {
+      return raced;
+    }
 
-  if (raced) {
-    return raced;
-  }
+    const [user] = yield* query((db) =>
+      db
+        .select({ locale: users.locale })
+        .from(users)
+        .where(eq(users.id, userId)),
+    );
+    const t = yield* serverTranslator(user?.locale === "en" ? "en" : "uk");
 
-  const [user] = await tx
-    .select({ locale: users.locale })
-    .from(users)
-    .where(eq(users.id, userId));
-  const t = await getServerTranslator(user?.locale === "en" ? "en" : "uk");
-
-  // the name only has to be unique per (name, currency, owner), and a user
-  // may already own a regular account called "Debts": suffix until it fits
-  const base = t("seed.debts");
-  const taken = new Set(
-    (
-      await tx
+    // the name only has to be unique per (name, currency, owner), and a user
+    // may already own a regular account called "Debts": suffix until it fits
+    const base = t("seed.debts");
+    const takenRows = yield* query((db) =>
+      db
         .select({ name: accounts.name })
         .from(accounts)
         .where(
@@ -385,25 +402,26 @@ export const getOrCreateDebtAccount = async (
             isNull(accounts.deletedAt),
             or(eq(accounts.name, base), like(accounts.name, `${base} (%)`)),
           ),
-        )
-    ).map((row) => row.name),
-  );
-  let name = base;
+        ),
+    );
+    const taken = new Set(takenRows.map((row) => row.name));
+    let name = base;
 
-  for (let n = 2; taken.has(name); n++) {
-    name = `${base} (${n})`;
-  }
+    for (let n = 2; taken.has(name); n++) {
+      name = `${base} (${n})`;
+    }
 
-  const account = await insertAccount(tx, {
-    userId,
-    values: {
-      name,
-      type: "debt",
-      currencyId,
-      initialBalance: 0,
-      isActive: true,
-    },
-  });
+    const account = yield* insertAccount({
+      userId,
+      values: {
+        name,
+        type: "debt",
+        currencyId,
+        initialBalance: 0,
+        isActive: true,
+      },
+    });
 
-  return account.id;
-};
+    return account.id;
+  },
+);

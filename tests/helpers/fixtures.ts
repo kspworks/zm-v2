@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 
 import { enrolTwoFactor, hashPassword } from "~/server/auth/two-factor";
 import { db } from "~/server/db";
+import { transaction } from "~/server/db/database";
 import {
   accountMembers,
   authAccounts,
@@ -12,6 +13,8 @@ import {
 import { generateTotpSecret } from "~/server/lib/totp";
 import { insertAccount } from "~/server/services/accounts";
 import { insertCategory } from "~/server/services/categories";
+
+import { run } from "./run";
 
 let sequence = 0;
 
@@ -106,18 +109,20 @@ export const makeAccount = async (
 ) => {
   sequence += 1;
 
-  return db.transaction((tx) =>
-    insertAccount(tx, {
-      userId: user.id,
-      values: {
-        name: `Account ${sequence}`,
-        type: "card",
-        currencyId: CURRENCY.UAH,
-        initialBalance: 0,
-        isActive: true,
-        ...overrides,
-      },
-    }),
+  return run(
+    transaction(
+      insertAccount({
+        userId: user.id,
+        values: {
+          name: `Account ${sequence}`,
+          type: "card",
+          currencyId: CURRENCY.UAH,
+          initialBalance: 0,
+          isActive: true,
+          ...overrides,
+        },
+      }),
+    ),
   );
 };
 
@@ -133,17 +138,19 @@ export const makeCategory = async (
 ) => {
   sequence += 1;
 
-  return db.transaction((tx) =>
-    insertCategory(tx, {
-      userId: user.id,
-      values: {
-        name: `Category ${sequence}`,
-        parentId: null,
-        isExpense: true,
-        isIncome: false,
-        ...overrides,
-      },
-    }),
+  return run(
+    transaction(
+      insertCategory({
+        userId: user.id,
+        values: {
+          name: `Category ${sequence}`,
+          parentId: null,
+          isExpense: true,
+          isIncome: false,
+          ...overrides,
+        },
+      }),
+    ),
   );
 };
 

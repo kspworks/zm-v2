@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
-
-import { db } from "~/server/db";
 import { reportRows } from "~/server/services/transaction-queries";
 import { callerFor } from "../helpers/caller";
 import { expectTRPCError } from "../helpers/errors";
 import { createUser, makeAccount, makeCategory } from "../helpers/fixtures";
+import { run } from "../helpers/run";
 
 const range = {
   accounts: [],
@@ -127,11 +126,11 @@ describe("reports.data", () => {
       });
     }
 
-    const capped = await reportRows(db, user.id, range, 2);
+    const capped = await run(reportRows(user.id, range, 2));
     expect(capped.rows).toHaveLength(2);
     expect(capped.truncated).toBe(true);
 
-    expect((await reportRows(db, user.id, range, 3)).truncated).toBe(false);
+    expect((await run(reportRows(user.id, range, 3))).truncated).toBe(false);
   });
 });
 

@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-
 import { db } from "~/server/db";
+import { transaction } from "~/server/db/database";
 import {
   accountMembers,
   accounts,
@@ -18,6 +18,7 @@ import {
   insertTransactionRow,
   makeAccount,
 } from "../helpers/fixtures";
+import { run } from "../helpers/run";
 
 const input = {
   name: "  Main card  ",
@@ -192,9 +193,7 @@ describe("accounts.list", () => {
     const other = await createUser();
     await makeAccount(user, { name: "Mine" });
     await makeAccount(other, { name: "Theirs" });
-    await db.transaction((tx) =>
-      getOrCreateDebtAccount(tx, user.id, CURRENCY.UAH),
-    );
+    await run(transaction(getOrCreateDebtAccount(user.id, CURRENCY.UAH)));
 
     const rows = await callerFor(user).accounts.list();
 
@@ -288,8 +287,8 @@ describe("accounts.update", () => {
 
   it("refuses debt accounts", async () => {
     const user = await createUser();
-    const debtId = await db.transaction((tx) =>
-      getOrCreateDebtAccount(tx, user.id, CURRENCY.UAH),
+    const debtId = await run(
+      transaction(getOrCreateDebtAccount(user.id, CURRENCY.UAH)),
     );
 
     await expectTRPCError(
@@ -439,8 +438,8 @@ describe("accounts.delete", () => {
       "FORBIDDEN",
     );
 
-    const debtId = await db.transaction((tx) =>
-      getOrCreateDebtAccount(tx, owner.id, CURRENCY.UAH),
+    const debtId = await run(
+      transaction(getOrCreateDebtAccount(owner.id, CURRENCY.UAH)),
     );
     await expectTRPCError(
       callerFor(owner).accounts.delete({ id: debtId }),
@@ -454,14 +453,14 @@ describe("getOrCreateDebtAccount", () => {
   it("creates one debt account per currency, named in the user's locale", async () => {
     const user = await createUser({ locale: "uk" });
 
-    const uah = await db.transaction((tx) =>
-      getOrCreateDebtAccount(tx, user.id, CURRENCY.UAH),
+    const uah = await run(
+      transaction(getOrCreateDebtAccount(user.id, CURRENCY.UAH)),
     );
-    const again = await db.transaction((tx) =>
-      getOrCreateDebtAccount(tx, user.id, CURRENCY.UAH),
+    const again = await run(
+      transaction(getOrCreateDebtAccount(user.id, CURRENCY.UAH)),
     );
-    const usd = await db.transaction((tx) =>
-      getOrCreateDebtAccount(tx, user.id, CURRENCY.USD),
+    const usd = await run(
+      transaction(getOrCreateDebtAccount(user.id, CURRENCY.USD)),
     );
 
     expect(again).toBe(uah);
@@ -480,11 +479,11 @@ describe("getOrCreateDebtAccount", () => {
     const a = await createUser({ locale: "en" });
     const b = await createUser();
 
-    const first = await db.transaction((tx) =>
-      getOrCreateDebtAccount(tx, a.id, CURRENCY.UAH),
+    const first = await run(
+      transaction(getOrCreateDebtAccount(a.id, CURRENCY.UAH)),
     );
-    const second = await db.transaction((tx) =>
-      getOrCreateDebtAccount(tx, b.id, CURRENCY.UAH),
+    const second = await run(
+      transaction(getOrCreateDebtAccount(b.id, CURRENCY.UAH)),
     );
 
     expect(first).not.toBe(second);
@@ -499,9 +498,7 @@ describe("getOrCreateDebtAccount", () => {
 
     const ids = await Promise.all(
       Array.from({ length: 5 }, () =>
-        db.transaction((tx) =>
-          getOrCreateDebtAccount(tx, user.id, CURRENCY.EUR),
-        ),
+        run(transaction(getOrCreateDebtAccount(user.id, CURRENCY.EUR))),
       ),
     );
 
@@ -512,8 +509,8 @@ describe("getOrCreateDebtAccount", () => {
     const user = await createUser({ locale: "en" });
     await makeAccount(user, { name: "Debts", currencyId: CURRENCY.UAH });
 
-    const id = await db.transaction((tx) =>
-      getOrCreateDebtAccount(tx, user.id, CURRENCY.UAH),
+    const id = await run(
+      transaction(getOrCreateDebtAccount(user.id, CURRENCY.UAH)),
     );
     const row = await db.query.accounts.findFirst({
       where: eq(accounts.id, id),

@@ -1,5 +1,6 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import { and, eq, isNull } from "drizzle-orm";
+import { Effect } from "effect";
 import superjson from "superjson";
 import { ZodError, z } from "zod";
 
@@ -7,8 +8,11 @@ import { type Locale, resolveLocale } from "~/i18n/config";
 import { auth } from "~/server/auth";
 import { isDev } from "~/server/config";
 import { type Db, db } from "~/server/db";
+import { query } from "~/server/db/database";
 import { users } from "~/server/db/schema";
-import { ImportRowsError } from "~/server/services/imports";
+import { runForTrpc } from "~/server/effect/runtime";
+import { now } from "~/server/lib/clock";
+import { ImportRowsError, unauthorized } from "~/server/lib/errors";
 
 export type CurrentUser = {
   id: string;
@@ -101,29 +105,29 @@ export const publicProcedure = t.procedure.use(timingMiddleware);
  * Resolves the *current* user from the database on every call, so deleting,
  * banning or re-roling a user takes effect on their next request.
  */
-export const protectedProcedure = publicProcedure.use(async ({ ctx, next }) => {
-  if (!ctx.userId) {
-    throw new TRPCError({ code: "UNAUTHORIZED" });
-  }
-
-  const row = await ctx.db.query.users.findFirst({
-    columns: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      locale: true,
-      banned: true,
-      banExpires: true,
-    },
-    where: and(eq(users.id, ctx.userId), isNull(users.deletedAt)),
-  });
-
+const loadCurrentUser = Effect.fn("trpc.loadCurrentUser")(function* (
+  userId: string,
+) {
+  const row = yield* query((db) =>
+    db.query.users.findFirst({
+      columns: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        locale: true,
+        banned: true,
+        banExpires: true,
+      },
+      where: and(eq(users.id, userId), isNull(users.deletedAt)),
+    }),
+  );
+  const at = yield* now;
   const banActive =
-    row?.banned && (!row.banExpires || row.banExpires.getTime() > Date.now());
+    row?.banned && (!row.banExpires || row.banExpires.getTime() > at.getTime());
 
   if (!row || banActive) {
-    throw new TRPCError({ code: "UNAUTHORIZED" });
+    return yield* unauthorized();
   }
 
   const user: CurrentUser = {
@@ -134,8 +138,24 @@ export const protectedProcedure = publicProcedure.use(async ({ ctx, next }) => {
     locale: row.locale === "en" ? "en" : "uk",
   };
 
-  return next({ ctx: { ...ctx, userId: user.id, user } });
+  return user;
 });
+
+/**
+ * Resolves the *current* user from the database on every call, so deleting,
+ * banning or re-roling a user takes effect on their next request.
+ */
+export const protectedProcedure = publicProcedure.use(
+  async ({ ctx, next, signal }) => {
+    if (!ctx.userId) {
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
+
+    const user = await runForTrpc(loadCurrentUser(ctx.userId), signal);
+
+    return next({ ctx: { ...ctx, userId: user.id, user } });
+  },
+);
 
 export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (ctx.user.role !== "admin") {

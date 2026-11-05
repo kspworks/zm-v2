@@ -6,6 +6,7 @@ import {
   scheduleUpdateSchema,
 } from "~/lib/validators/planned";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { runForTrpc } from "~/server/effect/runtime";
 import {
   createPlanned,
   deleteAllPlanned,
@@ -16,20 +17,26 @@ import {
 export const plannedRouter = createTRPCRouter({
   create: protectedProcedure
     .input(plannedCreateSchema)
-    .mutation(({ ctx, input }) => createPlanned(ctx.db, ctx.user.id, input)),
+    .mutation(({ ctx, input, signal }) =>
+      runForTrpc(createPlanned(ctx.user.id, input), signal),
+    ),
 
   schedule: protectedProcedure
     .input(z.object({ id: idSchema }))
-    .query(({ ctx, input }) => getSchedule(ctx.db, ctx.user.id, input.id)),
+    .query(({ ctx, input, signal }) =>
+      runForTrpc(getSchedule(ctx.user.id, input.id), signal),
+    ),
 
   updateSchedule: protectedProcedure
     .input(scheduleUpdateSchema)
-    .mutation(({ ctx, input }) => updateSchedule(ctx.db, ctx.user.id, input)),
+    .mutation(({ ctx, input, signal }) =>
+      runForTrpc(updateSchedule(ctx.user.id, input), signal),
+    ),
 
   /** From an occurrence: this one, the schedule and all its planned rows */
   deleteAll: protectedProcedure
     .input(z.object({ id: idSchema }))
-    .mutation(({ ctx, input }) =>
-      deleteAllPlanned(ctx.db, ctx.user.id, input.id),
+    .mutation(({ ctx, input, signal }) =>
+      runForTrpc(deleteAllPlanned(ctx.user.id, input.id), signal),
     ),
 });

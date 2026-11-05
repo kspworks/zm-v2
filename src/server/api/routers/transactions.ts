@@ -13,12 +13,12 @@ import {
   transactionUpdateSchema,
 } from "~/lib/validators/transactions";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { paginationLimit } from "~/server/config";
+import { runForTrpc } from "~/server/effect/runtime";
 import { adjustBalance, bulkCreate } from "~/server/services/bulk";
 import {
   filteredTotals,
   listOverdue,
-  listTransactions,
+  listTransactionsPage,
 } from "~/server/services/transaction-queries";
 import {
   createTransaction,
@@ -28,28 +28,38 @@ import {
 
 export const transactionsRouter = createTRPCRouter({
   /** Submitted rows, newest first */
-  list: protectedProcedure.input(listInputSchema).query(({ ctx, input }) =>
-    listTransactions(ctx.db, ctx.user.id, {
-      filter: input.filter,
-      cursor: input.cursor,
-      planned: "submitted",
-      limit: paginationLimit(),
-    }),
-  ),
+  list: protectedProcedure
+    .input(listInputSchema)
+    .query(({ ctx, input, signal }) =>
+      runForTrpc(
+        listTransactionsPage(ctx.user.id, {
+          filter: input.filter,
+          cursor: input.cursor,
+          planned: "submitted",
+        }),
+        signal,
+      ),
+    ),
 
   /** Planned rows, oldest first, each with its schedule */
-  planned: protectedProcedure.input(listInputSchema).query(({ ctx, input }) =>
-    listTransactions(ctx.db, ctx.user.id, {
-      filter: input.filter,
-      cursor: input.cursor,
-      planned: "planned",
-      limit: paginationLimit(),
-    }),
-  ),
+  planned: protectedProcedure
+    .input(listInputSchema)
+    .query(({ ctx, input, signal }) =>
+      runForTrpc(
+        listTransactionsPage(ctx.user.id, {
+          filter: input.filter,
+          cursor: input.cursor,
+          planned: "planned",
+        }),
+        signal,
+      ),
+    ),
 
   overdue: protectedProcedure
     .input(z.object({ filter: transactionFilterSchema }))
-    .query(({ ctx, input }) => listOverdue(ctx.db, ctx.user.id, input.filter)),
+    .query(({ ctx, input, signal }) =>
+      runForTrpc(listOverdue(ctx.user.id, input.filter), signal),
+    ),
 
   /** Totals over the whole filtered set: submitted rows, or planned ones */
   totals: protectedProcedure
@@ -59,37 +69,41 @@ export const transactionsRouter = createTRPCRouter({
         planned: z.boolean().default(false),
       }),
     )
-    .query(({ ctx, input }) =>
-      filteredTotals(
-        ctx.db,
-        ctx.user.id,
-        input.filter,
-        input.planned ? "planned" : "submitted",
+    .query(({ ctx, input, signal }) =>
+      runForTrpc(
+        filteredTotals(
+          ctx.user.id,
+          input.filter,
+          input.planned ? "planned" : "submitted",
+        ),
+        signal,
       ),
     ),
 
   create: protectedProcedure
     .input(transactionInputSchema)
-    .mutation(({ ctx, input }) =>
-      createTransaction(ctx.db, ctx.user.id, input),
+    .mutation(({ ctx, input, signal }) =>
+      runForTrpc(createTransaction(ctx.user.id, input), signal),
     ),
 
   update: protectedProcedure
     .input(transactionUpdateSchema)
-    .mutation(({ ctx, input }) =>
-      updateTransaction(ctx.db, ctx.user.id, input),
+    .mutation(({ ctx, input, signal }) =>
+      runForTrpc(updateTransaction(ctx.user.id, input), signal),
     ),
 
   delete: protectedProcedure
     .input(z.object({ id: idSchema }))
-    .mutation(({ ctx, input }) =>
-      deleteTransaction(ctx.db, ctx.user.id, input.id),
+    .mutation(({ ctx, input, signal }) =>
+      runForTrpc(deleteTransaction(ctx.user.id, input.id), signal),
     ),
 
   /** Several transactions in one call and one DB transaction */
   bulkCreate: protectedProcedure
     .input(z.object({ items: z.array(transactionInputSchema).min(1).max(100) }))
-    .mutation(({ ctx, input }) => bulkCreate(ctx.db, ctx.user.id, input.items)),
+    .mutation(({ ctx, input, signal }) =>
+      runForTrpc(bulkCreate(ctx.user.id, input.items), signal),
+    ),
 
   /** Records the difference between the actual and the derived balance */
   adjustBalance: protectedProcedure
@@ -112,5 +126,7 @@ export const transactionsRouter = createTRPCRouter({
           .nullish(),
       }),
     )
-    .mutation(({ ctx, input }) => adjustBalance(ctx.db, ctx.user.id, input)),
+    .mutation(({ ctx, input, signal }) =>
+      runForTrpc(adjustBalance(ctx.user.id, input), signal),
+    ),
 });

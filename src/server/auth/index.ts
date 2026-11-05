@@ -26,13 +26,9 @@ import { verifySecondFactor } from "~/server/auth/two-factor";
 import { authBaseUrl, isDev, mailConfig } from "~/server/config";
 import { db } from "~/server/db";
 import * as schema from "~/server/db/schema";
+import { hitRateLimit, resetRateLimit } from "~/server/legacy/rate-limit";
 import { newId } from "~/server/lib/ids";
-import {
-  hitRateLimit,
-  RATE_LIMITS,
-  rateLimitKeys,
-  resetRateLimit,
-} from "~/server/lib/rate-limit";
+import { RATE_LIMITS, rateLimitKeys } from "~/server/lib/rate-limit";
 import { reportError } from "~/server/lib/report";
 import {
   betterAuthTotp,

@@ -1,4 +1,6 @@
-import type { DbOrTx } from "~/server/db";
+import { Effect } from "effect";
+
+import { query } from "~/server/db/database";
 import { historyLogs } from "~/server/db/schema";
 
 export type AuditEntity =
@@ -13,32 +15,34 @@ export type AuditEntity =
 export type AuditAction = "create" | "update" | "delete" | "restore";
 
 /**
- * Writes one history row. Always pass the transaction handle of the change it
- * describes, so the log and the change commit or roll back together.
+ * Writes one history row per entity id on the current handle, so inside the
+ * change's `transaction(...)` the log and the change commit or roll back
+ * together.
  */
-export const audit = async (
-  tx: DbOrTx,
-  entry: {
-    entityType: AuditEntity;
-    entityId: string | string[];
-    action: AuditAction;
-    userId: string;
-    payload: unknown;
-  },
-): Promise<void> => {
-  const ids = Array.isArray(entry.entityId) ? entry.entityId : [entry.entityId];
+export const audit = Effect.fnUntraced(function* (entry: {
+  entityType: AuditEntity;
+  entityId: string | readonly string[];
+  action: AuditAction;
+  userId: string;
+  payload: unknown;
+}) {
+  const ids: readonly string[] = Array.isArray(entry.entityId)
+    ? entry.entityId
+    : [entry.entityId as string];
 
   if (ids.length === 0) {
     return;
   }
 
-  await tx.insert(historyLogs).values(
-    ids.map((entityId) => ({
-      entityType: entry.entityType,
-      entityId,
-      action: entry.action,
-      userId: entry.userId,
-      payload: (entry.payload ?? {}) as object,
-    })),
+  yield* query((db) =>
+    db.insert(historyLogs).values(
+      ids.map((entityId) => ({
+        entityType: entry.entityType,
+        entityId,
+        action: entry.action,
+        userId: entry.userId,
+        payload: (entry.payload ?? {}) as object,
+      })),
+    ),
   );
-};
+});

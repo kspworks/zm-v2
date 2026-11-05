@@ -3,6 +3,7 @@ import { z } from "zod";
 import { MAX_UPLOAD_BYTES } from "~/lib/import-limits";
 import { idSchema } from "~/lib/validators/common";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { runForTrpc } from "~/server/effect/runtime";
 import {
   listImports,
   undoImport,
@@ -10,7 +11,9 @@ import {
 } from "~/server/services/imports";
 
 export const importsRouter = createTRPCRouter({
-  list: protectedProcedure.query(({ ctx }) => listImports(ctx.db, ctx.user.id)),
+  list: protectedProcedure.query(({ ctx, signal }) =>
+    runForTrpc(listImports(ctx.user.id), signal),
+  ),
 
   upload: protectedProcedure
     .input(
@@ -20,9 +23,13 @@ export const importsRouter = createTRPCRouter({
         content: z.base64().max(Math.ceil((MAX_UPLOAD_BYTES * 4) / 3) + 4),
       }),
     )
-    .mutation(({ ctx, input }) => uploadImport(ctx.db, ctx.user.id, input)),
+    .mutation(({ ctx, input, signal }) =>
+      runForTrpc(uploadImport(ctx.user.id, input), signal),
+    ),
 
   undo: protectedProcedure
     .input(z.object({ id: idSchema }))
-    .mutation(({ ctx, input }) => undoImport(ctx.db, ctx.user.id, input.id)),
+    .mutation(({ ctx, input, signal }) =>
+      runForTrpc(undoImport(ctx.user.id, input.id), signal),
+    ),
 });

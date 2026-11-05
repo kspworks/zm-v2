@@ -8,15 +8,12 @@ import { issueSignInTicket } from "~/server/auth/sign-in-ticket";
 import { enrolTwoFactor } from "~/server/auth/two-factor";
 import type { DbOrTx } from "~/server/db";
 import { recoveryLinks, users } from "~/server/db/schema";
-import { audit } from "~/server/lib/audit";
-import { now } from "~/server/lib/clock";
-import { appError, notFound } from "~/server/lib/errors";
+import { audit } from "~/server/legacy/audit";
+import { now } from "~/server/legacy/clock";
+import { appError, notFound } from "~/server/legacy/errors";
+import { hitRateLimit } from "~/server/legacy/rate-limit";
 import { randomString } from "~/server/lib/ids";
-import {
-  hitRateLimit,
-  RATE_LIMITS,
-  rateLimitKeys,
-} from "~/server/lib/rate-limit";
+import { RATE_LIMITS, rateLimitKeys } from "~/server/lib/rate-limit";
 import { sha256 } from "~/server/lib/tokens";
 import { revokeSessions } from "~/server/services/admin";
 import { requirePassword, setPassword } from "~/server/services/credentials";

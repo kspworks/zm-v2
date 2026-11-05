@@ -1,6 +1,6 @@
 import type { DbOrTx } from "~/server/db";
 import { verifications } from "~/server/db/schema";
-import { now } from "~/server/lib/clock";
+import { now } from "~/server/legacy/clock";
 import { randomString } from "~/server/lib/ids";
 import { sha256 } from "~/server/lib/tokens";
 

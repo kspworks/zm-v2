@@ -1,6 +1,7 @@
 import { eq, lt, sql } from "drizzle-orm";
+import { Effect } from "effect";
 
-import { type DbOrTx, db as defaultDb } from "~/server/db";
+import { query } from "~/server/db/database";
 import { rateLimits } from "~/server/db/schema";
 import { now } from "~/server/lib/clock";
 
@@ -29,49 +30,50 @@ export const rateLimitKeys = {
  * returns the post-increment count, so concurrent processes never lose
  * updates or race a read-then-write.
  */
-export const hitRateLimit = async (
+export const hitRateLimit = Effect.fn("rateLimit.hit")(function* (
   key: string,
   { limit, windowMs }: RateLimitRule,
-  db: DbOrTx = defaultDb,
-): Promise<{ allowed: boolean; count: number }> => {
-  const at = now();
+) {
+  const at = yield* now;
   // raw sql parameters bypass Drizzle's column mapping, so pass ISO strings
   const nowParam = sql`${at.toISOString()}::timestamptz`;
   const cutoff = sql`${new Date(at.getTime() - windowMs).toISOString()}::timestamptz`;
 
-  const [row] = await db
-    .insert(rateLimits)
-    .values({ key, count: 1, windowStart: at })
-    .onConflictDoUpdate({
-      target: rateLimits.key,
-      set: {
-        count: sql`CASE WHEN ${rateLimits.windowStart} <= ${cutoff} THEN 1 ELSE ${rateLimits.count} + 1 END`,
-        windowStart: sql`CASE WHEN ${rateLimits.windowStart} <= ${cutoff} THEN ${nowParam} ELSE ${rateLimits.windowStart} END`,
-      },
-    })
-    .returning({ count: rateLimits.count });
+  const [row] = yield* query((db) =>
+    db
+      .insert(rateLimits)
+      .values({ key, count: 1, windowStart: at })
+      .onConflictDoUpdate({
+        target: rateLimits.key,
+        set: {
+          count: sql`CASE WHEN ${rateLimits.windowStart} <= ${cutoff} THEN 1 ELSE ${rateLimits.count} + 1 END`,
+          windowStart: sql`CASE WHEN ${rateLimits.windowStart} <= ${cutoff} THEN ${nowParam} ELSE ${rateLimits.windowStart} END`,
+        },
+      })
+      .returning({ count: rateLimits.count }),
+  );
 
   const count = row?.count ?? 1;
 
   return { allowed: count <= limit, count };
-};
+});
 
-export const resetRateLimit = async (
+export const resetRateLimit = Effect.fn("rateLimit.reset")(function* (
   key: string,
-  db: DbOrTx = defaultDb,
-): Promise<void> => {
-  await db.delete(rateLimits).where(eq(rateLimits.key, key));
-};
+) {
+  yield* query((db) => db.delete(rateLimits).where(eq(rateLimits.key, key)));
+});
 
 /** Drops windows older than 24 h; run by the nightly cron */
-export const sweepRateLimits = async (
-  db: DbOrTx = defaultDb,
-): Promise<number> => {
-  const cutoff = new Date(now().getTime() - 24 * 60 * MINUTE);
-  const deleted = await db
-    .delete(rateLimits)
-    .where(lt(rateLimits.windowStart, cutoff))
-    .returning({ key: rateLimits.key });
+export const sweepRateLimits = Effect.fn("rateLimit.sweep")(function* () {
+  const at = yield* now;
+  const cutoff = new Date(at.getTime() - 24 * 60 * MINUTE);
+  const deleted = yield* query((db) =>
+    db
+      .delete(rateLimits)
+      .where(lt(rateLimits.windowStart, cutoff))
+      .returning({ key: rateLimits.key }),
+  );
 
   return deleted.length;
-};
+});

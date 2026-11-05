@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { createTranslator } from "next-intl";
 
 import type { Locale } from "~/i18n/config";
@@ -9,3 +10,7 @@ import { loadMessages } from "~/i18n/messages";
  */
 export const getServerTranslator = async (locale: Locale) =>
   createTranslator({ locale, messages: await loadMessages(locale) });
+
+/** `getServerTranslator` for Effect code */
+export const serverTranslator = (locale: Locale) =>
+  Effect.promise(() => getServerTranslator(locale));

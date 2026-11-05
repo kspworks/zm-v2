@@ -4,7 +4,7 @@ import QRCode from "qrcode";
 import { decryptValue, encryptValue } from "~/server/auth/two-factor";
 import type { DbOrTx } from "~/server/db";
 import { verifications } from "~/server/db/schema";
-import { now } from "~/server/lib/clock";
+import { now } from "~/server/legacy/clock";
 import {
   generateTotpSecret,
   totpManualKey,

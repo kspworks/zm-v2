@@ -1,14 +1,17 @@
 import { and, eq, isNull } from "drizzle-orm";
+import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
 import type { TransactionInput } from "~/lib/validators/transactions";
 import { db } from "~/server/db";
+import { transaction } from "~/server/db/database";
 import { accounts, transactions } from "~/server/db/schema";
 import { deleteAccount } from "~/server/services/accounts";
 import { createTransaction } from "~/server/services/transactions";
 import { expectTRPCError } from "../helpers/errors";
 import { createUser, makeAccount } from "../helpers/fixtures";
 import { signal, untilBlockedOnLock } from "../helpers/locks";
+import { run } from "../helpers/run";
 
 const expense = (accountId: string): TransactionInput => ({
   kind: "expense",
@@ -39,15 +42,19 @@ describe("account deletion racing a write into the account", () => {
     // the delete has run but not committed when the create starts
     const deleted = signal();
     const commit = signal();
-    const deleting = db.transaction(async (tx) => {
-      await deleteAccount(tx, user.id, account.id);
-      deleted.resolve();
-      await commit.promise;
-    });
+    const deleting = run(
+      transaction(
+        Effect.gen(function* () {
+          yield* deleteAccount(user.id, account.id);
+          deleted.resolve();
+          yield* Effect.promise(() => commit.promise);
+        }),
+      ),
+    );
     await deleted.promise;
 
     const creating = expectTRPCError(
-      createTransaction(db, user.id, expense(account.id)),
+      run(createTransaction(user.id, expense(account.id))),
       "FORBIDDEN",
     );
     await untilBlockedOnLock();
@@ -70,15 +77,19 @@ describe("account deletion racing a write into the account", () => {
     // the create has run but not committed when the delete starts
     const created = signal();
     const commit = signal();
-    const creating = db.transaction(async (tx) => {
-      await createTransaction(tx, user.id, expense(account.id));
-      created.resolve();
-      await commit.promise;
-    });
+    const creating = run(
+      transaction(
+        Effect.gen(function* () {
+          yield* createTransaction(user.id, expense(account.id));
+          created.resolve();
+          yield* Effect.promise(() => commit.promise);
+        }),
+      ),
+    );
     await created.promise;
 
     const deleting = expectTRPCError(
-      deleteAccount(db, user.id, account.id),
+      run(deleteAccount(user.id, account.id)),
       "BAD_REQUEST",
       "account_has_transactions",
     );

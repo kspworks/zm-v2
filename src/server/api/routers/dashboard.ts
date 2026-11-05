@@ -3,6 +3,7 @@ import { z } from "zod";
 import { RANGE_MAX, RANGE_MIN } from "~/lib/dashboard";
 import { idSchema } from "~/lib/validators/common";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { runForTrpc } from "~/server/effect/runtime";
 import {
   balanceSeries,
   forecast,
@@ -21,13 +22,17 @@ const scope = {
 export const dashboardRouter = createTRPCRouter({
   balance: protectedProcedure
     .input(z.object({ ...scope, back: days, ahead: days }))
-    .query(({ ctx, input }) => balanceSeries(ctx.db, ctx.user.id, input)),
+    .query(({ ctx, input, signal }) =>
+      runForTrpc(balanceSeries(ctx.user.id, input), signal),
+    ),
 
   forecast: protectedProcedure
     .input(z.object(scope))
-    .query(({ ctx, input }) => forecast(ctx.db, ctx.user.id, input)),
+    .query(({ ctx, input, signal }) =>
+      runForTrpc(forecast(ctx.user.id, input), signal),
+    ),
 
-  nearest: protectedProcedure.query(({ ctx }) =>
-    nearestPlanned(ctx.db, ctx.user.id),
+  nearest: protectedProcedure.query(({ ctx, signal }) =>
+    runForTrpc(nearestPlanned(ctx.user.id), signal),
   ),
 });

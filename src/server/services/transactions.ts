@@ -1,10 +1,12 @@
 import { and, eq, inArray, isNull, ne, sql, sum } from "drizzle-orm";
+import { Effect } from "effect";
 
 import type { TransactionInput } from "~/lib/validators/transactions";
-import type { DbOrTx } from "~/server/db";
+import { type Database, query, transaction } from "~/server/db/database";
 import { accounts, transactions } from "~/server/db/schema";
 import { audit } from "~/server/lib/audit";
-import { appError, forbidden, notFound } from "~/server/lib/errors";
+import { now } from "~/server/lib/clock";
+import { badRequest, forbidden, notFound } from "~/server/lib/errors";
 import { newId } from "~/server/lib/ids";
 import {
   type AccountAccess,
@@ -36,25 +38,30 @@ export type Leg = {
  * Runs inside the caller's transaction: resolving the counterparty and the
  * debt account may insert rows.
  */
-export const prepareLegs = async (
-  tx: DbOrTx,
+export const prepareLegs = Effect.fn("transactions.prepareLegs")(function* (
   userId: string,
   input: TransactionInput,
-): Promise<{ legs: Leg[]; access: Map<string, AccountAccess> }> => {
+): Effect.fn.Return<
+  { legs: Leg[]; access: Map<string, AccountAccess> },
+  | Effect.Error<ReturnType<typeof requireWritableAccounts>>
+  | Effect.Error<ReturnType<typeof resolveCounterpartyRef>>
+  | Effect.Error<ReturnType<typeof getOrCreateDebtAccount>>,
+  Database
+> {
   const accountIds =
     input.kind === "transfer"
       ? [input.accountId, input.linkedAccountId]
       : [input.accountId];
 
   if (input.kind === "transfer" && input.accountId === input.linkedAccountId) {
-    throw appError("BAD_REQUEST", "fields_integrity_same_account_transfer");
+    return yield* badRequest("fields_integrity_same_account_transfer");
   }
 
-  const access = await requireWritableAccounts(tx, userId, accountIds);
+  const access = yield* requireWritableAccounts(userId, accountIds);
 
   // debt accounts are system-managed and never picked directly
   if (accountIds.some((id) => access.get(id)?.type === "debt")) {
-    throw forbidden("account_is_debt");
+    return yield* forbidden("account_is_debt");
   }
 
   const common = {
@@ -65,25 +72,24 @@ export const prepareLegs = async (
 
   if (input.kind === "expense" || input.kind === "income") {
     if (input.categoryId) {
-      const category = (
-        await categoryAccess(tx, userId, [input.categoryId])
-      ).get(input.categoryId);
+      const category = (yield* categoryAccess(userId, [input.categoryId])).get(
+        input.categoryId,
+      );
 
       if (!category?.canWrite) {
-        throw forbidden();
+        return yield* forbidden();
       }
 
       if (input.kind === "expense" && !category.isExpense) {
-        throw appError("BAD_REQUEST", "fields_integrity_not_expense_category");
+        return yield* badRequest("fields_integrity_not_expense_category");
       }
 
       if (input.kind === "income" && !category.isIncome) {
-        throw appError("BAD_REQUEST", "fields_integrity_not_income_category");
+        return yield* badRequest("fields_integrity_not_income_category");
       }
     }
 
-    const counterpartyId = await resolveCounterpartyRef(
-      tx,
+    const counterpartyId = yield* resolveCounterpartyRef(
       userId,
       input.counterparty,
     );
@@ -124,19 +130,17 @@ export const prepareLegs = async (
     };
   }
 
-  const counterpartyId = await resolveCounterpartyRef(
-    tx,
+  const counterpartyId = yield* resolveCounterpartyRef(
     userId,
     input.counterparty,
   );
 
   if (!counterpartyId) {
-    throw appError("BAD_REQUEST", "counterparty_required");
+    return yield* badRequest("counterparty_required");
   }
 
   const account = access.get(input.accountId);
-  const debtAccountId = await getOrCreateDebtAccount(
-    tx,
+  const debtAccountId = yield* getOrCreateDebtAccount(
     userId,
     account?.currencyId ?? "",
   );
@@ -161,7 +165,7 @@ export const prepareLegs = async (
       },
     ],
   };
-};
+});
 
 export type CreateOptions = {
   isPlanned?: boolean;
@@ -174,33 +178,34 @@ export type CreateOptions = {
 };
 
 /** Inserts prepared legs (a pair gets a fresh batchId) and audits them */
-export const insertLegs = async (
-  tx: DbOrTx,
+export const insertLegs = Effect.fn("transactions.insertLegs")(function* (
   userId: string,
-  legs: Leg[],
+  legs: readonly Leg[],
   options: CreateOptions = {},
-): Promise<{ ids: string[]; batchId: string | null }> => {
+) {
   const batchId = legs.length > 1 ? newId() : null;
-  const rows = await tx
-    .insert(transactions)
-    .values(
-      legs.map((leg) => ({
-        ...leg,
-        batchId,
-        isPlanned: options.isPlanned ?? false,
-        plannedTransactionId: options.plannedTransactionId ?? null,
-        plannedHash: options.plannedHash ?? null,
-        importId: options.importId ?? null,
-        createdBy: userId,
-        ...(options.createdAt ? { createdAt: options.createdAt } : {}),
-      })),
-    )
-    .returning({ id: transactions.id });
+  const rows = yield* query((db) =>
+    db
+      .insert(transactions)
+      .values(
+        legs.map((leg) => ({
+          ...leg,
+          batchId,
+          isPlanned: options.isPlanned ?? false,
+          plannedTransactionId: options.plannedTransactionId ?? null,
+          plannedHash: options.plannedHash ?? null,
+          importId: options.importId ?? null,
+          createdBy: userId,
+          ...(options.createdAt ? { createdAt: options.createdAt } : {}),
+        })),
+      )
+      .returning({ id: transactions.id }),
+  );
 
   const ids = rows.map((row) => row.id);
 
   if (options.audit !== false) {
-    await audit(tx, {
+    yield* audit({
       entityType: "transaction",
       entityId: ids,
       action: "create",
@@ -210,231 +215,240 @@ export const insertLegs = async (
   }
 
   return { ids, batchId };
-};
+});
 
 /** Balances of the given accounts (non-debt only), for the negative warning */
-export const balancesOf = async (db: DbOrTx, accountIds: string[]) => {
+export const balancesOf = Effect.fn("transactions.balancesOf")(function* (
+  accountIds: readonly string[],
+) {
   if (accountIds.length === 0) {
     return [];
   }
 
-  return db
-    .select({
-      id: accounts.id,
-      name: accounts.name,
-      balance: sql<number>`${accounts.initialBalance} + coalesce((${db
-        .select({ sum: sum(transactions.amount) })
-        .from(transactions)
-        .where(
-          and(
-            eq(transactions.accountId, accounts.id),
-            isNull(transactions.deletedAt),
-            eq(transactions.isPlanned, false),
-          ),
-        )}), 0)`.mapWith(Number),
-    })
-    .from(accounts)
-    .where(and(inArray(accounts.id, accountIds), ne(accounts.type, "debt")));
-};
+  return yield* query((db) =>
+    db
+      .select({
+        id: accounts.id,
+        name: accounts.name,
+        balance: sql<number>`${accounts.initialBalance} + coalesce((${db
+          .select({ sum: sum(transactions.amount) })
+          .from(transactions)
+          .where(
+            and(
+              eq(transactions.accountId, accounts.id),
+              isNull(transactions.deletedAt),
+              eq(transactions.isPlanned, false),
+            ),
+          )}), 0)`.mapWith(Number),
+      })
+      .from(accounts)
+      .where(
+        and(inArray(accounts.id, [...accountIds]), ne(accounts.type, "debt")),
+      ),
+  );
+});
 
-export const createTransaction = (
-  db: DbOrTx,
+export const createTransaction = Effect.fn("transactions.create")(function* (
   userId: string,
   input: TransactionInput,
   options: CreateOptions = {},
-) =>
-  db.transaction(async (tx) => {
-    const { legs } = await prepareLegs(tx, userId, input);
-    const result = await insertLegs(tx, userId, legs, options);
-    const balances = await balancesOf(
-      tx,
-      legs.map((leg) => leg.accountId),
-    );
+) {
+  const { legs } = yield* prepareLegs(userId, input);
+  const result = yield* insertLegs(userId, legs, options);
+  const balances = yield* balancesOf(legs.map((leg) => leg.accountId));
 
-    return { ...result, balances };
-  });
+  return { ...result, balances };
+}, transaction);
 
 /** The live row and every other live leg of its batch, locked */
-const loadBatch = async (tx: DbOrTx, id: string) => {
-  const [row] = await tx
-    .select()
-    .from(transactions)
-    .where(and(eq(transactions.id, id), isNull(transactions.deletedAt)))
-    .for("update");
+const loadBatch = Effect.fnUntraced(function* (id: string) {
+  const [row] = yield* query((db) =>
+    db
+      .select()
+      .from(transactions)
+      .where(and(eq(transactions.id, id), isNull(transactions.deletedAt)))
+      .for("update"),
+  );
 
   if (!row) {
-    throw notFound();
+    return yield* notFound();
   }
 
-  if (!row.batchId) {
+  const batchId = row.batchId;
+
+  if (!batchId) {
     return [row];
   }
 
-  return tx
-    .select()
-    .from(transactions)
-    .where(
-      and(
-        eq(transactions.batchId, row.batchId),
-        isNull(transactions.deletedAt),
-      ),
-    )
-    .orderBy(transactions.amount)
-    .for("update");
-};
+  return yield* query((db) =>
+    db
+      .select()
+      .from(transactions)
+      .where(
+        and(eq(transactions.batchId, batchId), isNull(transactions.deletedAt)),
+      )
+      .orderBy(transactions.amount)
+      .for("update"),
+  );
+});
 
 /**
  * Delete rights on existing rows: write access to every leg's account and,
  * where set, category.
  */
-export const requireDeletable = async (
-  tx: DbOrTx,
-  userId: string,
-  rows: { accountId: string; categoryId: string | null }[],
-) => {
-  await requireWritableAccounts(
-    tx,
-    userId,
-    rows.map((row) => row.accountId),
-  );
+export const requireDeletable = Effect.fn("transactions.requireDeletable")(
+  function* (
+    userId: string,
+    rows: readonly { accountId: string; categoryId: string | null }[],
+  ) {
+    yield* requireWritableAccounts(
+      userId,
+      rows.map((row) => row.accountId),
+    );
 
-  const categoryIds = rows
-    .map((row) => row.categoryId)
-    .filter((id): id is string => id !== null);
-  const categories = await categoryAccess(tx, userId, categoryIds);
+    const categoryIds = rows
+      .map((row) => row.categoryId)
+      .filter((id): id is string => id !== null);
+    const categories = yield* categoryAccess(userId, categoryIds);
 
-  for (const categoryId of categoryIds) {
-    if (!categories.get(categoryId)?.canWrite) {
-      throw forbidden();
+    for (const categoryId of categoryIds) {
+      if (!categories.get(categoryId)?.canWrite) {
+        return yield* forbidden();
+      }
     }
-  }
-};
+  },
+);
 
 /**
  * Orders the stored legs of a pair like prepareLegs does: the source or
  * real-account leg first, the destination or debt-account leg second.
  */
-const orderStoredLegs = async <T extends { accountId: string; amount: number }>(
-  tx: DbOrTx,
-  rows: T[],
-): Promise<T[]> => {
-  if (rows.length < 2) {
-    return rows;
-  }
+const orderStoredLegs = <T extends { accountId: string; amount: number }>(
+  rows: readonly T[],
+) =>
+  Effect.gen(function* () {
+    if (rows.length < 2) {
+      return [...rows];
+    }
 
-  const debt = await tx
-    .select({ id: accounts.id })
-    .from(accounts)
-    .where(
-      and(
-        inArray(
-          accounts.id,
-          rows.map((row) => row.accountId),
+    const debt = yield* query((db) =>
+      db
+        .select({ id: accounts.id })
+        .from(accounts)
+        .where(
+          and(
+            inArray(
+              accounts.id,
+              rows.map((row) => row.accountId),
+            ),
+            eq(accounts.type, "debt"),
+          ),
         ),
-        eq(accounts.type, "debt"),
-      ),
     );
-  const debtIds = new Set(debt.map((row) => row.id));
+    const debtIds = new Set(debt.map((row) => row.id));
 
-  if (debtIds.size > 0) {
-    return [...rows].sort(
-      (a, b) =>
-        Number(debtIds.has(a.accountId)) - Number(debtIds.has(b.accountId)),
-    );
-  }
+    if (debtIds.size > 0) {
+      return [...rows].sort(
+        (a, b) =>
+          Number(debtIds.has(a.accountId)) - Number(debtIds.has(b.accountId)),
+      );
+    }
 
-  return [...rows].sort((a, b) => a.amount - b.amount);
-};
+    return [...rows].sort((a, b) => a.amount - b.amount);
+  });
 
 /**
  * Updates both legs together. The kind can't change. Editing a planned
  * occurrence through here submits it (isPlanned = false, createdAt = now).
  */
-export const updateTransaction = (
-  db: DbOrTx,
+export const updateTransaction = Effect.fn("transactions.update")(function* (
   userId: string,
   { id, data }: { id: string; data: TransactionInput },
-) =>
-  db.transaction(async (tx) => {
-    const existing = await loadBatch(tx, id);
-    const first = existing[0];
+) {
+  const existing = yield* loadBatch(id);
+  const first = existing[0];
 
-    if (!first) {
-      throw notFound();
+  if (!first) {
+    return yield* notFound();
+  }
+
+  if (first.kind !== data.kind) {
+    return yield* badRequest("type_change_not_supported");
+  }
+
+  yield* requireDeletable(userId, existing);
+
+  const { legs } = yield* prepareLegs(userId, data);
+  const stored = yield* orderStoredLegs(existing);
+
+  if (stored.length !== legs.length) {
+    return yield* badRequest("type_change_not_supported");
+  }
+
+  const submitting = first.isPlanned;
+  const at = yield* now;
+
+  for (const [index, row] of stored.entries()) {
+    const leg = legs[index];
+
+    if (!leg) {
+      continue;
     }
 
-    if (first.kind !== data.kind) {
-      throw appError("BAD_REQUEST", "type_change_not_supported");
-    }
-
-    await requireDeletable(tx, userId, existing);
-
-    const { legs } = await prepareLegs(tx, userId, data);
-    const stored = await orderStoredLegs(tx, existing);
-
-    if (stored.length !== legs.length) {
-      throw appError("BAD_REQUEST", "type_change_not_supported");
-    }
-
-    const submitting = first.isPlanned;
-
-    for (const [index, row] of stored.entries()) {
-      const leg = legs[index];
-
-      if (!leg) {
-        continue;
-      }
-
-      await tx
+    yield* query((db) =>
+      db
         .update(transactions)
         .set({
           ...leg,
-          ...(submitting ? { isPlanned: false, createdAt: new Date() } : {}),
+          ...(submitting ? { isPlanned: false, createdAt: at } : {}),
         })
-        .where(eq(transactions.id, row.id));
-    }
-
-    await audit(tx, {
-      entityType: "transaction",
-      entityId: stored.map((row) => row.id),
-      action: "update",
-      userId,
-      payload: { data, submitted: submitting },
-    });
-
-    const balances = await balancesOf(
-      tx,
-      legs.map((leg) => leg.accountId),
+        .where(eq(transactions.id, row.id)),
     );
+  }
 
-    return {
-      ids: stored.map((row) => row.id),
-      submitted: submitting,
-      balances,
-    };
+  yield* audit({
+    entityType: "transaction",
+    entityId: stored.map((row) => row.id),
+    action: "update",
+    userId,
+    payload: { data, submitted: submitting },
   });
+
+  const balances = yield* balancesOf(legs.map((leg) => leg.accountId));
+
+  return {
+    ids: stored.map((row) => row.id),
+    submitted: submitting,
+    balances,
+  };
+}, transaction);
 
 /** Soft-deletes the row and every other live leg of its batch */
-export const deleteTransaction = (db: DbOrTx, userId: string, id: string) =>
-  db.transaction(async (tx) => {
-    const existing = await loadBatch(tx, id);
+export const deleteTransaction = Effect.fn("transactions.delete")(function* (
+  userId: string,
+  id: string,
+) {
+  const existing = yield* loadBatch(id);
 
-    await requireDeletable(tx, userId, existing);
+  yield* requireDeletable(userId, existing);
 
-    const ids = existing.map((row) => row.id);
+  const ids = existing.map((row) => row.id);
+  const at = yield* now;
 
-    await tx
+  yield* query((db) =>
+    db
       .update(transactions)
-      .set({ deletedAt: new Date() })
-      .where(inArray(transactions.id, ids));
+      .set({ deletedAt: at })
+      .where(inArray(transactions.id, ids)),
+  );
 
-    await audit(tx, {
-      entityType: "transaction",
-      entityId: ids,
-      action: "delete",
-      userId,
-      payload: { id },
-    });
-
-    return { ids };
+  yield* audit({
+    entityType: "transaction",
+    entityId: ids,
+    action: "delete",
+    userId,
+    payload: { id },
   });
+
+  return { ids };
+}, transaction);

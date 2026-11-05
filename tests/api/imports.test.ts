@@ -1,7 +1,9 @@
 import { and, eq, isNull } from "drizzle-orm";
+import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db } from "~/server/db";
+import { transaction } from "~/server/db/database";
 import {
   accounts,
   categories,
@@ -26,6 +28,7 @@ import {
   type TestUser,
 } from "../helpers/fixtures";
 import { signal, untilBlockedOnLock } from "../helpers/locks";
+import { run } from "../helpers/run";
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -477,19 +480,23 @@ describe("imports.list and imports.undo", () => {
     // the create has run but not committed when the undo starts
     const created = signal();
     const commit = signal();
-    const creating = db.transaction(async (tx) => {
-      await createTransaction(tx, user.id, {
-        kind: "expense",
-        date: "2026-03-14",
-        amount: 500,
-        accountId,
-        categoryId: null,
-        counterparty: null,
-        comment: null,
-      });
-      created.resolve();
-      await commit.promise;
-    });
+    const creating = run(
+      transaction(
+        Effect.gen(function* () {
+          yield* createTransaction(user.id, {
+            kind: "expense",
+            date: "2026-03-14",
+            amount: 500,
+            accountId,
+            categoryId: null,
+            counterparty: null,
+            comment: null,
+          });
+          created.resolve();
+          yield* Effect.promise(() => commit.promise);
+        }),
+      ),
+    );
     await created.promise;
 
     const undoing = expectTRPCError(

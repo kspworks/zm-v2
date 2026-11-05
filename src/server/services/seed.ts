@@ -1,7 +1,9 @@
+import { Effect } from "effect";
+
 import type { Locale } from "~/i18n/config";
-import type { DbOrTx } from "~/server/db";
+import { query } from "~/server/db/database";
 import { currencies } from "~/server/db/schema";
-import { getServerTranslator } from "~/server/lib/i18n";
+import { serverTranslator } from "~/server/lib/i18n";
 import { insertAccount } from "~/server/services/accounts";
 import { insertCategory } from "~/server/services/categories";
 
@@ -27,19 +29,17 @@ export const SEED_CATEGORIES = [
  * Gives a new user one "Cash" account per currency and the default
  * categories, named in their locale. Runs inside the registration transaction.
  */
-export const seedUserData = async (
-  tx: DbOrTx,
+export const seedUserData = Effect.fn("seed.userData")(function* (
   userId: string,
   locale: Locale,
-): Promise<void> => {
-  const t = await getServerTranslator(locale);
-  const allCurrencies = await tx
-    .select({ id: currencies.id })
-    .from(currencies)
-    .orderBy(currencies.code);
+) {
+  const t = yield* serverTranslator(locale);
+  const allCurrencies = yield* query((db) =>
+    db.select({ id: currencies.id }).from(currencies).orderBy(currencies.code),
+  );
 
   for (const currency of allCurrencies) {
-    await insertAccount(tx, {
+    yield* insertAccount({
       userId,
       values: {
         name: t("seed.cash"),
@@ -52,7 +52,7 @@ export const seedUserData = async (
   }
 
   for (const category of SEED_CATEGORIES) {
-    await insertCategory(tx, {
+    yield* insertCategory({
       userId,
       values: {
         name: t(`seed.categories.${category.key}`),
@@ -63,4 +63,4 @@ export const seedUserData = async (
       },
     });
   }
-};
+});

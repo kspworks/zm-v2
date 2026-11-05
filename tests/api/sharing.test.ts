@@ -1,7 +1,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-
 import { db } from "~/server/db";
+import { transaction } from "~/server/db/database";
 import { accountMembers } from "~/server/db/schema";
 import { getOrCreateDebtAccount } from "~/server/services/accounts";
 import { callerFor } from "../helpers/caller";
@@ -13,6 +13,7 @@ import {
   makeAccount,
   makeCategory,
 } from "../helpers/fixtures";
+import { run } from "../helpers/run";
 
 describe("sharing an account", () => {
   it("adds another user by email as read-only", async () => {
@@ -161,8 +162,8 @@ describe("sharing an account", () => {
       "share_self",
     );
 
-    const debt = await db.transaction((tx) =>
-      getOrCreateDebtAccount(tx, owner.id, CURRENCY.UAH),
+    const debt = await run(
+      transaction(getOrCreateDebtAccount(owner.id, CURRENCY.UAH)),
     );
     await expectTRPCError(
       callerFor(owner).sharing.add({

@@ -13,8 +13,8 @@ import {
 } from "~/server/auth/two-factor";
 import type { DbOrTx } from "~/server/db";
 import { authAccounts, users } from "~/server/db/schema";
-import { audit } from "~/server/lib/audit";
-import { appError, notFound } from "~/server/lib/errors";
+import { audit } from "~/server/legacy/audit";
+import { appError, notFound } from "~/server/legacy/errors";
 import { revokeSessions } from "~/server/services/admin";
 
 /*

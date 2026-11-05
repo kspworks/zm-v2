@@ -12,7 +12,7 @@ import {
   transactions,
   users,
 } from "~/server/db/schema";
-import { tomorrow as tomorrowInAppZone } from "~/server/lib/clock";
+import { tomorrow as tomorrowInAppZone } from "~/server/legacy/clock";
 import {
   insufficientFundsEmail,
   type ShortageSection,

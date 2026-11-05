@@ -1,6 +1,7 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
+import { Effect } from "effect";
 
-import type { DbOrTx } from "~/server/db";
+import { query } from "~/server/db/database";
 import {
   accountMembers,
   accounts,
@@ -35,65 +36,68 @@ export type AccountLock = "share" | "update";
  * the account rows are locked in id order, so concurrent writers touching
  * the same accounts can't deadlock.
  */
-export const accountAccess = async (
-  db: DbOrTx,
+export const accountAccess = Effect.fn("access.accountAccess")(function* (
   userId: string,
-  ids: string[],
+  ids: readonly string[],
   lock?: AccountLock,
-): Promise<Map<string, AccountAccess>> => {
+) {
   const unique = [...new Set(ids)];
 
   if (unique.length === 0) {
-    return new Map();
+    return new Map<string, AccountAccess>();
   }
 
-  const query = db
-    .select({
-      id: accounts.id,
-      type: accounts.type,
-      currencyId: accounts.currencyId,
-      isActive: accounts.isActive,
-      createdBy: accounts.createdBy,
-      name: accounts.name,
-      canRead: accountMembers.canRead,
-      canWrite: accountMembers.canWrite,
-    })
-    .from(accounts)
-    .innerJoin(
-      accountMembers,
-      and(
-        eq(accountMembers.accountId, accounts.id),
-        eq(accountMembers.userId, userId),
-        isNull(accountMembers.deletedAt),
-      ),
-    )
-    .where(and(inArray(accounts.id, unique), isNull(accounts.deletedAt)))
-    .orderBy(accounts.id);
-  const rows = await (lock ? query.for(lock, { of: accounts }) : query);
+  const rows: AccountAccess[] = yield* query((db) => {
+    const select = db
+      .select({
+        id: accounts.id,
+        type: accounts.type,
+        currencyId: accounts.currencyId,
+        isActive: accounts.isActive,
+        createdBy: accounts.createdBy,
+        name: accounts.name,
+        canRead: accountMembers.canRead,
+        canWrite: accountMembers.canWrite,
+      })
+      .from(accounts)
+      .innerJoin(
+        accountMembers,
+        and(
+          eq(accountMembers.accountId, accounts.id),
+          eq(accountMembers.userId, userId),
+          isNull(accountMembers.deletedAt),
+        ),
+      )
+      .where(and(inArray(accounts.id, unique), isNull(accounts.deletedAt)))
+      .orderBy(accounts.id);
+
+    return lock ? select.for(lock, { of: accounts }) : select;
+  });
 
   return new Map(rows.map((row) => [row.id, row]));
-};
+});
 
 /**
  * Every id must be a live account the user can write; returns the rows,
  * locked for the rest of the caller's transaction (see AccountLock)
  */
-export const requireWritableAccounts = async (
-  db: DbOrTx,
+export const requireWritableAccounts = Effect.fn(
+  "access.requireWritableAccounts",
+)(function* (
   userId: string,
-  ids: string[],
+  ids: readonly string[],
   lock: AccountLock = "share",
-): Promise<Map<string, AccountAccess>> => {
-  const access = await accountAccess(db, userId, ids, lock);
+) {
+  const access = yield* accountAccess(userId, ids, lock);
 
   for (const id of ids) {
     if (!access.get(id)?.canWrite) {
-      throw forbidden();
+      return yield* forbidden();
     }
   }
 
   return access;
-};
+});
 
 export type CategoryAccess = {
   id: string;
@@ -105,51 +109,50 @@ export type CategoryAccess = {
   canWrite: boolean;
 };
 
-export const categoryAccess = async (
-  db: DbOrTx,
+export const categoryAccess = Effect.fn("access.categoryAccess")(function* (
   userId: string,
-  ids: string[],
-): Promise<Map<string, CategoryAccess>> => {
+  ids: readonly string[],
+) {
   const unique = [...new Set(ids)];
 
   if (unique.length === 0) {
-    return new Map();
+    return new Map<string, CategoryAccess>();
   }
 
-  const rows = await db
-    .select({
-      id: categories.id,
-      parentId: categories.parentId,
-      isExpense: categories.isExpense,
-      isIncome: categories.isIncome,
-      createdBy: categories.createdBy,
-      canRead: categoryMembers.canRead,
-      canWrite: categoryMembers.canWrite,
-    })
-    .from(categories)
-    .innerJoin(
-      categoryMembers,
-      and(
-        eq(categoryMembers.categoryId, categories.id),
-        eq(categoryMembers.userId, userId),
-        isNull(categoryMembers.deletedAt),
-      ),
-    )
-    .where(and(inArray(categories.id, unique), isNull(categories.deletedAt)));
+  const rows: CategoryAccess[] = yield* query((db) =>
+    db
+      .select({
+        id: categories.id,
+        parentId: categories.parentId,
+        isExpense: categories.isExpense,
+        isIncome: categories.isIncome,
+        createdBy: categories.createdBy,
+        canRead: categoryMembers.canRead,
+        canWrite: categoryMembers.canWrite,
+      })
+      .from(categories)
+      .innerJoin(
+        categoryMembers,
+        and(
+          eq(categoryMembers.categoryId, categories.id),
+          eq(categoryMembers.userId, userId),
+          isNull(categoryMembers.deletedAt),
+        ),
+      )
+      .where(and(inArray(categories.id, unique), isNull(categories.deletedAt))),
+  );
 
   return new Map(rows.map((row) => [row.id, row]));
-};
+});
 
-export const requireWritableCategory = async (
-  db: DbOrTx,
-  userId: string,
-  id: string,
-): Promise<CategoryAccess> => {
-  const access = (await categoryAccess(db, userId, [id])).get(id);
+export const requireWritableCategory = Effect.fn(
+  "access.requireWritableCategory",
+)(function* (userId: string, id: string) {
+  const access = (yield* categoryAccess(userId, [id])).get(id);
 
   if (!access?.canWrite) {
-    throw forbidden();
+    return yield* forbidden();
   }
 
   return access;
-};
+});

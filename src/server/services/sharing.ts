@@ -1,10 +1,12 @@
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { Effect } from "effect";
 
 import type { ShareEntity } from "~/lib/validators/sharing";
-import type { DbOrTx } from "~/server/db";
+import { query, transaction } from "~/server/db/database";
 import { accountMembers, categoryMembers, users } from "~/server/db/schema";
 import { audit } from "~/server/lib/audit";
-import { appError, forbidden } from "~/server/lib/errors";
+import { now } from "~/server/lib/clock";
+import { badRequest, forbidden } from "~/server/lib/errors";
 import { newId } from "~/server/lib/ids";
 import {
   accountAccess,
@@ -18,79 +20,82 @@ import {
  * never shared.
  */
 
-const requireShareable = async (
-  db: DbOrTx,
+const requireShareable = Effect.fnUntraced(function* (
   userId: string,
   entity: ShareEntity,
   id: string,
-): Promise<{ createdBy: string }> => {
+) {
   if (entity === "category") {
-    const access = await requireWritableCategory(db, userId, id);
+    const access = yield* requireWritableCategory(userId, id);
 
     return { createdBy: access.createdBy };
   }
 
-  const access = (await accountAccess(db, userId, [id])).get(id);
+  const access = (yield* accountAccess(userId, [id])).get(id);
 
   if (!access?.canWrite) {
-    throw forbidden();
+    return yield* forbidden();
   }
 
   if (access.type === "debt") {
-    throw appError("BAD_REQUEST", "share_debt_account");
+    return yield* badRequest("share_debt_account");
   }
 
   return { createdBy: access.createdBy };
-};
+});
 
 const membersTable = (entity: ShareEntity) =>
   entity === "account"
     ? { table: accountMembers, key: accountMembers.accountId }
     : { table: categoryMembers, key: categoryMembers.categoryId };
 
-export const listShares = async (
-  db: DbOrTx,
+export const listShares = Effect.fn("sharing.list")(function* (
   userId: string,
   input: { entity: ShareEntity; id: string },
-) => {
-  const { createdBy } = await requireShareable(
-    db,
-    userId,
-    input.entity,
-    input.id,
-  );
+) {
+  const { createdBy } = yield* requireShareable(userId, input.entity, input.id);
   const { table, key } = membersTable(input.entity);
 
-  const rows = await db
-    .select({
-      userId: users.id,
-      name: users.name,
-      email: users.email,
-      canWrite: table.canWrite,
-    })
-    .from(table)
-    .innerJoin(users, eq(users.id, table.userId))
-    .where(
-      and(eq(key, input.id), isNull(table.deletedAt), isNull(users.deletedAt)),
-    )
-    .orderBy(asc(users.name));
+  const rows = yield* query((db) =>
+    db
+      .select({
+        userId: users.id,
+        name: users.name,
+        email: users.email,
+        canWrite: table.canWrite,
+      })
+      .from(table)
+      .innerJoin(users, eq(users.id, table.userId))
+      .where(
+        and(
+          eq(key, input.id),
+          isNull(table.deletedAt),
+          isNull(users.deletedAt),
+        ),
+      )
+      .orderBy(asc(users.name)),
+  );
 
   return rows.map((row) => ({
     ...row,
     isOwner: row.userId === createdBy,
     isSelf: row.userId === userId,
   }));
-};
+});
 
-export const addShare = (
-  db: DbOrTx,
+export const addShare = Effect.fn("sharing.add")(function* (
   userId: string,
-  input: { entity: ShareEntity; id: string; email: string; canWrite: boolean },
-) =>
-  db.transaction(async (tx) => {
-    await requireShareable(tx, userId, input.entity, input.id);
+  input: {
+    entity: ShareEntity;
+    id: string;
+    email: string;
+    canWrite: boolean;
+  },
+) {
+  yield* requireShareable(userId, input.entity, input.id);
 
-    const [target] = await tx
+  const [target] = yield* query((db) =>
+    db
       .select({ id: users.id })
       .from(users)
       .where(
@@ -98,21 +103,23 @@ export const addShare = (
           sql`lower(${users.email}) = ${input.email.trim().toLowerCase()}`,
           isNull(users.deletedAt),
         ),
-      );
+      ),
+  );
 
-    if (!target) {
-      throw appError("BAD_REQUEST", "share_user_not_found");
-    }
+  if (!target) {
+    return yield* badRequest("share_user_not_found");
+  }
 
-    if (target.id === userId) {
-      throw appError("BAD_REQUEST", "share_self");
-    }
+  if (target.id === userId) {
+    return yield* badRequest("share_self");
+  }
 
-    // one live member row per pair: re-sharing updates the rights in place
-    const rights = { canRead: true, canWrite: input.canWrite };
+  // one live member row per pair: re-sharing updates the rights in place
+  const rights = { canRead: true, canWrite: input.canWrite };
 
-    if (input.entity === "account") {
-      await tx
+  if (input.entity === "account") {
+    yield* query((db) =>
+      db
         .insert(accountMembers)
         .values({
           id: newId(),
@@ -124,9 +131,11 @@ export const addShare = (
           target: [accountMembers.accountId, accountMembers.userId],
           targetWhere: isNull(accountMembers.deletedAt),
           set: rights,
-        });
-    } else {
-      await tx
+        }),
+    );
+  } else {
+    yield* query((db) =>
+      db
         .insert(categoryMembers)
         .values({
           id: newId(),
@@ -138,57 +147,54 @@ export const addShare = (
           target: [categoryMembers.categoryId, categoryMembers.userId],
           targetWhere: isNull(categoryMembers.deletedAt),
           set: rights,
-        });
-    }
+        }),
+    );
+  }
 
-    await audit(tx, {
-      entityType: input.entity,
-      entityId: input.id,
-      action: "update",
-      userId,
-      payload: {
-        share: { userId: target.id, canWrite: input.canWrite },
-      },
-    });
-
-    return { userId: target.id };
+  yield* audit({
+    entityType: input.entity,
+    entityId: input.id,
+    action: "update",
+    userId,
+    payload: {
+      share: { userId: target.id, canWrite: input.canWrite },
+    },
   });
 
-export const revokeShare = (
-  db: DbOrTx,
+  return { userId: target.id };
+}, transaction);
+
+export const revokeShare = Effect.fn("sharing.revoke")(function* (
   userId: string,
   input: { entity: ShareEntity; id: string; userId: string },
-) =>
-  db.transaction(async (tx) => {
-    const { createdBy } = await requireShareable(
-      tx,
-      userId,
-      input.entity,
-      input.id,
-    );
+) {
+  const { createdBy } = yield* requireShareable(userId, input.entity, input.id);
 
-    if (input.userId === createdBy) {
-      throw forbidden();
-    }
+  if (input.userId === createdBy) {
+    return yield* forbidden();
+  }
 
-    const { table, key } = membersTable(input.entity);
+  const { table, key } = membersTable(input.entity);
+  const at = yield* now;
 
-    await tx
+  yield* query((db) =>
+    db
       .update(table)
-      .set({ deletedAt: new Date() })
+      .set({ deletedAt: at })
       .where(
         and(
           eq(key, input.id),
           eq(table.userId, input.userId),
           isNull(table.deletedAt),
         ),
-      );
+      ),
+  );
 
-    await audit(tx, {
-      entityType: input.entity,
-      entityId: input.id,
-      action: "update",
-      userId,
-      payload: { revoke: { userId: input.userId } },
-    });
+  yield* audit({
+    entityType: input.entity,
+    entityId: input.id,
+    action: "update",
+    userId,
+    payload: { revoke: { userId: input.userId } },
   });
+}, transaction);
