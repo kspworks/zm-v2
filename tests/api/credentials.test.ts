@@ -13,6 +13,7 @@ import {
   createAdmin,
   createUserWithCredentials,
 } from "../helpers/fixtures";
+import { run } from "../helpers/run";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -243,10 +244,11 @@ describe("second-factor input", () => {
       "BAD_REQUEST",
     );
     await expectTRPCError(
-      changePassword(
-        db,
-        { id: user.id, sessionId: null },
-        { currentPassword: password, newPassword: "newsecret", code },
+      run(
+        changePassword(
+          { id: user.id, sessionId: null },
+          { currentPassword: password, newPassword: "newsecret", code },
+        ),
       ),
       "BAD_REQUEST",
       "invalid_code",

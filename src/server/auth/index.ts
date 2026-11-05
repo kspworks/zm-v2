@@ -12,32 +12,35 @@ import { setSessionCookie } from "better-auth/cookies";
 import {
   hashPassword as scryptHash,
   verifyPassword as scryptVerify,
-  symmetricDecrypt,
 } from "better-auth/crypto";
 import { nextCookies } from "better-auth/next-js";
 import { admin, twoFactor } from "better-auth/plugins";
 import type { BetterAuthPlugin } from "better-auth/types";
-import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { env } from "~/env";
+import {
+  isLiveUser,
+  rehashLegacyPassword,
+  sendPasswordReset,
+  translateTotpCode,
+} from "~/server/auth/hooks";
 import { ticketIdentifier } from "~/server/auth/sign-in-ticket";
 import { verifySecondFactor } from "~/server/auth/two-factor";
-import { authBaseUrl, isDev, mailConfig } from "~/server/config";
+import { authBaseUrl } from "~/server/config";
 import { db } from "~/server/db";
+import { transaction } from "~/server/db/database";
 import * as schema from "~/server/db/schema";
-import { hitRateLimit, resetRateLimit } from "~/server/legacy/rate-limit";
+import { runServer } from "~/server/effect/runtime";
 import { newId } from "~/server/lib/ids";
-import { RATE_LIMITS, rateLimitKeys } from "~/server/lib/rate-limit";
-import { reportError } from "~/server/lib/report";
 import {
-  betterAuthTotp,
-  DEV_OTP,
-  LEGACY_PREFIX,
-  verifyTotp,
-} from "~/server/lib/totp";
-import { passwordResetEmail } from "~/server/mail/templates";
-import { sendMail } from "~/server/mail/transport";
+  hitRateLimit,
+  RATE_LIMITS,
+  type RateLimitRule,
+  rateLimitKeys,
+  resetRateLimit,
+} from "~/server/lib/rate-limit";
+import { reportError } from "~/server/lib/report";
 
 export const SESSION_TTL_SECONDS = 14 * 24 * 60 * 60;
 
@@ -48,6 +51,15 @@ const SIGN_IN_COMPLETE_PATHS = new Set([
   "/two-factor/verify-totp",
   "/two-factor/verify-backup-code",
 ]);
+
+/** Counts an attempt; past the limit, better-auth answers 429 */
+const limitOrReject = async (key: string, rule: RateLimitRule) => {
+  const { allowed } = await runServer(hitRateLimit(key, rule));
+
+  if (!allowed) {
+    throw new APIError("TOO_MANY_REQUESTS", { code: "TOO_MANY_REQUESTS" });
+  }
+};
 
 const zm = () =>
   ({
@@ -95,16 +107,8 @@ const zm = () =>
           matcher: (ctx) => ctx.path === "/sign-in/email",
           handler: createAuthMiddleware(async (ctx) => {
             const email = String(ctx.body?.email ?? "");
-            const { allowed } = await hitRateLimit(
-              rateLimitKeys.login(email),
-              RATE_LIMITS.login,
-            );
 
-            if (!allowed) {
-              throw new APIError("TOO_MANY_REQUESTS", {
-                code: "TOO_MANY_REQUESTS",
-              });
-            }
+            await limitOrReject(rateLimitKeys.login(email), RATE_LIMITS.login);
           }),
         },
         {
@@ -112,16 +116,11 @@ const zm = () =>
           matcher: (ctx) => ctx.path === "/request-password-reset",
           handler: createAuthMiddleware(async (ctx) => {
             const email = String(ctx.body?.email ?? "");
-            const { allowed } = await hitRateLimit(
+
+            await limitOrReject(
               rateLimitKeys.resetRequest(email),
               RATE_LIMITS.resetRequest,
             );
-
-            if (!allowed) {
-              throw new APIError("TOO_MANY_REQUESTS", {
-                code: "TOO_MANY_REQUESTS",
-              });
-            }
           }),
         },
         {
@@ -131,16 +130,11 @@ const zm = () =>
           handler: createAuthMiddleware(async (ctx) => {
             const token = String(ctx.body?.token ?? ctx.query?.token ?? "");
             const code = String(ctx.body?.code ?? "");
-            const { allowed } = await hitRateLimit(
+
+            await limitOrReject(
               rateLimitKeys.resetSubmit(token),
               RATE_LIMITS.resetSubmit,
             );
-
-            if (!allowed) {
-              throw new APIError("TOO_MANY_REQUESTS", {
-                code: "TOO_MANY_REQUESTS",
-              });
-            }
 
             const pending =
               await ctx.context.internalAdapter.findVerificationValue(
@@ -151,10 +145,12 @@ const zm = () =>
               throw new APIError("BAD_REQUEST", { code: "INVALID_TOKEN" });
             }
 
-            const ok = await db.transaction((tx) =>
-              verifySecondFactor(tx, pending.value, code, {
-                allowBackupCode: true,
-              }),
+            const ok = await runServer(
+              transaction(
+                verifySecondFactor(pending.value, code, {
+                  allowBackupCode: true,
+                }),
+              ),
             );
 
             if (!ok) {
@@ -179,30 +175,13 @@ const zm = () =>
                   identifier,
                 )
               : null;
-            const row = pending
-              ? await db.query.twoFactors.findFirst({
-                  where: eq(schema.twoFactors.userId, pending.value),
-                })
-              : undefined;
+            const replacement = pending
+              ? await runServer(translateTotpCode(pending.value, code))
+              : null;
 
-            if (!row) {
-              return;
-            }
-
-            const secret = await symmetricDecrypt({
-              key: ctx.context.secretConfig,
-              data: row.secret,
-            });
-            const legacy = secret.startsWith(LEGACY_PREFIX);
-
-            if (
-              (isDev() && code === DEV_OTP) ||
-              (legacy && verifyTotp(secret, code))
-            ) {
+            if (replacement) {
               return {
-                context: {
-                  body: { ...ctx.body, code: betterAuthTotp(secret) },
-                },
+                context: { body: { ...ctx.body, code: replacement } },
               };
             }
           }),
@@ -225,29 +204,7 @@ const zm = () =>
               return;
             }
 
-            const [credential] = await db
-              .select({
-                id: schema.authAccounts.id,
-                hash: schema.authAccounts.password,
-              })
-              .from(schema.authAccounts)
-              .innerJoin(
-                schema.users,
-                eq(schema.users.id, schema.authAccounts.userId),
-              )
-              .where(
-                and(
-                  eq(schema.users.email, email),
-                  eq(schema.authAccounts.providerId, "credential"),
-                ),
-              );
-
-            if (credential?.hash?.startsWith("$2")) {
-              await db
-                .update(schema.authAccounts)
-                .set({ password: await scryptHash(password) })
-                .where(eq(schema.authAccounts.id, credential.id));
-            }
+            await runServer(rehashLegacyPassword(email, password));
           }),
         },
         {
@@ -256,7 +213,7 @@ const zm = () =>
             const email = ctx.context.newSession?.user.email;
 
             if (email) {
-              await resetRateLimit(rateLimitKeys.login(email));
+              await runServer(resetRateLimit(rateLimitKeys.login(email)));
             }
           }),
         },
@@ -314,16 +271,10 @@ export const auth = betterAuth({
     resetPasswordTokenExpiresIn: 60 * 60,
     // without SMTP the "forgot password" link is hidden and this is a no-op;
     // the answer is the same either way, so addresses can't be enumerated
-    sendResetPassword: async ({ user, url }) => {
-      if (!mailConfig()) {
-        return;
-      }
-
-      const locale =
-        (user as { locale?: string }).locale === "en" ? "en" : "uk";
-      const mail = await passwordResetEmail(locale, { name: user.name, url });
-      await sendMail({ to: user.email, ...mail });
-    },
+    sendResetPassword: ({ user, url }) =>
+      runServer(
+        sendPasswordReset(user as typeof user & { locale?: string }, url),
+      ),
   },
   rateLimit: {
     enabled: env.NODE_ENV !== "test",
@@ -336,17 +287,10 @@ export const auth = betterAuth({
   databaseHooks: {
     session: {
       create: {
-        before: async (session) => {
-          const user = await db.query.users.findFirst({
-            columns: { id: true },
-            where: and(
-              eq(schema.users.id, session.userId),
-              isNull(schema.users.deletedAt),
-            ),
-          });
-
-          return user ? { data: session } : false;
-        },
+        before: async (session) =>
+          (await runServer(isLiveUser(session.userId)))
+            ? { data: session }
+            : false,
       },
     },
   },

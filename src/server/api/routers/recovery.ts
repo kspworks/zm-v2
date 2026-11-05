@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { otpSchema, passwordSchema } from "~/lib/validators/auth";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
+import { runForTrpc } from "~/server/effect/runtime";
 import {
   completeRecovery,
   startRecoveryEnrolment,
@@ -13,11 +14,15 @@ const token = z.string().trim().min(1).max(128);
 export const recoveryRouter = createTRPCRouter({
   validate: publicProcedure
     .input(z.object({ token }))
-    .query(({ ctx, input }) => validateRecoveryLink(ctx.db, input.token)),
+    .query(({ input, signal }) =>
+      runForTrpc(validateRecoveryLink(input.token), signal),
+    ),
 
   startEnrolment: publicProcedure
     .input(z.object({ token }))
-    .mutation(({ ctx, input }) => startRecoveryEnrolment(ctx.db, input.token)),
+    .mutation(({ input, signal }) =>
+      runForTrpc(startRecoveryEnrolment(input.token), signal),
+    ),
 
   complete: publicProcedure
     .input(
@@ -28,5 +33,7 @@ export const recoveryRouter = createTRPCRouter({
         code: otpSchema.nullish(),
       }),
     )
-    .mutation(({ ctx, input }) => completeRecovery(ctx.db, input)),
+    .mutation(({ input, signal }) =>
+      runForTrpc(completeRecovery(input), signal),
+    ),
 });

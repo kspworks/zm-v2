@@ -6,6 +6,7 @@ import { LoginForm } from "~/components/auth/login-form";
 import { sanitizeAuthError, sanitizeCallbackUrl } from "~/lib/auth-routing";
 import { getCurrentUser } from "~/server/auth/session";
 import { mailConfig } from "~/server/config";
+import { runServer } from "~/server/effect/runtime";
 import { ADMIN_INVITE_ID, countActiveAdmins } from "~/server/services/invites";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -34,7 +35,7 @@ export default async function LoginPage({
       canResetPassword={mailConfig() !== null}
       // a fresh install has nobody to sign in as: point at the bootstrap
       adminInviteHref={
-        (await countActiveAdmins()) === 0
+        (await runServer(countActiveAdmins())) === 0
           ? `/auth/register/invite?id=${ADMIN_INVITE_ID}`
           : null
       }

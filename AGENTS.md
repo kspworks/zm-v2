@@ -66,8 +66,8 @@ functions.
   procedures use `runForTrpc(effect, signal)`; server components, better-auth
   hooks and cron routes use `runServer`, after handling expected errors with
   `Effect.catchTag`. The runtime holds no mutable application state.
-- **Migration interop** (temporary): `~/server/legacy/*` and `runWith(tx, effect)`
-  bridge code not yet migrated. Don't add new callers.
+- **Migration interop** (temporary): `~/server/legacy/*` bridges code not yet
+  migrated. Don't add new callers.
 
 ## Multi-process safety
 

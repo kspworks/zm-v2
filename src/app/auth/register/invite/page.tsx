@@ -1,10 +1,11 @@
-import { TRPCError } from "@trpc/server";
+import { Effect } from "effect";
 import { AlertCircleIcon } from "lucide-react";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
 import { RegisterWizard } from "~/components/auth/register-wizard";
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
+import { runServer } from "~/server/effect/runtime";
 import { validateInvite } from "~/server/services/invites";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -21,13 +22,11 @@ export default async function RegisterInvitePage({
   const inviteId = typeof id === "string" ? id.trim() : "";
 
   const invite = inviteId
-    ? await validateInvite(inviteId).catch((error: unknown) => {
-        if (error instanceof TRPCError && error.code === "FORBIDDEN") {
-          return null;
-        }
-
-        throw error;
-      })
+    ? await runServer(
+        validateInvite(inviteId).pipe(
+          Effect.catchTag("Forbidden", () => Effect.succeed(null)),
+        ),
+      )
     : null;
 
   if (!invite) {

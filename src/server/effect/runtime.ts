@@ -1,4 +1,4 @@
-import { Cause, Effect, Exit, Layer, ManagedRuntime } from "effect";
+import { Cause, type Effect, Exit, Layer, ManagedRuntime } from "effect";
 
 import { Database, type SqlError } from "~/server/db/database";
 import { AppConfig } from "~/server/effect/app-config";
@@ -62,23 +62,4 @@ export const runServer = async <A, E>(
   }
 
   throw Cause.squash(exit.cause);
-};
-
-/**
- * Migration interop: lets code not yet migrated to Effect run an effect on its
- * own Drizzle handle, with failures thrown as the TRPCError it used to throw.
- */
-export const runWith = async <A>(
-  handle: Database["Service"],
-  effect: Effect.Effect<A, AppError | SqlError, AppServices>,
-): Promise<A> => {
-  const exit = await runtime.runPromiseExit(
-    Effect.provideService(effect, Database, handle),
-  );
-
-  if (Exit.isSuccess(exit)) {
-    return exit.value;
-  }
-
-  throw toTRPCError(exit.cause);
 };

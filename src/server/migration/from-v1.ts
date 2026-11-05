@@ -20,6 +20,7 @@ import {
   twoFactors,
   users,
 } from "~/server/db/schema";
+import { runServer } from "~/server/effect/runtime";
 import { newId } from "~/server/lib/ids";
 import { LEGACY_PREFIX } from "~/server/lib/totp";
 
@@ -146,9 +147,11 @@ export const migrateFromV1 = async (
       if (user.otp_secret) {
         await tx.insert(twoFactors).values({
           userId: id,
-          secret: await encryptValue(`${LEGACY_PREFIX}${user.otp_secret}`),
-          backupCodes: await encryptValue(
-            JSON.stringify(generateBackupCodes()),
+          secret: await runServer(
+            encryptValue(`${LEGACY_PREFIX}${user.otp_secret}`),
+          ),
+          backupCodes: await runServer(
+            encryptValue(JSON.stringify(generateBackupCodes())),
           ),
           verified: true,
         });

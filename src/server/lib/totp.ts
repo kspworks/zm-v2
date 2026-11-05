@@ -65,11 +65,14 @@ export const totpManualKey = (secret: string): string =>
 export const generateTotp = (secret: string, timestamp = Date.now()): string =>
   totpFor(secret).generate({ timestamp });
 
-/** Accepts the current step and one step either side */
+/**
+ * Accepts the current step and one step either side of `timestamp`, which
+ * server code takes from Effect's Clock (see `totpMatches`)
+ */
 export const verifyTotp = (
   secret: string,
   code: string,
-  timestamp = Date.now(),
+  timestamp: number,
 ): boolean => {
   const token = code.replace(/\s+/g, "");
 

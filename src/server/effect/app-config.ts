@@ -25,6 +25,7 @@ export class AppConfig extends Context.Service<
     readonly authBaseUrl: string;
     readonly mail: MailConfig | null;
     readonly isDev: boolean;
+    readonly nodeEnv: string | undefined;
     readonly buildId: string | undefined;
   }
 >()("zm/server/effect/AppConfig") {
@@ -36,6 +37,7 @@ export class AppConfig extends Context.Service<
       authBaseUrl: authBaseUrl(),
       mail: mailConfig(),
       isDev: isDev(),
+      nodeEnv: process.env.NODE_ENV,
       buildId: buildId(),
     });
 

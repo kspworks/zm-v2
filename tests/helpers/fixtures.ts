@@ -66,12 +66,10 @@ export const createUserWithCredentials = async (
     accountId: user.id,
     providerId: "credential",
     userId: user.id,
-    password: await hashPassword(password),
+    password: await run(hashPassword(password)),
   });
 
-  const backupCodes = await db.transaction((tx) =>
-    enrolTwoFactor(tx, user.id, secret),
-  );
+  const backupCodes = await run(transaction(enrolTwoFactor(user.id, secret)));
 
   const [fresh] = await db.select().from(users).where(eq(users.id, user.id));
 

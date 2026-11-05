@@ -1,4 +1,5 @@
 import { and, eq, isNull } from "drizzle-orm";
+import { Effect } from "effect";
 
 import {
   confirmPendingEnrolment,
@@ -11,10 +12,10 @@ import {
   verifyPasswordHash,
   verifySecondFactor,
 } from "~/server/auth/two-factor";
-import type { DbOrTx } from "~/server/db";
+import { query, transaction } from "~/server/db/database";
 import { authAccounts, users } from "~/server/db/schema";
-import { audit } from "~/server/legacy/audit";
-import { appError, notFound } from "~/server/legacy/errors";
+import { audit } from "~/server/lib/audit";
+import { badRequest, notFound } from "~/server/lib/errors";
 import { revokeSessions } from "~/server/services/admin";
 
 /*
@@ -24,128 +25,125 @@ import { revokeSessions } from "~/server/services/admin";
  * change or re-enrolment revokes the user's other sessions. All are audited.
  */
 
-const credentialOf = async (tx: DbOrTx, userId: string) => {
-  const [row] = await tx
-    .select()
-    .from(authAccounts)
-    .where(
-      and(
-        eq(authAccounts.userId, userId),
-        eq(authAccounts.providerId, "credential"),
-      ),
-    )
-    .for("update");
+const credentialOf = Effect.fnUntraced(function* (userId: string) {
+  const [row] = yield* query((db) =>
+    db
+      .select()
+      .from(authAccounts)
+      .where(
+        and(
+          eq(authAccounts.userId, userId),
+          eq(authAccounts.providerId, "credential"),
+        ),
+      )
+      .for("update"),
+  );
 
   if (!row?.password) {
-    throw notFound();
+    return yield* notFound();
   }
 
   return row;
-};
+});
 
-export const requirePassword = async (
-  tx: DbOrTx,
-  userId: string,
-  password: string,
-) => {
-  const credential = await credentialOf(tx, userId);
+export const requirePassword = Effect.fn("credentials.requirePassword")(
+  function* (userId: string, password: string) {
+    const credential = yield* credentialOf(userId);
 
-  if (!(await verifyPasswordHash(credential.password ?? "", password))) {
-    throw appError("BAD_REQUEST", "invalid_password");
-  }
+    if (!(yield* verifyPasswordHash(credential.password ?? "", password))) {
+      return yield* badRequest("invalid_password");
+    }
 
-  return credential;
-};
+    return credential;
+  },
+);
 
-const requireCode = async (
-  tx: DbOrTx,
+const requireCode = Effect.fnUntraced(function* (
   userId: string,
   code: string,
   allowBackupCode: boolean,
-) => {
-  if (!(await verifySecondFactor(tx, userId, code, { allowBackupCode }))) {
-    throw appError("BAD_REQUEST", "invalid_code");
+) {
+  if (!(yield* verifySecondFactor(userId, code, { allowBackupCode }))) {
+    return yield* badRequest("invalid_code");
   }
-};
+});
 
-export const setPassword = async (
-  tx: DbOrTx,
+export const setPassword = Effect.fn("credentials.setPassword")(function* (
   userId: string,
   newPassword: string,
-) => {
-  const credential = await credentialOf(tx, userId);
+) {
+  const credential = yield* credentialOf(userId);
+  const password = yield* hashPassword(newPassword);
 
-  await tx
-    .update(authAccounts)
-    .set({ password: await hashPassword(newPassword) })
-    .where(eq(authAccounts.id, credential.id));
-};
+  yield* query((db) =>
+    db
+      .update(authAccounts)
+      .set({ password })
+      .where(eq(authAccounts.id, credential.id)),
+  );
+});
 
-const userEmail = async (tx: DbOrTx, userId: string) => {
-  const [row] = await tx
-    .select({ email: users.email })
-    .from(users)
-    .where(and(eq(users.id, userId), isNull(users.deletedAt)));
+const userEmail = Effect.fnUntraced(function* (userId: string) {
+  const [row] = yield* query((db) =>
+    db
+      .select({ email: users.email })
+      .from(users)
+      .where(and(eq(users.id, userId), isNull(users.deletedAt))),
+  );
 
   if (!row) {
-    throw notFound();
+    return yield* notFound();
   }
 
   return row.email;
-};
+});
 
-export const changePassword = (
-  db: DbOrTx,
-  user: { id: string; sessionId: string | null },
-  input: { currentPassword: string; newPassword: string; code: string },
-) =>
-  db.transaction(async (tx) => {
-    await requirePassword(tx, user.id, input.currentPassword);
-    await requireCode(tx, user.id, input.code, false);
-    await setPassword(tx, user.id, input.newPassword);
-    await revokeSessions(tx, user.id, user.sessionId);
-    await audit(tx, {
+export const changePassword = Effect.fn("credentials.changePassword")(
+  function* (
+    user: { id: string; sessionId: string | null },
+    input: { currentPassword: string; newPassword: string; code: string },
+  ) {
+    yield* requirePassword(user.id, input.currentPassword);
+    yield* requireCode(user.id, input.code, false);
+    yield* setPassword(user.id, input.newPassword);
+    yield* revokeSessions(user.id, user.sessionId);
+    yield* audit({
       entityType: "user",
       entityId: user.id,
       action: "update",
       userId: user.id,
       payload: { passwordChanged: true },
     });
-  });
+  },
+  transaction,
+);
 
 const reenrolKey = (userId: string) => `zm-reenrol:${userId}`;
 
-export const startReenrol = (
-  db: DbOrTx,
+export const startReenrol = Effect.fn("credentials.startReenrol")(function* (
   userId: string,
   input: { password: string; code: string },
-) =>
-  db.transaction(async (tx) => {
-    await requirePassword(tx, userId, input.password);
-    await requireCode(tx, userId, input.code, true);
+) {
+  yield* requirePassword(userId, input.password);
+  yield* requireCode(userId, input.code, true);
 
-    return startPendingEnrolment(
-      tx,
-      reenrolKey(userId),
-      await userEmail(tx, userId),
-    );
-  });
+  return yield* startPendingEnrolment(
+    reenrolKey(userId),
+    yield* userEmail(userId),
+  );
+}, transaction);
 
-export const confirmReenrol = (
-  db: DbOrTx,
-  user: { id: string; sessionId: string | null },
-  code: string,
-) =>
-  db.transaction(async (tx) => {
-    const secret = await confirmPendingEnrolment(tx, reenrolKey(user.id), code);
+export const confirmReenrol = Effect.fn("credentials.confirmReenrol")(
+  function* (user: { id: string; sessionId: string | null }, code: string) {
+    const secret = yield* confirmPendingEnrolment(reenrolKey(user.id), code);
 
     if (!secret) {
-      throw appError("BAD_REQUEST", "invalid_code");
+      return yield* badRequest("invalid_code");
     }
 
-    const backupCodes = await enrolTwoFactor(tx, user.id, secret);
-    await revokeSessions(tx, user.id, user.sessionId);
-    await audit(tx, {
+    const backupCodes = yield* enrolTwoFactor(user.id, secret);
+    yield* revokeSessions(user.id, user.sessionId);
+    yield* audit({
       entityType: "user",
       entityId: user.id,
       action: "update",
@@ -154,19 +152,17 @@ export const confirmReenrol = (
     });
 
     return { backupCodes };
-  });
+  },
+  transaction,
+);
 
-export const newBackupCodes = (
-  db: DbOrTx,
-  userId: string,
-  input: { password: string; code: string },
-) =>
-  db.transaction(async (tx) => {
-    await requirePassword(tx, userId, input.password);
-    await requireCode(tx, userId, input.code, false);
+export const newBackupCodes = Effect.fn("credentials.newBackupCodes")(
+  function* (userId: string, input: { password: string; code: string }) {
+    yield* requirePassword(userId, input.password);
+    yield* requireCode(userId, input.code, false);
 
-    const backupCodes = await regenerateBackupCodes(tx, userId);
-    await audit(tx, {
+    const backupCodes = yield* regenerateBackupCodes(userId);
+    yield* audit({
       entityType: "user",
       entityId: userId,
       action: "update",
@@ -175,4 +171,6 @@ export const newBackupCodes = (
     });
 
     return { backupCodes };
-  });
+  },
+  transaction,
+);

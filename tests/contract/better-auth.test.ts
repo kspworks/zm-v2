@@ -10,6 +10,7 @@ import {
   caseSwappedBackupCode,
   createUserWithCredentials,
 } from "../helpers/fixtures";
+import { run } from "../helpers/run";
 
 /**
  * Contract: better-auth's email + TOTP sign-in, driven through its public
@@ -194,7 +195,7 @@ describe("login rate limit", () => {
 describe("sign-in ticket", () => {
   it("creates a session once and cannot be replayed", async () => {
     const { user } = await createUserWithCredentials();
-    const ticket = await issueSignInTicket(db, user.id);
+    const ticket = await run(issueSignInTicket(user.id));
 
     const browser = new AuthSession();
     const response = await browser.post("/zm/ticket-sign-in", { ticket });

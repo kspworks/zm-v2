@@ -1,6 +1,8 @@
-import type { DbOrTx } from "~/server/db";
+import { Effect } from "effect";
+
+import { query } from "~/server/db/database";
 import { verifications } from "~/server/db/schema";
-import { now } from "~/server/legacy/clock";
+import { now } from "~/server/lib/clock";
 import { randomString } from "~/server/lib/ids";
 import { sha256 } from "~/server/lib/tokens";
 
@@ -15,17 +17,19 @@ const TICKET_TTL_MS = 10 * 60_000;
 export const ticketIdentifier = (ticket: string) =>
   `zm-signin:${sha256(ticket)}`;
 
-export const issueSignInTicket = async (
-  tx: DbOrTx,
+export const issueSignInTicket = Effect.fn("signInTicket.issue")(function* (
   userId: string,
-): Promise<string> => {
+) {
   const ticket = randomString(48);
+  const at = yield* now;
 
-  await tx.insert(verifications).values({
-    identifier: ticketIdentifier(ticket),
-    value: userId,
-    expiresAt: new Date(now().getTime() + TICKET_TTL_MS),
-  });
+  yield* query((db) =>
+    db.insert(verifications).values({
+      identifier: ticketIdentifier(ticket),
+      value: userId,
+      expiresAt: new Date(at.getTime() + TICKET_TTL_MS),
+    }),
+  );
 
   return ticket;
-};
+});
