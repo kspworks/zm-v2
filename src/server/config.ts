@@ -74,6 +74,8 @@ export const mailConfig = (): MailConfig | null => {
   };
 };
 
+export const redisUrl = (): string | undefined => str(env.REDIS_URL);
+
 export const isDev = (): boolean => env.NODE_ENV === "development";
 
 export const buildId = (): string | undefined => str(env.NEXT_PUBLIC_BUILD_ID);

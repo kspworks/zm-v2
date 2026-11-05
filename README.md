@@ -137,16 +137,17 @@ The suite calls the tRPC procedures, route handlers and better-auth's HTTP
 handler against a real Postgres, so it needs Docker:
 
 ```shell
-pnpm test           # starts docker-compose.test.yml (port 5433, tmpfs) on first run
+pnpm test           # starts docker-compose.test.yml (postgres 5433, redis 6380) on first run
 pnpm test:tz        # the date tests with a non-UTC APP_TIMEZONE
-pnpm test:db:down   # stop and remove the test database
+pnpm test:db:down   # stop and remove the test database and redis
 ```
 
 Configuration lives in `.env.test`; variables already set in the environment
 win, which is how CI (and a machine where port 5433 is taken:
 `ZM_TEST_DB_PORT=5434 pnpm test:db:up`, then override `DATABASE_URL`) points
 the suite at another database. Every table except `currencies` is truncated
-between tests.
+between tests. `TEST_REDIS_URL` is used only by the Redis rate-limit store's
+own tests; everything else counts rate limits in Postgres.
 
 ### Browser tests
 
@@ -208,7 +209,7 @@ left in the image. Docker's build cache can't see a secret's contents, so
 
 | Route                  | When                    | What                                                                           |
 | ---------------------- | ----------------------- | ------------------------------------------------------------------------------ |
-| `/api/cron/daily-0000` | 00:00 in `APP_TIMEZONE` | rolls the one-year planned window forward, sweeps rate-limit rows              |
+| `/api/cron/daily-0000` | 00:00 in `APP_TIMEZONE` | rolls the one-year planned window forward, sweeps Postgres rate-limit rows     |
 | `/api/cron/daily-0900` | 09:00 in `APP_TIMEZONE` | emails readers of accounts that tomorrow's planned transactions would overdraw |
 
 Both answer only `Authorization: Bearer <CRON_SECRET>` and return plain-text

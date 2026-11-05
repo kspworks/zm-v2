@@ -36,6 +36,8 @@
       `MAIL_FROM`. The host and port are used as given.
     - Sentry: `NEXT_PUBLIC_SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_ENV`, and for source
       maps `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN`.
+    - Redis for the rate-limit counters: `REDIS_URL` (e.g. an Upstash
+      `rediss://` URL). Without it they are kept in Postgres.
 
 ### Cron on Vercel runs in UTC
 
@@ -53,7 +55,7 @@ midnight job, running shortly _after_ local midnight is what matters
 The app runs as Docker containers on a VPS, isolated from the other apps on
 the same server. Host Apache terminates TLS and proxies to
 `127.0.0.1:$APP_PORT`. Postgres stays on the host and is reached over its
-socket.
+socket. A `redis` container holds the rate-limit counters in memory.
 
 On every push to `main`, the GitLab pipeline (`.gitlab-ci.yml`) runs lint,
 typecheck and tests. When they pass, it builds the image (`Dockerfile`,
@@ -64,7 +66,8 @@ then:
 1. copies `compose.vps.yml` to `$PROD_OUT_PATH/compose.yml`;
 2. pulls the image and runs the migrations (`node migrate.mjs`). A failure
    stops here, with the old containers still serving;
-3. recreates `web` and `cron`;
+3. recreates `web` and `cron` (and `redis` when its image or settings
+   changed);
 4. removes this app's images older than 30 days that no container uses. It
    finds them by the label `kspworks.zm-v2=app`, so other apps' images are
    left alone.
@@ -78,6 +81,9 @@ If the app is compromised, the attacker stays inside those containers:
 - They see only this app's `.env` and the Postgres socket, and the Postgres
   role can touch only this app's database. The `cron` container gets nothing
   but `CRON_SECRET` and `APP_TIMEZONE`.
+- Redis has no published port and sits on an internal network that only
+  `web` joins (`cron` can't reach it). It requires `REDIS_PASSWORD`, runs
+  read-only as its own UID, and keeps nothing on disk.
 - Containers share the host kernel, so keep the kernel and Docker patched
   (unattended-upgrades).
 
@@ -133,6 +139,10 @@ read-only filesystem can't hold the file.
    - `DATABASE_URL=postgresql://zm_v2:<password>@localhost/<db>` and
      `DATABASE_SOCKET_PATH=/var/run/postgresql/.s.PGSQL.5432`. The URL's host
      is ignored once the socket is set.
+   - `REDIS_PASSWORD=<openssl rand -hex 32>`. Hex, because the compose file
+     puts it into `REDIS_URL` as is. Don't set `REDIS_URL` yourself:
+     `compose.yml` builds it. Without the password, compose refuses to
+     start.
 7. **CI variables:** `PROD_OUT_PATH=/srv/zm-v2`, and optionally
    `BUILD_DOTENV` (type **File**, protected) with the build-time values:
    `NEXT_PUBLIC_SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_ENV`, `SENTRY_ORG`,
@@ -192,8 +202,9 @@ The Docker deploy runs a single `web` container, but nothing may assume one
 process: Vercel runs many serverless instances, and the container may be
 scaled. So:
 
-- **No in-process state.** Rate limits, locks and caches live in Postgres; a
-  module variable would exist once per process.
+- **No in-process state.** Locks and caches live in Postgres, rate-limit
+  counters in Redis (Postgres without it, or while it's down); a module
+  variable would exist once per process.
 - **No read-then-write races.** Check-then-write logic is a single
   statement, a row lock (`SELECT … FOR UPDATE`) or an advisory lock.
 - **Module top level runs once per process**, which is why the

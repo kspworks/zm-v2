@@ -25,12 +25,15 @@ test:
   services:
     - name: postgres:15-alpine
       alias: postgres
+    - name: redis:8-alpine
+      alias: redis
   variables:
     POSTGRES_USER: "zm"
     POSTGRES_PASSWORD: "zm"
     POSTGRES_DB: "zm_test"
     TEST_DB_AUTOSTART: "0"
     DATABASE_URL: "postgresql://zm:zm@postgres:5432/zm_test?idle_timeout=2"
+    TEST_REDIS_URL: "redis://redis:6379"
     COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
     NEXT_TELEMETRY_DISABLED: "1"
   script:
@@ -96,8 +99,9 @@ build:
       "$IMAGE:$CI_COMMIT_SHA" sh -s < smoke-standalone.sh
     - docker push --all-tags "$IMAGE"
 
-# Pulls the new image on the server, migrates, then recreates web and cron. A
-# failed migration stops the deploy with the old containers still serving.
+# Pulls the new image on the server, migrates, then recreates web and cron
+# (redis only when its image or settings changed). A failed migration stops
+# the deploy with the old containers still serving.
 # Roll back by re-running the deploy job of an older pipeline (migrations only
 # go forward, so an older image has to cope with the newer schema). Finally
 # removes this app's images (by label) older than 30 days that no container
@@ -122,7 +126,7 @@ deploy:production:
   # one step per line, so a failure names itself
   script:
     - scp compose.vps.yml "$SSH_CONNECT:$PROD_OUT_PATH/compose.yml"
-    - ssh $SSH_CONNECT "cd $PROD_OUT_PATH && export IMAGE_TAG=$CI_COMMIT_SHA && docker compose pull web cron"
+    - ssh $SSH_CONNECT "cd $PROD_OUT_PATH && export IMAGE_TAG=$CI_COMMIT_SHA && docker compose pull redis web cron"
     - ssh $SSH_CONNECT "cd $PROD_OUT_PATH && export IMAGE_TAG=$CI_COMMIT_SHA && docker compose run --rm web node migrate.mjs"
-    - ssh $SSH_CONNECT "cd $PROD_OUT_PATH && export IMAGE_TAG=$CI_COMMIT_SHA && docker compose up -d --wait web cron"
+    - ssh $SSH_CONNECT "cd $PROD_OUT_PATH && export IMAGE_TAG=$CI_COMMIT_SHA && docker compose up -d --wait redis web cron"
     - ssh $SSH_CONNECT "docker image prune -af --filter label=kspworks.zm-v2=app --filter until=720h" || true

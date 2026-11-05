@@ -27,6 +27,12 @@ const url = Schema.String.check(
   Schema.makeFilter((value: string) => URL.canParse(value)),
 );
 
+const redisUrl = url.check(
+  Schema.makeFilter((value: string) =>
+    ["redis:", "rediss:"].includes(new URL(value).protocol),
+  ),
+);
+
 const positiveInt = Schema.NumberFromString.check(
   Schema.isInt(),
   Schema.isGreaterThan(0),
@@ -59,6 +65,10 @@ export const env = createEnv({
         ),
       ),
     ),
+    // optional: rate limits use Redis when set, Postgres otherwise (and as
+    // the per-call fallback when Redis is unreachable); see
+    // "~/server/lib/rate-limit"
+    REDIS_URL: env$(Schema.UndefinedOr(redisUrl)),
     BETTER_AUTH_SECRET: env$(Schema.String.check(Schema.isMinLength(32))),
     BETTER_AUTH_URL: env$(Schema.UndefinedOr(url)),
     VERCEL_URL: optionalString,
@@ -83,6 +93,7 @@ export const env = createEnv({
     DATABASE_URL: process.env.DATABASE_URL,
     DATABASE_SOCKET_PATH: process.env.DATABASE_SOCKET_PATH,
     DATABASE_LOG: process.env.DATABASE_LOG,
+    REDIS_URL: process.env.REDIS_URL,
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
     VERCEL_URL: process.env.VERCEL_URL,

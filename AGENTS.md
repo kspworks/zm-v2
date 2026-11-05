@@ -84,9 +84,12 @@ functions.
 ## Multi-process safety
 
 Production runs as more than one Node process (serverless on Vercel, and the
-Docker `web` container may be scaled). So: **no in-process state** — rate limits, locks and caches live in
-Postgres — and **no read-then-write races** — use single statements, row locks
-(`.for("update")`) or advisory locks.
+Docker `web` container may be scaled). So: **no in-process state** — locks and
+caches live in Postgres, rate-limit counters in Redis or Postgres — and **no
+read-then-write races** — use single statements, row locks (`.for("update")`)
+or advisory locks. Redis holds only data that may be lost; anything that must
+commit or roll back with a transaction (verifications, sessions, locks) stays
+in Postgres.
 
 ## Atomicity and the audit log
 
@@ -217,10 +220,14 @@ never a guess.
 
 ## Rate limiting and cron
 
-- Limits are a fixed-window counter in Postgres, applied as one atomic upsert
-  that returns the post-increment count. The keys live in
-  `~/server/lib/rate-limit`. better-auth's own limiter must use database
-  storage, never memory.
+- Limits are a fixed-window counter that returns the post-increment count in
+  one atomic step: a Lua `INCR` + `PEXPIRE` in Redis when `REDIS_URL` is set
+  (the `Redis` service, `~/server/effect/redis`), otherwise an upsert in
+  Postgres. Any Redis failure or a command slower than 250 ms falls back to
+  Postgres **for that call**, so a limit never fails open or locks everyone
+  out; reset clears both stores. The keys live in `~/server/lib/rate-limit`.
+- better-auth's own limiter goes through `rateLimit.customStorage` into the
+  same `hitRateLimit`, never its memory store.
 - Cron routes compare `Authorization: Bearer <CRON_SECRET>` in **constant
   time**, and refuse every request when the secret is missing — otherwise the
   literal `Bearer undefined` would be accepted.

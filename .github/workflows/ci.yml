@@ -31,13 +31,22 @@ jobs:
           --health-interval 1s
           --health-timeout 2s
           --health-retries 30
+      redis:
+        image: redis:8-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 1s
+          --health-timeout 2s
+          --health-retries 30
 
     env:
-      # postgres comes from the service above, so global-setup must not reach
-      # for docker compose
+      # postgres and redis come from the services above, so global-setup must
+      # not reach for docker compose
       TEST_DB_AUTOSTART: "0"
       # overrides .env.test; idle_timeout lets the forked workers exit
       DATABASE_URL: "postgresql://zm:zm@localhost:5432/zm_test?idle_timeout=2"
+      TEST_REDIS_URL: "redis://localhost:6379"
       NEXT_TELEMETRY_DISABLED: "1"
 
     steps:

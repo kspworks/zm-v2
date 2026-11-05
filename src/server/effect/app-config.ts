@@ -9,6 +9,7 @@ import {
   type MailConfig,
   mailConfig,
   paginationLimit,
+  redisUrl,
 } from "~/server/config";
 
 /**
@@ -24,6 +25,7 @@ export class AppConfig extends Context.Service<
     readonly cronSecret: string | undefined;
     readonly authBaseUrl: string;
     readonly mail: MailConfig | null;
+    readonly redisUrl: string | undefined;
     readonly isDev: boolean;
     readonly nodeEnv: string | undefined;
     readonly buildId: string | undefined;
@@ -36,6 +38,7 @@ export class AppConfig extends Context.Service<
       cronSecret: cronSecret(),
       authBaseUrl: authBaseUrl(),
       mail: mailConfig(),
+      redisUrl: redisUrl(),
       isDev: isDev(),
       nodeEnv: process.env.NODE_ENV,
       buildId: buildId(),

@@ -57,6 +57,8 @@ export default defineConfig({
       APP_TIMEZONE: "Europe/Kyiv",
       TRANSACTIONS_PAGINATION_LIMIT: "50",
       MAIL_HOST: "",
+      // rate limits in Postgres, where resetRateLimits clears them
+      REDIS_URL: "",
       SENTRY_AUTH_TOKEN: "",
       SENTRY_ORG: "",
       SENTRY_PROJECT: "",

@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
+import { consumeAuthRateLimit } from "~/server/auth";
 import { issueSignInTicket } from "~/server/auth/sign-in-ticket";
 import { db } from "~/server/db";
 import { rateLimits, sessions, users } from "~/server/db/schema";
@@ -189,6 +190,33 @@ describe("login rate limit", () => {
         .from(rateLimits)
         .where(eq(rateLimits.key, `login:email:${user.email}`)),
     ).toHaveLength(0);
+  });
+});
+
+describe("better-auth rate limiter", () => {
+  // disabled under NODE_ENV=test, so its storage is exercised directly
+  it("counts through the app limiter and denies past max", async () => {
+    const rule = { window: 10, max: 3 };
+    const results = [];
+
+    for (let i = 0; i < 4; i++) {
+      results.push(
+        await consumeAuthRateLimit("127.0.0.1|/sign-in/email", rule),
+      );
+    }
+
+    expect(results).toEqual([
+      { allowed: true, retryAfter: null },
+      { allowed: true, retryAfter: null },
+      { allowed: true, retryAfter: null },
+      { allowed: false, retryAfter: 10 },
+    ]);
+
+    const [row] = await db
+      .select()
+      .from(rateLimits)
+      .where(eq(rateLimits.key, "auth:127.0.0.1|/sign-in/email"));
+    expect(row?.count).toBe(4);
   });
 });
 

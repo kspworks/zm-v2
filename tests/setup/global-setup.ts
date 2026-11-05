@@ -3,7 +3,7 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 
 import { migrationConfig } from "../../drizzle.config";
-import { ensureTestDatabase } from "../helpers/test-db";
+import { ensureTestDatabase, ensureTestRedis } from "../helpers/test-db";
 
 export default async function setup(): Promise<void> {
   const url = process.env.DATABASE_URL;
@@ -18,6 +18,14 @@ export default async function setup(): Promise<void> {
   }
 
   await ensureTestDatabase(url);
+
+  const redisUrl = process.env.TEST_REDIS_URL;
+
+  if (!redisUrl) {
+    throw new Error("TEST_REDIS_URL is missing - is .env.test present?");
+  }
+
+  await ensureTestRedis(redisUrl);
 
   const client = postgres(url, { max: 1, onnotice: () => false });
 

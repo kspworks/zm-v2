@@ -62,6 +62,24 @@ const limitOrReject = async (key: string, rule: RateLimitRule) => {
   }
 };
 
+/**
+ * better-auth's own per-IP-and-path limiter, counted by the app's limiter. Its
+ * `window` is in seconds.
+ */
+export const consumeAuthRateLimit = async (
+  key: string,
+  rule: { window: number; max: number },
+) => {
+  const { allowed } = await runServer(
+    hitRateLimit(rateLimitKeys.auth(key), {
+      limit: rule.max,
+      windowMs: rule.window * 1000,
+    }),
+  );
+
+  return { allowed, retryAfter: allowed ? null : rule.window };
+};
+
 const zm = () =>
   ({
     id: "zm",
@@ -281,8 +299,9 @@ export const auth = betterAuth({
   },
   rateLimit: {
     enabled: env.NODE_ENV !== "test",
-    storage: "database",
-    modelName: "authRateLimits",
+    // the app's shared limiter (Redis, falling back to Postgres), never
+    // better-auth's in-memory store: production runs several processes
+    customStorage: { consume: consumeAuthRateLimit },
   },
   advanced: {
     database: { generateId: () => newId() },

@@ -29,9 +29,11 @@ export const totp = (manualKey: string): string =>
 
 /**
  * Clears the sign-in rate limits. better-auth allows 3 sign-ins per 10 s per
- * IP on its own (auth_rate_limits), on top of the app's per-email limit
- * (rate_limits); every browser here shares 127.0.0.1, so on a fast machine
- * the suite's sign-ins would trip it. Call before each test that signs in.
+ * IP on its own (counted in rate_limits under "auth:", like the app's
+ * per-email limit; auth_rate_limits is what older builds used); every browser
+ * here shares 127.0.0.1, so on a fast machine the suite's sign-ins would trip
+ * it. The e2e server runs without REDIS_URL, so Postgres holds them all. Call
+ * before each test that signs in.
  */
 export const resetRateLimits = async () => {
   const sql = postgres(E2E_DATABASE_URL, { max: 1, onnotice: () => false });

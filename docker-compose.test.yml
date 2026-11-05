@@ -1,4 +1,4 @@
-# Throwaway postgres for the test suite. Kept separate from docker-compose.yml
+# Throwaway postgres and redis for the test suite. Kept separate from docker-compose.yml
 # so the per-test TRUNCATE never touches local dev data.
 name: zm-new-test
 
@@ -24,6 +24,22 @@ services:
                -c full_page_writes=off
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U zm -d zm_test"]
+      interval: 1s
+      timeout: 2s
+      retries: 30
+
+  # the Redis rate-limit store (tests/services/rate-limit-redis.test.ts);
+  # in memory only, like production
+  redis-test:
+    image: redis:8-alpine
+    container_name: zm-new-redis-test
+    restart: unless-stopped
+    ports:
+      # override when 6380 is taken, together with TEST_REDIS_URL
+      - "${ZM_TEST_REDIS_PORT:-6380}:6379"
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
       interval: 1s
       timeout: 2s
       retries: 30

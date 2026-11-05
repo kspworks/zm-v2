@@ -3,6 +3,7 @@ import { Cause, type Effect, Exit, Layer, ManagedRuntime } from "effect";
 import { Database, type SqlError } from "~/server/db/database";
 import { AppConfig } from "~/server/effect/app-config";
 import { Mailer } from "~/server/effect/mailer";
+import { Redis } from "~/server/effect/redis";
 import { toTRPCError } from "~/server/effect/to-trpc-error";
 import type { AppError } from "~/server/lib/errors";
 
@@ -11,6 +12,7 @@ export const AppLayer = Layer.mergeAll(
   Database.layer,
   AppConfig.layer,
   Mailer.layer.pipe(Layer.provide(AppConfig.layer)),
+  Redis.layer.pipe(Layer.provide(AppConfig.layer)),
 );
 
 export type AppServices = Layer.Success<typeof AppLayer>;
@@ -20,7 +22,8 @@ type AppRuntime = ManagedRuntime.ManagedRuntime<AppServices, never>;
 /**
  * One runtime per process. Cached on globalThis outside production, like the
  * pool, so HMR and vitest's shared module graph don't rebuild it. It holds no
- * mutable application state: rate limits and locks stay in Postgres.
+ * mutable application state: locks stay in Postgres, and rate-limit counters
+ * in Redis (when configured) or Postgres - shared stores, never memory.
  */
 const globalForRuntime = globalThis as unknown as {
   zmRuntime: AppRuntime | undefined;
