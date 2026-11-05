@@ -305,6 +305,11 @@ export const auth = betterAuth({
   },
   advanced: {
     database: { generateId: () => newId() },
+    // the rightmost X-Forwarded-For entry is the address our own reverse
+    // proxy (Apache on the VPS, Vercel's edge) saw; anything left of it is
+    // client-supplied. Without this, a two-entry header resolves to no IP and
+    // the request falls into one bucket shared by every such client.
+    ipAddress: { trustedProxies: ["127.0.0.1", "::1"] },
   },
   databaseHooks: {
     session: {

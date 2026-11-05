@@ -158,6 +158,12 @@ read-only filesystem can't hold the file.
    ProxyPass        / http://127.0.0.1:8092/
    ProxyPassReverse / http://127.0.0.1:8092/
    ```
+
+   Apache appends the client's address to `X-Forwarded-For`, and the app
+   keys its rate limits by that rightmost entry. If another proxy sits in
+   front of Apache (Cloudflare, a load balancer), add its address ranges to
+   `advanced.ipAddress.trustedProxies` in `src/server/auth/index.ts`.
+   Otherwise every visitor is counted under that proxy's address.
 10. **Switch over.** Run the pipeline on `main`, then check
     `curl -I http://127.0.0.1:8092/auth/login`. Once it answers,
     `apachectl configtest && sudo systemctl reload apache2`. Then stop the
