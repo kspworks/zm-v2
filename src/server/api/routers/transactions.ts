@@ -32,6 +32,7 @@ import {
 import {
   createTransaction,
   deleteTransaction,
+  restoreTransaction,
   updateTransaction,
 } from "~/server/services/transactions";
 
@@ -107,6 +108,13 @@ export const transactionsRouter = createTRPCRouter({
     .input(validate(Schema.Struct({ id: idSchema })))
     .mutation(({ ctx, input, signal }) =>
       runForTrpc(deleteTransaction(ctx.user.id, input.id), signal),
+    ),
+
+  /** The Undo of `delete` */
+  restore: protectedProcedure
+    .input(validate(Schema.Struct({ id: idSchema })))
+    .mutation(({ ctx, input, signal }) =>
+      runForTrpc(restoreTransaction(ctx.user.id, input.id), signal),
     ),
 
   /** Several transactions in one call and one DB transaction */

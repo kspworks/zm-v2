@@ -200,7 +200,7 @@ export function BulkEntryDialog({
                 {row.kind === "expense" ? (
                   <MinusIcon className="text-destructive" />
                 ) : (
-                  <PlusIcon className="text-emerald-600 dark:text-emerald-400" />
+                  <PlusIcon className="text-positive" />
                 )}
               </Button>
               <Input

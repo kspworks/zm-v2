@@ -36,7 +36,8 @@
     "saved": "Saved",
     "deleted": "Deleted",
     "createAccountLink": "Create an account",
-    "share": "Share"
+    "share": "Share",
+    "undo": "Undo"
   },
   "seed": {
     "cash": "Cash",
@@ -80,7 +81,9 @@
     "settings": "Settings",
     "logout": "Log out",
     "openMenu": "Open menu",
-    "build": "Build {id} · {env}"
+    "build": "Build {id} · {env}",
+    "primary": "Main navigation",
+    "menu": "Menu"
   },
   "auth": {
     "login": {
@@ -348,7 +351,8 @@
     "toast": {
       "created": "Saved",
       "negative": "Account \"{name}\" has negative balance",
-      "deleted": "Deleted"
+      "deleted": "Deleted",
+      "restored": "Restored"
     },
     "loadMore": "Load more"
   },
@@ -529,7 +533,18 @@
       "empty": "Nothing planned yet"
     },
     "noAccounts": "Create an account to see your dashboard.",
-    "createAccount": "Create account"
+    "createAccount": "Create account",
+    "start": {
+      "title": "Welcome to ZM",
+      "description": "Your dashboard fills in as soon as you record something. Start wherever suits you.",
+      "add": "Add your first transaction",
+      "import": "Import from ZenMoney",
+      "importHint": "Bring in your accounts, categories and history from a CSV export",
+      "accounts": "Set up your accounts",
+      "accountsHint": "Add your cards, savings and opening balances",
+      "planned": "Plan regular payments",
+      "plannedHint": "Salary, rent and subscriptions feed the forecast"
+    }
   },
   "reports": {
     "title": "Reports",
@@ -565,7 +580,10 @@
     "nextYear": "Next year",
     "customRange": "Custom range",
     "expand": "Show subcategories",
-    "collapse": "Hide subcategories"
+    "collapse": "Hide subcategories",
+    "sameDays": "Same days only",
+    "sameDaysHint": "This period is still running, so both are cut to its first {days, plural, one {# day} other {# days}}.",
+    "fullPeriodsHint": "Comparing whole periods, although one is still running."
   },
   "users": {
     "title": "Users",

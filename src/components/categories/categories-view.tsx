@@ -157,7 +157,7 @@ export function CategoriesView() {
                   {category.isIncome ? (
                     <Badge
                       variant="outline"
-                      className="border-emerald-600/40 text-emerald-700 dark:text-emerald-400"
+                      className="text-positive border-emerald-600/40"
                     >
                       {t("isIncome")}
                     </Badge>

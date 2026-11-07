@@ -4,6 +4,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { format, subMonths } from "date-fns";
 import { Schema } from "effect";
 import { AlertTriangleIcon, ChartPieIcon } from "lucide-react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useMemo } from "react";
 
@@ -53,10 +54,14 @@ import type { Period } from "~/lib/period";
 import {
   buildReport,
   colorSlots,
+  DEBTS_KEY,
+  NONE_KEY,
   type ReportGroupBy,
   type ReportInput,
   reportGroupBySchema,
 } from "~/lib/report";
+import { filteredHref } from "~/lib/transaction-links";
+import { NO_CATEGORY } from "~/lib/validators/transactions";
 import { useTRPC } from "~/trpc/react";
 
 const SLOTS = 8;
@@ -68,6 +73,16 @@ const GROUP_BY_LABELS = {
   account: "byAccount",
   counterparty: "byCounterparty",
 } as const;
+
+function TileName({ name, href }: { name: string; href: string | null }) {
+  return href ? (
+    <Link href={href} className="touch:py-2 hover:underline">
+      {name}
+    </Link>
+  ) : (
+    name
+  );
+}
 
 export function ReportsView() {
   const t = useTranslations("reports");
@@ -146,6 +161,44 @@ export function ReportsView() {
       return slot ? `var(--series-${slot})` : "var(--series-other)";
     };
   }, [charts]);
+
+  // the rows behind a tile, in this report's period and filters
+  const hrefOf = useMemo(() => {
+    const scope = { ...filter, ...period };
+    const leafIds = new Map<string, Set<string>>();
+
+    for (const row of data.data?.rows ?? []) {
+      const top = row.parentId ?? row.categoryId;
+
+      if (top && row.categoryId) {
+        leafIds.set(top, (leafIds.get(top) ?? new Set()).add(row.categoryId));
+      }
+    }
+
+    return (key: string): string | null => {
+      if (key === DEBTS_KEY) {
+        return null;
+      }
+
+      switch (groupBy) {
+        case "account":
+          return filteredHref("/transactions", { ...scope, accounts: [key] });
+        case "counterparty":
+          return key === NONE_KEY
+            ? null
+            : filteredHref("/transactions", {
+                ...scope,
+                counterparties: [key],
+              });
+        default:
+          return filteredHref("/transactions", {
+            ...scope,
+            categories:
+              key === NONE_KEY ? [NO_CATEGORY] : [...(leafIds.get(key) ?? [])],
+          });
+      }
+    };
+  }, [data.data, filter, period, groupBy]);
 
   return (
     <>
@@ -257,7 +310,11 @@ export function ReportsView() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
-                <ReportTreemap chart={chart} colorOf={colorOf} />
+                <ReportTreemap
+                  chart={chart}
+                  colorOf={colorOf}
+                  hrefOf={hrefOf}
+                />
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -277,7 +334,10 @@ export function ReportsView() {
                               className="size-2.5 shrink-0 rounded-sm"
                               style={{ background: colorOf(tile.key) }}
                             />
-                            {tile.name}
+                            <TileName
+                              name={tile.name}
+                              href={hrefOf(tile.key)}
+                            />
                           </span>
                         </TableCell>
                         <TableCell className="text-right">

@@ -1,5 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 
 import type { TransactionInputData as TransactionInput } from "~/lib/validators/transactions";
 import { db } from "~/server/db";
@@ -7,6 +7,7 @@ import {
   accounts,
   counterparties,
   historyLogs,
+  plannedTransactions,
   transactions,
 } from "~/server/db/schema";
 import { callerFor } from "../helpers/caller";
@@ -675,6 +676,170 @@ describe("transactions.update", () => {
         id: ids[0] ?? "",
         data: expense(account.id),
       }),
+      "NOT_FOUND",
+    );
+  });
+});
+
+describe("transactions.restore", () => {
+  it("brings back both legs and the balances, and logs it", async () => {
+    const user = await createUser();
+    const from = await makeAccount(user, { initialBalance: 5000 });
+    const to = await makeAccount(user);
+    const created = await callerFor(user).transactions.create({
+      kind: "transfer",
+      date: DATE,
+      amount: 2000,
+      accountId: from.id,
+      linkedAccountId: to.id,
+      linkedAmount: 2000,
+      comment: null,
+    });
+    const id = created.ids[1] ?? "";
+
+    await callerFor(user).transactions.delete({ id });
+    expect(await balanceOf(user, from.id)).toBe(5000);
+
+    await expect(callerFor(user).transactions.restore({ id })).resolves.toEqual(
+      { ids: expect.arrayContaining(created.ids) },
+    );
+
+    const rows = await rowsOf(created.ids);
+    expect(rows.every((row) => row.deletedAt === null)).toBe(true);
+    expect(await balanceOf(user, from.id)).toBe(3000);
+    expect(await balanceOf(user, to.id)).toBe(2000);
+
+    const logs = await db
+      .select()
+      .from(historyLogs)
+      .where(
+        and(
+          eq(historyLogs.action, "restore"),
+          inArray(historyLogs.entityId, created.ids),
+        ),
+      );
+    expect(logs).toHaveLength(2);
+  });
+
+  it("changes nothing for a live row", async () => {
+    const user = await createUser();
+    const account = await makeAccount(user);
+    const { ids } = await callerFor(user).transactions.create(
+      expense(account.id),
+    );
+
+    await expect(
+      callerFor(user).transactions.restore({ id: ids[0] ?? "" }),
+    ).resolves.toEqual({ ids: [] });
+  });
+
+  it("leaves a leg that was deleted at another time", async () => {
+    const user = await createUser();
+    const from = await makeAccount(user);
+    const to = await makeAccount(user);
+    const batchId = "batch-of-another-delete";
+    const kept = await insertTransactionRow({
+      kind: "transfer",
+      batchId,
+      accountId: from.id,
+      amount: -100,
+      createdBy: user.id,
+    });
+    const gone = await insertTransactionRow({
+      kind: "transfer",
+      batchId,
+      accountId: to.id,
+      amount: 100,
+      createdBy: user.id,
+    });
+
+    await db
+      .update(transactions)
+      .set({ deletedAt: new Date("2026-01-01T00:00:00Z") })
+      .where(eq(transactions.id, gone.id));
+    await db
+      .update(transactions)
+      .set({ deletedAt: new Date("2026-02-01T00:00:00Z") })
+      .where(eq(transactions.id, kept.id));
+
+    await callerFor(user).transactions.restore({ id: kept.id });
+
+    const rows = await rowsOf([kept.id, gone.id]);
+    expect(rows.find((row) => row.id === kept.id)?.deletedAt).toBeNull();
+    expect(rows.find((row) => row.id === gone.id)?.deletedAt).not.toBeNull();
+  });
+
+  it("needs the rights of the delete", async () => {
+    const owner = await createUser();
+    const stranger = await createUser();
+    const account = await makeAccount(owner);
+    const { ids } = await callerFor(owner).transactions.create(
+      expense(account.id),
+    );
+    const id = ids[0] ?? "";
+
+    await callerFor(owner).transactions.delete({ id });
+
+    await expectTRPCError(
+      callerFor(stranger).transactions.restore({ id }),
+      "FORBIDDEN",
+    );
+  });
+
+  it("refuses an unknown row and one whose account is gone", async () => {
+    const user = await createUser();
+    const account = await makeAccount(user);
+    const { ids } = await callerFor(user).transactions.create(
+      expense(account.id),
+    );
+    const id = ids[0] ?? "";
+
+    await expectTRPCError(
+      callerFor(user).transactions.restore({ id: "missing" }),
+      "NOT_FOUND",
+    );
+
+    await callerFor(user).transactions.delete({ id });
+    await callerFor(user).accounts.delete({ id: account.id });
+
+    await expectTRPCError(
+      callerFor(user).transactions.restore({ id }),
+      "FORBIDDEN",
+    );
+  });
+
+  it("brings back a planned occurrence only while its schedule lives", async () => {
+    vi.useFakeTimers({
+      toFake: ["Date"],
+      now: new Date("2026-03-10T12:00:00Z"),
+    });
+    onTestFinished(() => void vi.useRealTimers());
+
+    const user = await createUser();
+    const account = await makeAccount(user);
+    await callerFor(user).planned.create({
+      data: expense(account.id, { date: "2026-03-20" }),
+      schedule: { repeatType: "monthly", repeatInterval: 1 },
+    });
+    const [occurrence] = await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.accountId, account.id));
+    const id = occurrence?.id ?? "";
+
+    await callerFor(user).transactions.delete({ id });
+    await callerFor(user).transactions.restore({ id });
+    expect((await rowsOf([id]))[0]?.deletedAt).toBeNull();
+
+    await callerFor(user).transactions.delete({ id });
+    await db
+      .update(plannedTransactions)
+      .set({ deletedAt: new Date("2026-01-01T00:00:00Z") })
+      .where(
+        eq(plannedTransactions.id, occurrence?.plannedTransactionId ?? ""),
+      );
+    await expectTRPCError(
+      callerFor(user).transactions.restore({ id }),
       "NOT_FOUND",
     );
   });

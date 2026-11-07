@@ -4,6 +4,7 @@ import {
   defaultPeriods,
   isWholeMonth,
   monthOf,
+  sameDays,
   shiftPeriod,
 } from "~/lib/period";
 
@@ -34,6 +35,38 @@ describe("period", () => {
       startDate: "2026-02-18",
       endDate: "2026-02-24",
     });
+  });
+
+  it("cuts both periods to the days of the running one that have passed", () => {
+    const periods = defaultPeriods("2026-03-07");
+
+    expect(sameDays(periods, "2026-03-07")).toEqual({
+      days: 7,
+      periods: [
+        { startDate: "2026-02-01", endDate: "2026-02-07" },
+        { startDate: "2026-03-01", endDate: "2026-03-07" },
+      ],
+    });
+  });
+
+  it("never runs past the end of the shorter period", () => {
+    const periods = defaultPeriods("2026-03-30");
+
+    expect(sameDays(periods, "2026-03-30")?.periods[0]).toEqual({
+      startDate: "2026-02-01",
+      endDate: "2026-02-28",
+    });
+  });
+
+  it("notices a running period on either side", () => {
+    const [last, current] = defaultPeriods("2026-03-07");
+
+    expect(sameDays([current, last], "2026-03-07")?.days).toBe(7);
+  });
+
+  it("leaves periods that are over alone", () => {
+    expect(sameDays(defaultPeriods("2026-03-31"), "2026-03-31")).toBeNull();
+    expect(sameDays(defaultPeriods("2026-03-15"), "2026-05-01")).toBeNull();
   });
 
   it("defaults to last month vs this month", () => {

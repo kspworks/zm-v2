@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { type PointerEvent, useEffect, useRef, useState } from "react";
 
@@ -89,11 +90,15 @@ function LeafTooltip({ leaf, sign }: { leaf: LeafRect; sign: string }) {
 export function ReportTreemap({
   chart,
   colorOf,
+  hrefOf,
 }: {
   chart: ReportChart;
   colorOf: (key: string) => string;
+  /** Where a tile's rows are listed, if anywhere */
+  hrefOf: (key: string) => string | null;
 }) {
   const t = useTranslations("reports");
+  const router = useRouter();
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   const [hover, setHover] = useState<Hover | null>(null);
@@ -151,14 +156,24 @@ export function ReportTreemap({
                 : formatMoney(leaf.value, sign);
             const inBand = leaf.height <= BAND;
             const showLabel = leaf.width > 58 && leaf.height >= BAND - 2;
+            const href = hrefOf(leaf.tileKey);
 
             return (
-              // biome-ignore lint/a11y/noStaticElementInteractions: hover and focus only reveal the tooltip; the label carries the same facts
+              // biome-ignore lint/a11y/noStaticElementInteractions: hover and focus reveal the tooltip; with a target it acts as a link
               <g
                 key={leaf.key}
                 tabIndex={0}
+                role={href ? "link" : undefined}
                 aria-label={describeLeaf(leaf)}
-                className="outline-none"
+                className={
+                  href ? "cursor-pointer outline-none" : "outline-none"
+                }
+                onClick={() => href && router.push(href)}
+                onKeyDown={(event) => {
+                  if (href && event.key === "Enter") {
+                    router.push(href);
+                  }
+                }}
                 onPointerEnter={(event) => pointAt(leaf, event)}
                 onPointerMove={(event) => pointAt(leaf, event)}
                 onPointerLeave={() => setHover(null)}

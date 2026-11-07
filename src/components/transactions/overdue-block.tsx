@@ -41,6 +41,7 @@ export function OverdueBlock({
           <TransactionItem
             key={row.id}
             row={row}
+            onOpen={() => onSubmit(row)}
             actions={
               <PlannedRowMenu
                 row={row}

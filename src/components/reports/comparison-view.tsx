@@ -2,9 +2,10 @@
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ChartPieIcon, ChevronRightIcon } from "lucide-react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { parseAsString, useQueryStates } from "nuqs";
-import { Fragment, type ReactNode, useMemo, useState } from "react";
+import { parseAsBoolean, parseAsString, useQueryStates } from "nuqs";
+import { Fragment, type ReactNode, useId, useMemo, useState } from "react";
 
 import { Money } from "~/components/app/money";
 import { PageHeader } from "~/components/app/page-header";
@@ -24,7 +25,9 @@ import {
   EmptyHeader,
   EmptyMedia,
 } from "~/components/ui/empty";
+import { Field, FieldLabel } from "~/components/ui/field";
 import { Skeleton } from "~/components/ui/skeleton";
+import { Switch } from "~/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -33,15 +36,19 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-import { defaultPeriods, type Period } from "~/lib/period";
+import { defaultPeriods, type Period, sameDays } from "~/lib/period";
 import {
   buildComparison,
   type ComparisonPair,
   type ComparisonRow,
   type ComparisonSection,
   type ComparisonTable,
+  DEBTS_KEY,
+  NONE_KEY,
 } from "~/lib/report";
+import { filteredHref } from "~/lib/transaction-links";
 import { cn } from "~/lib/utils";
+import { NO_CATEGORY } from "~/lib/validators/transactions";
 import { useTRPC } from "~/trpc/react";
 
 const periodParsers = {
@@ -49,6 +56,8 @@ const periodParsers = {
   aEnd: parseAsString,
   bStart: parseAsString,
   bEnd: parseAsString,
+  /** Set to compare whole periods while one is still running */
+  full: parseAsBoolean,
 };
 
 const periodOr = (
@@ -140,6 +149,22 @@ const scaleOf = (table: ComparisonTable) => {
   return Math.max(...pairs.map((pair) => Math.abs(pair.b - pair.a)));
 };
 
+function RowName({ name, href }: { name: string; href: string | null }) {
+  return href ? (
+    <Link
+      href={href}
+      className="touch:inline-flex touch:min-h-11 touch:items-center truncate hover:underline"
+      title={name}
+    >
+      {name}
+    </Link>
+  ) : (
+    <span className="truncate" title={name}>
+      {name}
+    </span>
+  );
+}
+
 function Section({
   title,
   section,
@@ -148,6 +173,7 @@ function Section({
   goodWhen,
   expanded,
   toggle,
+  hrefOf,
 }: {
   title: string;
   section: ComparisonSection;
@@ -156,6 +182,7 @@ function Section({
   goodWhen: "up" | "down";
   expanded: (row: ComparisonRow) => boolean;
   toggle: (row: ComparisonRow) => void;
+  hrefOf: (row: ComparisonRow) => string | null;
 }) {
   const t = useTranslations("reports");
 
@@ -195,9 +222,7 @@ function Section({
                   ) : (
                     <span className="size-6 shrink-0" />
                   )}
-                  <span className="truncate" title={row.name}>
-                    {row.name}
-                  </span>
+                  <RowName name={row.name} href={hrefOf(row)} />
                 </span>
               }
               pair={row}
@@ -211,7 +236,7 @@ function Section({
                     key={child.key}
                     name={
                       <span className="text-muted-foreground block truncate pl-7">
-                        {child.name}
+                        <RowName name={child.name} href={hrefOf(child)} />
                       </span>
                     }
                     pair={child}
@@ -238,6 +263,7 @@ export function ComparisonView() {
     history: "replace",
   });
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+  const switchId = useId();
 
   const [a, b] = useMemo((): [Period, Period] => {
     const [fallbackA, fallbackB] = defaultPeriods(today);
@@ -248,11 +274,15 @@ export function ComparisonView() {
     ];
   }, [periods, today]);
 
+  const running = useMemo(() => sameDays([a, b], today), [a, b, today]);
+  const [shownA, shownB] =
+    running && !periods.full ? running.periods : ([a, b] as const);
+
   // the periods replace the filter's own dates
   const data = useQuery({
     ...trpc.reports.compare.queryOptions({
       filter: { ...filter, startDate: null, endDate: null },
-      periods: [a, b],
+      periods: [shownA, shownB],
     }),
     placeholderData: keepPreviousData,
   });
@@ -265,6 +295,24 @@ export function ComparisonView() {
       }),
     [data.data, t, tt],
   );
+
+  // the rows behind a line, in the second period
+  const hrefOf = (row: ComparisonRow) => {
+    if (row.key === DEBTS_KEY) {
+      return null;
+    }
+
+    return filteredHref("/transactions", {
+      ...filter,
+      ...shownB,
+      categories:
+        row.key === NONE_KEY
+          ? [NO_CATEGORY]
+          : [
+              ...new Set([row.key, ...row.children.map((child) => child.key)]),
+            ].filter((key) => key !== NONE_KEY && key !== DEBTS_KEY),
+    });
+  };
 
   const toggle = (key: string) =>
     setExpandedKeys((keys) => {
@@ -296,6 +344,30 @@ export function ComparisonView() {
         }
       />
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4 sm:p-6">
+        {running ? (
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <p className="text-muted-foreground min-w-0 flex-1 basis-64 text-sm">
+              {periods.full
+                ? t("fullPeriodsHint")
+                : t("sameDaysHint", { days: running.days })}
+            </p>
+            <Field orientation="horizontal" className="w-auto">
+              <Switch
+                id={switchId}
+                checked={!periods.full}
+                onCheckedChange={(on) =>
+                  void setPeriods({ full: on ? null : true })
+                }
+              />
+              <FieldLabel
+                htmlFor={switchId}
+                className="touch:min-h-11 touch:items-center font-normal"
+              >
+                {t("sameDays")}
+              </FieldLabel>
+            </Field>
+          </div>
+        ) : null}
         <Card className="py-2">
           <CardContent className="@container px-2 sm:px-4">
             <Table aria-label={t("comparison")} className="table-fixed">
@@ -345,6 +417,7 @@ export function ComparisonView() {
                     expanded: (row: ComparisonRow) =>
                       expandedKeys.has(keyOf(section, row)),
                     toggle: (row: ComparisonRow) => toggle(keyOf(section, row)),
+                    hrefOf,
                   }) as const;
 
                 return (

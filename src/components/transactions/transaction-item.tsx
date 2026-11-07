@@ -147,9 +147,12 @@ export const displayAmount = (row: TransactionRowData) => {
 export function TransactionItem({
   row,
   actions,
+  onOpen,
 }: {
   row: TransactionRowData;
   actions?: ReactNode;
+  /** What clicking the row does: opens its form */
+  onOpen?: () => void;
 }) {
   const t = useTranslations("transactions");
   const locale = useLocale() as Locale;
@@ -163,26 +166,55 @@ export function TransactionItem({
   const comment = row.comment ?? "";
 
   return (
-    <div className="group flex items-start gap-3 px-3 py-2.5 sm:px-4">
+    // biome-ignore lint/a11y/noStaticElementInteractions: a wider mouse and touch target for the title button, which is the keyboard and screen-reader path
+    // biome-ignore lint/a11y/useKeyWithClickEvents: the title button handles the keyboard
+    <div
+      className={cn(
+        "group flex items-start gap-3 px-3 py-2.5 sm:px-4",
+        onOpen && "hover:bg-accent/50 cursor-pointer transition-colors",
+      )}
+      onClick={
+        onOpen
+          ? () => {
+              // selecting a comment to copy it is not a click on the row
+              if (window.getSelection()?.isCollapsed !== false) {
+                onOpen();
+              }
+            }
+          : undefined
+      }
+    >
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-1.5">
-          <span
-            className={cn(
-              "truncate text-sm font-medium",
-              row.category?.deleted && "text-muted-foreground italic",
-            )}
-          >
-            {description}
-          </span>
+          {onOpen ? (
+            <button
+              type="button"
+              className={cn(
+                "focus-visible:ring-ring truncate rounded-sm text-left text-sm font-medium outline-none focus-visible:ring-2",
+                row.category?.deleted && "text-muted-foreground italic",
+              )}
+            >
+              {description}
+            </button>
+          ) : (
+            <span
+              className={cn(
+                "truncate text-sm font-medium",
+                row.category?.deleted && "text-muted-foreground italic",
+              )}
+            >
+              {description}
+            </span>
+          )}
           {counterpartyNote ? (
-            <span className="text-muted-foreground shrink-0 truncate text-sm">
+            <span className="text-muted-foreground min-w-0 truncate text-sm">
               · {counterpartyNote}
             </span>
           ) : null}
           {row.debtLabel?.settles ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <CheckCheckIcon className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <CheckCheckIcon className="text-positive size-3.5 shrink-0" />
               </TooltipTrigger>
               <TooltipContent>{t("debt.settled")}</TooltipContent>
             </Tooltip>
@@ -249,7 +281,16 @@ export function TransactionItem({
           />
         ) : null}
       </div>
-      {actions ? <div className="-mr-2 shrink-0">{actions}</div> : null}
+      {actions ? (
+        // biome-ignore lint/a11y/noStaticElementInteractions: only keeps the menu's clicks from reaching the row
+        // biome-ignore lint/a11y/useKeyWithClickEvents: nothing to do from the keyboard here
+        <div
+          className="-mr-2 shrink-0"
+          onClick={(event) => event.stopPropagation()}
+        >
+          {actions}
+        </div>
+      ) : null}
     </div>
   );
 }

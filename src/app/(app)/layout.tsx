@@ -34,7 +34,10 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             : null,
         }}
       />
-      <SidebarInset className="min-w-0">{children}</SidebarInset>
+      {/* room for the fixed bottom nav */}
+      <SidebarInset className="min-w-0 max-md:pb-[calc(3.5rem+env(safe-area-inset-bottom))]">
+        {children}
+      </SidebarInset>
     </SidebarProvider>
   );
 }

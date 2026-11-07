@@ -1,12 +1,14 @@
 "use client";
 
-import { ChevronRightIcon, type LucideIcon, PlusIcon } from "lucide-react";
+import { ChevronRightIcon, PlusIcon } from "lucide-react";
 import Link, { useLinkStatus } from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { type ComponentProps, type ReactNode, Suspense, useState } from "react";
 
+import { BottomNav } from "~/components/app/bottom-nav";
 import { Logo } from "~/components/app/logo";
+import { NavIcon } from "~/components/app/nav-icon";
 import {
   NAV_ITEMS,
   type NavSubItem,
@@ -151,6 +153,7 @@ export function AppSidebar({
         </SidebarFooter>
         <SidebarRail />
       </Sidebar>
+      <BottomNav onAdd={() => openQuickAdd("transactions")} />
       {/* outside the sidebar: on phones it is a sheet that unmounts on close */}
       <QuickAddDialogs
         kind={quickAdd}
@@ -259,17 +262,6 @@ function NavGroup({
       </SidebarMenuItem>
     </Collapsible>
   );
-}
-
-/**
- * A nav item's icon, swapped for a spinner while its link is pending, so the
- * click is acknowledged before the page arrives. Must render inside the Link.
- */
-function NavIcon({ icon: Icon }: { icon: LucideIcon }) {
-  const t = useTranslations();
-  const { pending } = useLinkStatus();
-
-  return pending ? <Spinner aria-label={t("common.loading")} /> : <Icon />;
 }
 
 /** The same for a sub-page link, which has no icon: a spinner at its end */

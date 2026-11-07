@@ -22,12 +22,15 @@ export function LedgerLayout({
   filters,
   actions,
   sidebar,
+  summary,
   children,
 }: {
   title: string;
   filters?: ReactNode;
   actions?: ReactNode;
   sidebar: ReactNode;
+  /** The headline shown when the sidebar is not; tapping it opens the sheet */
+  summary?: ReactNode;
   children: ReactNode;
 }) {
   const t = useTranslations("sidebar");
@@ -40,21 +43,34 @@ export function LedgerLayout({
         actions={
           <>
             {filters}
-            <Button
-              variant="outline"
-              size="icon-sm"
-              className="lg:hidden"
-              aria-label={t("title")}
-              onClick={() => setSheetOpen(true)}
-            >
-              <WalletIcon />
-            </Button>
+            {summary ? null : (
+              <Button
+                variant="outline"
+                size="icon-sm"
+                className="lg:hidden"
+                aria-label={t("title")}
+                onClick={() => setSheetOpen(true)}
+              >
+                <WalletIcon />
+              </Button>
+            )}
             {actions}
           </>
         }
       />
       <div className="mx-auto grid w-full max-w-6xl gap-6 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <div className="flex min-w-0 flex-col gap-4">{children}</div>
+        <div className="flex min-w-0 flex-col gap-4">
+          {summary ? (
+            <button
+              type="button"
+              className="focus-visible:ring-ring rounded-xl text-left outline-none focus-visible:ring-2 lg:hidden"
+              onClick={() => setSheetOpen(true)}
+            >
+              {summary}
+            </button>
+          ) : null}
+          {children}
+        </div>
         <aside className="hidden lg:block">
           <div className="sticky top-20">{sidebar}</div>
         </aside>

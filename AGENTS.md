@@ -142,7 +142,8 @@ Per entity, through the member tables, with `canRead` / `canWrite`:
 - The **kind can never change** on edit (`type_change_not_supported`).
 - Editing a planned occurrence through the regular update **submits** it:
   `isPlanned = false`, `createdAt = now`.
-- Delete soft-deletes every live row in the batch.
+- Delete soft-deletes every live row in the batch. `restore` undoes it: the row
+  and the legs with the same `deletedAt`, under the delete's own access rules.
 - **Balances are derived**: `initialBalance + SUM(amount)` over non-planned,
   non-deleted rows, computed in SQL on read. Never cache them.
 
@@ -171,6 +172,9 @@ Per entity, through the member tables, with `canRead` / `canWrite`:
 - **Totals and report data** are computed server-side over the whole filtered
   set, not the loaded pages. They exclude transfers between the user's own
   non-debt accounts, and count a debt pair by its **real-account** leg.
+- **Period comparison**: while a period is running, both default to the days of
+  it that have passed (`sameDays` in `~/lib/period`), so a part of a month is
+  never set against a whole one.
 
 ## Planned transactions
 

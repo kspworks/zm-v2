@@ -13,10 +13,10 @@ export function PageHeader({
 }) {
   return (
     <header className="bg-background/95 supports-backdrop-filter:bg-background/80 sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b px-4 backdrop-blur">
-      <SidebarTrigger className="-ml-1" />
+      <SidebarTrigger className="-ml-1 max-md:hidden" />
       <Separator
         orientation="vertical"
-        className="mr-1 data-[orientation=vertical]:h-4"
+        className="mr-1 data-vertical:self-center data-[orientation=vertical]:h-4 max-md:hidden"
       />
       <h1 className="min-w-0 flex-1 truncate text-base font-semibold">
         {title}

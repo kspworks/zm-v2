@@ -26,15 +26,19 @@ export function Money({
     <span
       className={cn(
         "whitespace-nowrap tabular-nums",
-        colored && amount > 0 && "text-emerald-600 dark:text-emerald-400",
+        colored && amount > 0 && "text-positive",
         className,
       )}
     >
       {hideSign ? null : parts.sign}
       {parts.integral}
-      <span className="opacity-60">.{parts.fraction}</span>
+      <span className="opacity-60 in-[.text-destructive]:opacity-100 in-[.text-muted-foreground]:opacity-100 in-[.text-positive]:opacity-100 dark:in-[.text-destructive]:opacity-80 dark:in-[.text-positive]:opacity-80">
+        .{parts.fraction}
+      </span>
       {sign ? (
-        <span className="ml-1 font-normal opacity-80">{sign}</span>
+        <span className="ml-1 font-normal opacity-80 in-[.text-destructive]:opacity-100 in-[.text-muted-foreground]:opacity-100 in-[.text-positive]:opacity-100">
+          {sign}
+        </span>
       ) : null}
     </span>
   );

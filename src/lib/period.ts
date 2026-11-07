@@ -50,6 +50,36 @@ export const shiftPeriod = (period: Period, step: 1 | -1): Period => {
   };
 };
 
+/**
+ * Both periods cut to the days of the running one that have passed, so a month
+ * in progress is measured against the same days of the other instead of all
+ * of it. Null when neither is still running.
+ */
+export const sameDays = (
+  [a, b]: [Period, Period],
+  today: string,
+): { periods: [Period, Period]; days: number } | null => {
+  const running = [b, a].find(
+    (period) => period.startDate <= today && today < period.endDate,
+  );
+
+  if (!running) {
+    return null;
+  }
+
+  const days =
+    differenceInCalendarDays(parseISO(today), parseISO(running.startDate)) + 1;
+  const cut = (period: Period): Period => {
+    const end = iso(addDays(parseISO(period.startDate), days - 1));
+
+    return end < period.endDate
+      ? { startDate: period.startDate, endDate: end }
+      : period;
+  };
+
+  return { periods: [cut(a), cut(b)], days };
+};
+
 /** Last month vs this month */
 export const defaultPeriods = (today: string): [Period, Period] => {
   const current = monthOf(today);

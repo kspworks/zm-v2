@@ -42,7 +42,7 @@ export function DeltaCell({
         diff === 0
           ? "text-muted-foreground"
           : good
-            ? "text-emerald-600 dark:text-emerald-400"
+            ? "text-positive"
             : "text-destructive",
         className,
       )}

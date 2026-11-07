@@ -86,9 +86,14 @@ export function TransactionsView({
       actions={
         <>
           {extraActions}
-          <Button size="sm" onClick={() => setDialog({ mode: "create" })}>
+          {/* phones have Add in the bottom nav */}
+          <Button
+            size="sm"
+            className="max-md:hidden"
+            onClick={() => setDialog({ mode: "create" })}
+          >
             <PlusIcon />
-            <span className="max-sm:sr-only">{t("add")}</span>
+            {t("add")}
           </Button>
         </>
       }
@@ -152,6 +157,7 @@ export function TransactionsView({
           <TransactionGroups
             rows={rows}
             planned={false}
+            onOpen={(row) => setDialog({ mode: "edit", row })}
             actions={(row) => (
               <RowMenu>
                 <DropdownMenuItem

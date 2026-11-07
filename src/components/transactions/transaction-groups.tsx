@@ -54,10 +54,12 @@ export function TransactionGroups({
   rows,
   planned,
   actions,
+  onOpen,
 }: {
   rows: TransactionRowData[];
   planned: boolean;
   actions: (row: TransactionRowData) => ReactNode;
+  onOpen: (row: TransactionRowData) => void;
 }) {
   const groups: { date: string; rows: TransactionRowData[] }[] = [];
 
@@ -78,7 +80,12 @@ export function TransactionGroups({
           <DayHeading date={group.date} planned={planned} />
           <div className="bg-card divide-y overflow-hidden rounded-lg border">
             {group.rows.map((row) => (
-              <TransactionItem key={row.id} row={row} actions={actions(row)} />
+              <TransactionItem
+                key={row.id}
+                row={row}
+                actions={actions(row)}
+                onOpen={() => onOpen(row)}
+              />
             ))}
           </div>
         </section>

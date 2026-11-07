@@ -3,7 +3,11 @@ import { Effect } from "effect";
 
 import type { TransactionInput } from "~/lib/validators/transactions";
 import { type Database, query, transaction } from "~/server/db/database";
-import { accounts, transactions } from "~/server/db/schema";
+import {
+  accounts,
+  plannedTransactions,
+  transactions,
+} from "~/server/db/schema";
 import { audit } from "~/server/lib/audit";
 import { now } from "~/server/lib/clock";
 import { badRequest, forbidden, notFound } from "~/server/lib/errors";
@@ -446,6 +450,86 @@ export const deleteTransaction = Effect.fn("transactions.delete")(function* (
     entityType: "transaction",
     entityId: ids,
     action: "delete",
+    userId,
+    payload: { id },
+  });
+
+  return { ids };
+}, transaction);
+
+/**
+ * Undoes a delete: the row and the legs that went with it, recognised by the
+ * same `deletedAt`, so a leg removed some other time stays gone. The rights
+ * are those of the delete, which also refuses a deleted account or category.
+ * Restoring a live row changes nothing, so a repeated Undo is harmless.
+ */
+export const restoreTransaction = Effect.fn("transactions.restore")(function* (
+  userId: string,
+  id: string,
+) {
+  const [row] = yield* query((db) =>
+    db.select().from(transactions).where(eq(transactions.id, id)).for("update"),
+  );
+
+  if (!row) {
+    return yield* notFound();
+  }
+
+  const { batchId, deletedAt, plannedTransactionId } = row;
+
+  if (!deletedAt) {
+    return { ids: [] };
+  }
+
+  const rows = batchId
+    ? yield* query((db) =>
+        db
+          .select()
+          .from(transactions)
+          .where(
+            and(
+              eq(transactions.batchId, batchId),
+              eq(transactions.deletedAt, deletedAt),
+            ),
+          )
+          .for("update"),
+      )
+    : [row];
+
+  yield* requireDeletable(userId, rows);
+
+  if (plannedTransactionId) {
+    const [schedule] = yield* query((db) =>
+      db
+        .select({ id: plannedTransactions.id })
+        .from(plannedTransactions)
+        .where(
+          and(
+            eq(plannedTransactions.id, plannedTransactionId),
+            isNull(plannedTransactions.deletedAt),
+          ),
+        ),
+    );
+
+    // nothing would drive or edit the occurrence any more
+    if (!schedule) {
+      return yield* notFound();
+    }
+  }
+
+  const ids = rows.map((leg) => leg.id);
+
+  yield* query((db) =>
+    db
+      .update(transactions)
+      .set({ deletedAt: null })
+      .where(inArray(transactions.id, ids)),
+  );
+
+  yield* audit({
+    entityType: "transaction",
+    entityId: ids,
+    action: "restore",
     userId,
     payload: { id },
   });

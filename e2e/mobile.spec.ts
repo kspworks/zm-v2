@@ -9,8 +9,8 @@ import {
 
 /**
  * Phone-width layout, which only a real browser can judge. Runs under the
- * `mobile` project (a Pixel 7): the sidebar turns into a sheet behind the menu
- * button and dialogs into bottom drawers.
+ * `mobile` project (a Pixel 7): the sidebar turns into a sheet behind the
+ * bottom nav's Menu, and dialogs into bottom drawers.
  */
 
 /** [sidebar link, path, heading]; a sub-page link sits under its group's button */
@@ -59,7 +59,7 @@ test("the menu sheet reaches every page and each one fits", async ({
 
   for (const [link, path, name = link, group] of PAGES) {
     await test.step(name, async () => {
-      await page.getByRole("button", { name: "Toggle Sidebar" }).click();
+      await page.getByRole("button", { name: "Menu", exact: true }).click();
       const sheet = page.getByRole("dialog");
       if (group) {
         await sheet.getByRole("button", { name: group, exact: true }).click();
@@ -77,6 +77,51 @@ test("the menu sheet reaches every page and each one fits", async ({
       });
     });
   }
+});
+
+test("the bottom nav goes to the daily pages and adds from anywhere", async ({
+  page,
+}) => {
+  await page.goto("/reports/compare");
+  const nav = page.getByRole("navigation", { name: "Main navigation" });
+
+  await expect(nav.getByRole("link", { name: "Reports" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+
+  await nav.getByRole("link", { name: "Transactions" }).click();
+  await expect(page).toHaveURL(/\/transactions$/);
+
+  await nav.getByRole("button", { name: "Add transaction" }).click();
+  const drawer = page.getByRole("dialog", { name: "New transaction" });
+  await expect(drawer).toBeVisible();
+  await drawer.getByRole("button", { name: "Close" }).first().click();
+  await expect(drawer).toBeHidden();
+});
+
+test("controls are big enough to tap", async ({ page }) => {
+  await page.goto("/transactions");
+  await expect(page.getByRole("button", { name: "Filters" })).toBeVisible();
+
+  const undersized = await page.evaluate(() =>
+    [...document.querySelectorAll("header button, main button, nav button")]
+      .map((element) => element.getBoundingClientRect())
+      .filter((box) => box.width > 0 && Math.min(box.width, box.height) < 44)
+      .map((box) => `${box.width}x${box.height}`),
+  );
+
+  expect(undersized).toEqual([]);
+});
+
+test("the dashboard leads with the balance and opens the full list", async ({
+  page,
+}) => {
+  await page.goto("/dashboard");
+  const summary = page.getByRole("button", { name: /^Available/ });
+
+  await summary.click();
+  await expect(page.getByRole("dialog", { name: "Balances" })).toBeVisible();
 });
 
 test("adds a transaction from the bottom drawer", async ({ page }) => {
@@ -110,7 +155,7 @@ test("the menu sheet's + opens a create drawer over the current page", async ({
   page,
 }) => {
   await page.goto("/dashboard");
-  await page.getByRole("button", { name: "Toggle Sidebar" }).click();
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
   const sheet = page.getByRole("dialog");
   await sheet.getByRole("button", { name: "Add account" }).click();
 

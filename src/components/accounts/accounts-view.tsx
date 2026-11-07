@@ -18,6 +18,7 @@ import {
   UsersIcon,
   WalletIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -58,6 +59,7 @@ import {
 } from "~/components/ui/item";
 import { Skeleton } from "~/components/ui/skeleton";
 import { useToastError } from "~/hooks/use-toast-error";
+import { filteredHref } from "~/lib/transaction-links";
 import { cn } from "~/lib/utils";
 import { useTRPC } from "~/trpc/react";
 import type { RouterOutputs } from "~/trpc/types";
@@ -155,14 +157,24 @@ export function AccountsView() {
                 <Item
                   key={account.id}
                   variant="outline"
-                  className={cn(!account.isActive && "opacity-60")}
+                  className={cn(
+                    "hover:bg-accent/50 relative transition-colors",
+                    !account.isActive && "opacity-60",
+                  )}
                 >
                   <ItemMedia variant="icon">
                     <Icon />
                   </ItemMedia>
                   <ItemContent className="min-w-0">
                     <ItemTitle className="w-full flex-wrap">
-                      <span className="truncate">{account.name}</span>
+                      <Link
+                        href={filteredHref("/transactions", {
+                          accounts: [account.id],
+                        })}
+                        className="focus-visible:after:ring-ring truncate outline-none after:absolute after:inset-0 after:rounded-lg focus-visible:after:ring-2"
+                      >
+                        {account.name}
+                      </Link>
                       {!account.isActive ? (
                         <Badge variant="outline">{tc("inactive")}</Badge>
                       ) : null}
@@ -181,7 +193,7 @@ export function AccountsView() {
                         : ` · ${tc("owner", { name: account.ownerName })}`}
                     </ItemDescription>
                   </ItemContent>
-                  <ItemActions>
+                  <ItemActions className="relative z-10">
                     <Money
                       amount={account.balance}
                       sign={account.currencySign}

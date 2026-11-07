@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
@@ -18,6 +19,7 @@ import {
 } from "~/components/ui/tooltip";
 import type { Locale } from "~/i18n/config";
 import { formatListDate, relativeDay } from "~/lib/dates";
+import { filteredHref } from "~/lib/transaction-links";
 import { cn } from "~/lib/utils";
 import type { RouterOutputs } from "~/trpc/types";
 
@@ -44,7 +46,18 @@ function ItemLine({ item }: { item: Item }) {
   const label = useEntryLabel();
 
   return (
-    <div className="flex items-baseline justify-between gap-2 text-sm">
+    <Link
+      // overdue rows are waiting at the top of the transactions list
+      href={
+        item.overdue
+          ? "/transactions"
+          : filteredHref("/planned", {
+              startDate: item.date,
+              endDate: item.date,
+            })
+      }
+      className="hover:bg-accent/50 focus-visible:ring-ring touch:min-h-11 -mx-1 flex items-baseline justify-between gap-2 rounded-md px-1 text-sm transition-colors outline-none focus-visible:ring-2"
+    >
       <span className="flex min-w-0 flex-col">
         {item.comment ? (
           <Tooltip>
@@ -69,7 +82,7 @@ function ItemLine({ item }: { item: Item }) {
         colored={!item.unsigned}
         className="shrink-0"
       />
-    </div>
+    </Link>
   );
 }
 

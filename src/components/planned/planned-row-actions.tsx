@@ -57,6 +57,9 @@ export function PlannedRowMenu({
   );
 }
 
+/** Long enough to notice a slip and reach the button */
+const UNDO_MS = 10_000;
+
 /**
  * Deleting a row: a recurring planned occurrence asks "Only this one" or
  * "All planned"; anything else gets a plain Yes/No.
@@ -69,6 +72,7 @@ export function DeleteTransactionDialog({
   onClose: () => void;
 }) {
   const t = useTranslations("transactions");
+  const tc = useTranslations("common");
   const trpc = useTRPC();
   const toastError = useToastError();
   const invalidate = useInvalidateMoney();
@@ -79,9 +83,25 @@ export function DeleteTransactionDialog({
     await invalidate();
   };
 
+  const restore = useMutation(
+    trpc.transactions.restore.mutationOptions({
+      onSuccess: async () => {
+        toast.success(t("toast.restored"));
+        await invalidate();
+      },
+      onError: toastError,
+    }),
+  );
   const removeOne = useMutation(
     trpc.transactions.delete.mutationOptions({
-      onSuccess,
+      onSuccess: async (_result, { id }) => {
+        toast.success(t("toast.deleted"), {
+          duration: UNDO_MS,
+          action: { label: tc("undo"), onClick: () => restore.mutate({ id }) },
+        });
+        onClose();
+        await invalidate();
+      },
       onError: toastError,
     }),
   );

@@ -549,7 +549,7 @@ export function TransactionForm({
                     {negativeSign ? (
                       <MinusIcon className="text-destructive" />
                     ) : (
-                      <PlusIcon className="text-emerald-600 dark:text-emerald-400" />
+                      <PlusIcon className="text-positive" />
                     )}
                   </InputGroupAddon>
                   <InputGroupInput

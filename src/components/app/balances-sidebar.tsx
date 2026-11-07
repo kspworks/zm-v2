@@ -2,12 +2,14 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { XIcon } from "lucide-react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 
 import { Money } from "~/components/app/money";
 import { Separator } from "~/components/ui/separator";
 import { Skeleton } from "~/components/ui/skeleton";
+import { filteredHref } from "~/lib/transaction-links";
 import { cn } from "~/lib/utils";
 import { useTRPC } from "~/trpc/react";
 
@@ -64,7 +66,7 @@ function Totals({
           sign={row.sign}
           className={cn(
             "text-lg font-semibold",
-            tone === "good" && "text-emerald-600 dark:text-emerald-400",
+            tone === "good" && "text-positive",
             tone === "bad" && "text-destructive",
           )}
         />
@@ -73,9 +75,45 @@ function Totals({
   );
 }
 
+/** One debtor or creditor; opens their transactions when they are known */
+function Person({
+  row,
+  fallback,
+}: {
+  row: {
+    counterpartyId: string | null;
+    counterpartyName: string | null;
+    currencySign: string;
+    sum: number;
+  };
+  fallback: string;
+}) {
+  const className = "flex items-center justify-between gap-2";
+  const content = (
+    <>
+      <span className="truncate">{row.counterpartyName ?? fallback}</span>
+      <Money amount={Math.abs(row.sum)} sign={row.currencySign} />
+    </>
+  );
+
+  return row.counterpartyId ? (
+    <Link
+      href={filteredHref("/transactions", {
+        counterparties: [row.counterpartyId],
+      })}
+      className={cn(className, "touch:min-h-11 hover:underline")}
+    >
+      {content}
+    </Link>
+  ) : (
+    <div className={className}>{content}</div>
+  );
+}
+
 /**
  * Available money, debts, and the accounts list. Clicking an account toggles it
- * in the account filter; without `onToggleAccount` the list is display only.
+ * in the account filter; without `onToggleAccount` it opens that account's
+ * transactions.
  */
 export function BalancesSidebar({
   selectedAccounts,
@@ -122,14 +160,8 @@ export function BalancesSidebar({
     rows.length === 0 ? null : (
       <ul className="flex flex-col gap-1 text-sm">
         {rows.map((row) => (
-          <li
-            key={`${row.counterpartyId}-${row.currencyId}`}
-            className="flex items-center justify-between gap-2"
-          >
-            <span className="truncate">
-              {row.counterpartyName ?? t("unknown")}
-            </span>
-            <Money amount={Math.abs(row.sum)} sign={row.currencySign} />
+          <li key={`${row.counterpartyId}-${row.currencyId}`}>
+            <Person row={row} fallback={t("unknown")} />
           </li>
         ))}
       </ul>
@@ -165,8 +197,8 @@ export function BalancesSidebar({
             {active.map((account) => {
               const selected = selectedAccounts?.includes(account.id) ?? false;
               const className = cn(
-                "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm",
-                onToggleAccount && "hover:bg-accent transition-colors",
+                "touch:min-h-11 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm",
+                "hover:bg-accent transition-colors",
                 selected && "bg-accent font-medium",
               );
               const row = (
@@ -195,7 +227,14 @@ export function BalancesSidebar({
                       {row}
                     </button>
                   ) : (
-                    <div className={className}>{row}</div>
+                    <Link
+                      href={filteredHref("/transactions", {
+                        accounts: [account.id],
+                      })}
+                      className={className}
+                    >
+                      {row}
+                    </Link>
                   )}
                 </li>
               );

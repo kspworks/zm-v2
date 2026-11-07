@@ -8,6 +8,7 @@ import {
   Trash2Icon,
   UsersRoundIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -52,6 +53,7 @@ import { Skeleton } from "~/components/ui/skeleton";
 import { Spinner } from "~/components/ui/spinner";
 import { useToastError } from "~/hooks/use-toast-error";
 import { formatMoney } from "~/lib/money";
+import { filteredHref } from "~/lib/transaction-links";
 import { useTRPC } from "~/trpc/react";
 import type { RouterOutputs } from "~/trpc/types";
 
@@ -62,10 +64,7 @@ export function DebtBalance({ sum, sign }: { sum: number; sign: string }) {
   const amount = formatMoney(Math.abs(sum), sign);
 
   return sum > 0 ? (
-    <Badge
-      variant="outline"
-      className="border-emerald-600/40 text-emerald-700 dark:text-emerald-400"
-    >
+    <Badge variant="outline" className="text-positive border-emerald-600/40">
       {t("oweMe", { amount })}
     </Badge>
   ) : (
@@ -151,14 +150,28 @@ export function CounterpartiesView() {
         ) : (
           <ItemGroup className="gap-2">
             {rows.map((row) => (
-              <Item key={row.id} variant="outline" size="sm">
+              <Item
+                key={row.id}
+                variant="outline"
+                size="sm"
+                className="hover:bg-accent/50 relative transition-colors"
+              >
                 <ItemContent className="min-w-0">
-                  <ItemTitle className="truncate">{row.name}</ItemTitle>
+                  <ItemTitle className="w-full">
+                    <Link
+                      href={filteredHref("/transactions", {
+                        counterparties: [row.id],
+                      })}
+                      className="focus-visible:after:ring-ring truncate outline-none after:absolute after:inset-0 after:rounded-lg focus-visible:after:ring-2"
+                    >
+                      {row.name}
+                    </Link>
+                  </ItemTitle>
                   <ItemDescription>
                     {t("usage", { count: row.usage })}
                   </ItemDescription>
                 </ItemContent>
-                <ItemActions className="flex-wrap justify-end">
+                <ItemActions className="relative z-10 flex-wrap justify-end">
                   {row.balances.map((balance) => (
                     <DebtBalance
                       key={balance.currencyId}

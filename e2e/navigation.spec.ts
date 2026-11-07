@@ -132,3 +132,51 @@ test.describe("unknown paths", () => {
     await expect(page.getByText("Page not found")).toBeVisible();
   });
 });
+
+test("a transaction row opens its form and a delete can be undone", async ({
+  page,
+}) => {
+  await page.goto("/transactions");
+  const main = page.locator("main");
+
+  await main.getByRole("button", { name: "Add transaction" }).click();
+  const create = page.getByRole("dialog", { name: "New transaction" });
+  await create.getByLabel("Amount").fill("12");
+  await create.getByLabel("Comment").fill("Undo me");
+  await create.getByRole("button", { name: "Save" }).click();
+  await expect(create.getByLabel("Amount")).toHaveValue("");
+  await create.getByRole("button", { name: "Close" }).first().click();
+
+  const row = main.getByText("Undo me");
+  await row.click();
+  const edit = page.getByRole("dialog", { name: "Edit transaction" });
+  await expect(edit.getByLabel("Comment")).toHaveValue("Undo me");
+  await edit.getByRole("button", { name: "Close" }).first().click();
+  await expect(edit).toBeHidden();
+
+  await main
+    .locator("section > div > div", { hasText: "Undo me" })
+    .getByRole("button", { name: "Actions" })
+    .click();
+  await page.getByRole("menuitem", { name: "Delete" }).click();
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "Yes" })
+    .click();
+  await expect(row).toBeHidden();
+
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(row).toBeVisible();
+});
+
+test("an account row opens its transactions", async ({ page }) => {
+  await page.goto("/accounts");
+  await page
+    .locator("main")
+    .locator('[data-slot="item"]')
+    .first()
+    .getByRole("link")
+    .click();
+
+  await expect(page).toHaveURL(/\/transactions\?accounts=/);
+});

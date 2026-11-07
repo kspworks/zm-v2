@@ -10,13 +10,19 @@ import {
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { parseAsString, useQueryStates } from "nuqs";
-import { type ReactNode, useId, useMemo } from "react";
+import { type ReactNode, useId, useMemo, useState } from "react";
 
 import { BalancesSidebar } from "~/components/app/balances-sidebar";
 import { LedgerLayout } from "~/components/app/ledger-layout";
 import { BalanceChart } from "~/components/dashboard/balance-chart";
+import { BalanceSummary } from "~/components/dashboard/balance-summary";
 import { ForecastTable } from "~/components/dashboard/forecast-table";
+import { GettingStarted } from "~/components/dashboard/getting-started";
 import { NearestPlanned } from "~/components/dashboard/nearest-planned";
+import {
+  type TransactionDialogState,
+  TransactionFormDialog,
+} from "~/components/transactions/transaction-form-dialog";
 import { useToday } from "~/components/transactions/transaction-groups";
 import { Button } from "~/components/ui/button";
 import {
@@ -283,29 +289,53 @@ export function DashboardView() {
   });
   const nearest = useQuery(trpc.dashboard.nearest.queryOptions());
 
+  const [dialog, setDialog] = useState<TransactionDialogState>(null);
+
   const noAccounts = accounts.isSuccess && currencies.length === 0;
+  // nothing recorded or planned yet, so there is nothing to chart
+  const firstRun =
+    accounts.isSuccess &&
+    nearest.isSuccess &&
+    nearest.data.length === 0 &&
+    accounts.data.every((account) => account.usage === 0);
+
+  const currencyTabs = (className: string, listClassName?: string) =>
+    currencies.length > 1 && currency ? (
+      <Tabs
+        className={className}
+        value={currency.code}
+        onValueChange={(code) => void setState({ currency: code })}
+      >
+        <TabsList className={listClassName}>
+          {currencies.map((c) => (
+            <TabsTrigger key={c.id} value={c.code}>
+              {c.code}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+    ) : null;
 
   return (
     <LedgerLayout
       title={t("title")}
-      filters={
-        currencies.length > 1 && currency ? (
-          <Tabs
-            value={currency.code}
-            onValueChange={(code) => void setState({ currency: code })}
-          >
-            <TabsList>
-              {currencies.map((c) => (
-                <TabsTrigger key={c.id} value={c.code}>
-                  {c.code}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
+      // beside the title they would squeeze it on a phone
+      filters={currencyTabs("max-sm:hidden")}
+      sidebar={<BalancesSidebar />}
+      summary={
+        currency && !firstRun ? (
+          <BalanceSummary
+            available={currencyAccounts.reduce(
+              (sum, account) => sum + account.balance,
+              0,
+            )}
+            sign={currency.sign}
+            currencyId={currency.id}
+          />
         ) : null
       }
-      sidebar={<BalancesSidebar />}
     >
+      {firstRun ? null : currencyTabs("sm:hidden", "w-full")}
       {noAccounts ? (
         <Empty className="border">
           <EmptyHeader>
@@ -320,6 +350,8 @@ export function DashboardView() {
             </Button>
           </EmptyContent>
         </Empty>
+      ) : firstRun ? (
+        <GettingStarted onAdd={() => setDialog({ mode: "create" })} />
       ) : (
         <>
           <Card className="gap-2">
@@ -395,6 +427,8 @@ export function DashboardView() {
           </Card>
         </>
       )}
+
+      <TransactionFormDialog state={dialog} onClose={() => setDialog(null)} />
     </LedgerLayout>
   );
 }

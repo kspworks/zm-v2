@@ -36,7 +36,7 @@ export function ForecastTable({
     {
       key: "income",
       value: (m: ForecastMonth) => m.income,
-      className: () => "text-emerald-600 dark:text-emerald-400",
+      className: () => "text-positive",
     },
     {
       key: "expense",

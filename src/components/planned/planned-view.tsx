@@ -114,6 +114,7 @@ export function PlannedView() {
           <TransactionGroups
             rows={rows}
             planned
+            onOpen={(row) => setSubmitting({ mode: "submit", row })}
             actions={(row) => (
               <PlannedRowMenu
                 row={row}
