@@ -458,6 +458,77 @@ export const deleteTransaction = Effect.fn("transactions.delete")(function* (
 }, transaction);
 
 /**
+ * Confirms a planned transaction exactly as planned, every leg at once, so a
+ * bill that went out as expected takes one tap instead of a form. Keeps the
+ * row's date. A row already submitted changes nothing, so a repeat is harmless.
+ */
+export const submitPlanned = Effect.fn("transactions.submitPlanned")(function* (
+  userId: string,
+  id: string,
+) {
+  const existing = yield* loadBatch(id);
+
+  if (!existing[0]?.isPlanned) {
+    return { ids: [] };
+  }
+
+  yield* requireDeletable(userId, existing);
+
+  const ids = existing.map((row) => row.id);
+  const at = yield* now;
+
+  yield* query((db) =>
+    db
+      .update(transactions)
+      .set({ isPlanned: false, createdAt: at })
+      .where(inArray(transactions.id, ids)),
+  );
+
+  yield* audit({
+    entityType: "transaction",
+    entityId: ids,
+    action: "update",
+    userId,
+    payload: { id, submitted: true },
+  });
+
+  return { ids };
+}, transaction);
+
+/** The Undo of `submitPlanned`: the row goes back to waiting */
+export const unsubmitPlanned = Effect.fn("transactions.unsubmitPlanned")(
+  function* (userId: string, id: string) {
+    const existing = yield* loadBatch(id);
+
+    if (existing[0]?.isPlanned !== false) {
+      return { ids: [] };
+    }
+
+    yield* requireDeletable(userId, existing);
+
+    const ids = existing.map((row) => row.id);
+
+    yield* query((db) =>
+      db
+        .update(transactions)
+        .set({ isPlanned: true })
+        .where(inArray(transactions.id, ids)),
+    );
+
+    yield* audit({
+      entityType: "transaction",
+      entityId: ids,
+      action: "update",
+      userId,
+      payload: { id, submitted: false },
+    });
+
+    return { ids };
+  },
+  transaction,
+);
+
+/**
  * Undoes a delete: the row and the legs that went with it, recognised by the
  * same `deletedAt`, so a leg removed some other time stays gone. The rights
  * are those of the delete, which also refuses a deleted account or category.

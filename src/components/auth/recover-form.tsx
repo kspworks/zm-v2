@@ -172,6 +172,7 @@ export function RecoverForm({ token }: { token: string }) {
                   <TotpEnrolment
                     qrDataUrl={qr.qrDataUrl}
                     manualKey={qr.manualKey}
+                    otpUri={qr.otpUri}
                     code={code}
                     onCodeChange={setCode}
                   />

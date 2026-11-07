@@ -168,7 +168,7 @@ describe("buildReport", () => {
     expect(income?.tiles.map((t) => [t.name, t.value])).toEqual([
       ["Debts", 700],
     ]);
-    expect(colorSlots([income as ReportChart], 8).get(DEBTS_KEY)).toBe(1);
+    expect(colorSlots([income as ReportChart], 8).has(DEBTS_KEY)).toBe(true);
   });
 
   it("groups by the account, debts on their real account", () => {
@@ -241,23 +241,50 @@ const chart = (
 });
 
 describe("colorSlots", () => {
-  it("gives slots to the largest tiles in size order and none past the limit", () => {
+  it("keeps a tile's color whatever else is in the view or how big it is", () => {
+    const alone = colorSlots([chart("UAH", [["rent", 100]])], 12);
+    const crowded = colorSlots(
+      [
+        chart("UAH", [
+          ["food", 9000],
+          ["fun", 5000],
+          ["rent", 1],
+        ]),
+        chart("USD", [["misc", 300]]),
+      ],
+      12,
+    );
+
+    expect(crowded.get("rent")).toBe(alone.get("rent"));
+  });
+
+  it("gives ordered keys their own slots, wrapping past the last", () => {
     const slots = colorSlots(
       [
         chart("UAH", [
-          ["rent", 900],
-          ["food", 500],
-          ["fun", 300],
-          ["misc", 100],
+          ["c", 1],
+          ["a", 900],
+          ["b", 50],
         ]),
       ],
       2,
+      ["a", "b", "c"],
     );
 
-    expect([...slots.entries()]).toEqual([
-      ["rent", 1],
-      ["food", 2],
+    expect(slots.get("a")).toBe(1);
+    expect(slots.get("b")).toBe(2);
+    expect(slots.get("c")).toBe(1);
+  });
+
+  it("stays within the slots", () => {
+    const keys = Array.from({ length: 50 }, (_, index): [string, number] => [
+      `category-${index}`,
+      index + 1,
     ]);
+    const slots = [...colorSlots([chart("UAH", keys)], 12).values()];
+
+    expect(slots.every((slot) => slot >= 1 && slot <= 12)).toBe(true);
+    expect(new Set(slots).size).toBeGreaterThan(6);
   });
 
   it("never gives a slot to the no-category tile", () => {
@@ -272,38 +299,7 @@ describe("colorSlots", () => {
     );
 
     expect(slots.has(NONE_KEY)).toBe(false);
-    expect(slots.get("food")).toBe(1);
-  });
-
-  it("sums a category across currencies", () => {
-    const slots = colorSlots(
-      [
-        chart("UAH", [
-          ["rent", 600],
-          ["food", 500],
-        ]),
-        chart("USD", [["food", 200]]),
-      ],
-      8,
-    );
-
-    expect(slots.get("food")).toBe(1);
-    expect(slots.get("rent")).toBe(2);
-  });
-
-  it("breaks ties by key", () => {
-    const slots = colorSlots(
-      [
-        chart("UAH", [
-          ["b", 100],
-          ["a", 100],
-        ]),
-      ],
-      8,
-    );
-
-    expect(slots.get("a")).toBe(1);
-    expect(slots.get("b")).toBe(2);
+    expect(slots.has("food")).toBe(true);
   });
 });
 

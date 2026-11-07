@@ -114,45 +114,54 @@ const members = alias(accountMembers, "am");
 export const readableAccounts = (db: DbOrTx, userId: string, where?: SQL) => {
   const stats = accountStats(db);
 
-  return db
-    .select({
-      id: accounts.id,
-      name: accounts.name,
-      type: accounts.type,
-      currencyId: accounts.currencyId,
-      currencyCode: currencies.code,
-      currencySign: currencies.sign,
-      initialBalance: accounts.initialBalance,
-      isActive: accounts.isActive,
-      createdBy: accounts.createdBy,
-      ownerName: users.name,
-      canWrite: accountMembers.canWrite,
-      balance: sql<number>`${accounts.initialBalance} + ${stats.total}`.mapWith(
-        Number,
-      ),
-      usage: stats.usage,
-      memberCount: sql<number>`(${db
-        .select({ count: count() })
-        .from(members)
-        .where(
-          and(eq(members.accountId, accounts.id), isNull(members.deletedAt)),
-        )})`.mapWith(Number),
-    })
-    .from(accounts)
-    .innerJoin(
-      accountMembers,
-      and(
-        eq(accountMembers.accountId, accounts.id),
-        eq(accountMembers.userId, userId),
-        isNull(accountMembers.deletedAt),
-        eq(accountMembers.canRead, true),
-      ),
-    )
-    .innerJoin(currencies, eq(currencies.id, accounts.currencyId))
-    .innerJoin(users, eq(users.id, accounts.createdBy))
-    .leftJoinLateral(stats, sql`true`)
-    .where(and(isNull(accounts.deletedAt), where))
-    .orderBy(desc(stats.usage), asc(accounts.name), asc(accounts.id));
+  return (
+    db
+      .select({
+        id: accounts.id,
+        name: accounts.name,
+        type: accounts.type,
+        currencyId: accounts.currencyId,
+        currencyCode: currencies.code,
+        currencySign: currencies.sign,
+        initialBalance: accounts.initialBalance,
+        isActive: accounts.isActive,
+        createdBy: accounts.createdBy,
+        ownerName: users.name,
+        canWrite: accountMembers.canWrite,
+        balance:
+          sql<number>`${accounts.initialBalance} + ${stats.total}`.mapWith(
+            Number,
+          ),
+        usage: stats.usage,
+        memberCount: sql<number>`(${db
+          .select({ count: count() })
+          .from(members)
+          .where(
+            and(eq(members.accountId, accounts.id), isNull(members.deletedAt)),
+          )})`.mapWith(Number),
+      })
+      .from(accounts)
+      .innerJoin(
+        accountMembers,
+        and(
+          eq(accountMembers.accountId, accounts.id),
+          eq(accountMembers.userId, userId),
+          isNull(accountMembers.deletedAt),
+          eq(accountMembers.canRead, true),
+        ),
+      )
+      .innerJoin(currencies, eq(currencies.id, accounts.currencyId))
+      .innerJoin(users, eq(users.id, accounts.createdBy))
+      .leftJoinLateral(stats, sql`true`)
+      .where(and(isNull(accounts.deletedAt), where))
+      // the code settles "Cash" against "Cash", so new accounts keep one order
+      .orderBy(
+        desc(stats.usage),
+        asc(accounts.name),
+        asc(currencies.code),
+        asc(accounts.id),
+      )
+  );
 };
 
 export type AccountRow = Awaited<ReturnType<typeof readableAccounts>>[number];

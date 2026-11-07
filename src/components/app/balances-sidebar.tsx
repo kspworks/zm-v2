@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 import { Money } from "~/components/app/money";
 import { Separator } from "~/components/ui/separator";
 import { Skeleton } from "~/components/ui/skeleton";
+import { usePrimaryCurrency } from "~/hooks/use-primary-currency";
 import { filteredHref } from "~/lib/transaction-links";
 import { cn } from "~/lib/utils";
 import { useTRPC } from "~/trpc/react";
@@ -17,6 +18,7 @@ type CurrencySum = { code: string; sign: string; sum: number };
 
 const sumByCurrency = (
   rows: { code: string; sign: string; value: number }[],
+  primaryCode?: string,
 ): CurrencySum[] => {
   const map = new Map<string, CurrencySum>();
 
@@ -32,7 +34,11 @@ const sumByCurrency = (
 
   return [...map.values()]
     .filter((row) => row.sum !== 0)
-    .sort((a, b) => a.code.localeCompare(b.code));
+    .sort(
+      (a, b) =>
+        Number(b.code === primaryCode) - Number(a.code === primaryCode) ||
+        a.code.localeCompare(b.code),
+    );
 };
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -126,6 +132,7 @@ export function BalancesSidebar({
   const trpc = useTRPC();
   const accounts = useQuery(trpc.accounts.list.queryOptions());
   const debts = useQuery(trpc.counterparties.balances.queryOptions());
+  const primary = usePrimaryCurrency();
 
   if (accounts.isPending || debts.isPending) {
     return (
@@ -137,12 +144,16 @@ export function BalancesSidebar({
   }
 
   const active = (accounts.data ?? []).filter((account) => account.isActive);
+  const primaryCode = active.find(
+    (account) => account.currencyId === primary.currencyId,
+  )?.currencyCode;
   const available = sumByCurrency(
     active.map((a) => ({
       code: a.currencyCode,
       sign: a.currencySign,
       value: a.balance,
     })),
+    primaryCode,
   );
   const debtRows = debts.data ?? [];
   const oweMe = debtRows.filter((row) => row.sum > 0);
@@ -154,6 +165,7 @@ export function BalancesSidebar({
         sign: r.currencySign,
         value: r.sum,
       })),
+      primaryCode,
     );
 
   const people = (rows: typeof debtRows) =>

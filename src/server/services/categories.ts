@@ -81,6 +81,7 @@ export const listCategories = Effect.fn("categories.list")(function* (
         isExpense: categories.isExpense,
         isIncome: categories.isIncome,
         seedKey: categories.seedKey,
+        createdAt: categories.createdAt,
         createdBy: categories.createdBy,
         ownerName: users.name,
         canWrite: categoryMembers.canWrite,

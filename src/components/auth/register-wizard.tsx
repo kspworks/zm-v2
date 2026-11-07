@@ -226,6 +226,7 @@ export function RegisterWizard({
             <TotpEnrolment
               qrDataUrl={makeQr.data.qrDataUrl}
               manualKey={makeQr.data.manualKey}
+              otpUri={makeQr.data.otpUri}
               code={code}
               onCodeChange={setCode}
               onComplete={(value) => void submitCode(value)}

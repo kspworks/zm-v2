@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { InfoIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { type FormEvent, useState } from "react";
@@ -21,7 +21,15 @@ import {
 } from "~/components/ui/card";
 import { Field, FieldGroup, FieldLabel } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 import { Spinner } from "~/components/ui/spinner";
+import { usePrimaryCurrency } from "~/hooks/use-primary-currency";
 import { useToastError } from "~/hooks/use-toast-error";
 import { useTRPC } from "~/trpc/react";
 
@@ -61,6 +69,52 @@ const submitWith = (action: () => void) => (event: FormEvent) => {
   event.preventDefault();
   action();
 };
+
+function PrimaryCurrencyCard() {
+  const t = useTranslations("settings");
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const toastError = useToastError();
+  const currencies = useQuery(trpc.accounts.currencies.queryOptions());
+  const primary = usePrimaryCurrency();
+
+  const set = useMutation(
+    trpc.me.setPrimaryCurrency.mutationOptions({
+      onSuccess: () =>
+        queryClient.invalidateQueries(trpc.me.primaryCurrency.pathFilter()),
+      onError: toastError,
+    }),
+  );
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("primaryCurrency")}</CardTitle>
+        <CardDescription>{t("primaryCurrencyHint")}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Select
+          value={primary.currencyId ?? ""}
+          onValueChange={(currencyId) => set.mutate({ currencyId })}
+        >
+          <SelectTrigger
+            aria-label={t("primaryCurrency")}
+            className="w-full sm:w-64"
+          >
+            <SelectValue placeholder={t("primaryCurrencyAuto")} />
+          </SelectTrigger>
+          <SelectContent>
+            {currencies.data?.map((currency) => (
+              <SelectItem key={currency.id} value={currency.id}>
+                {currency.code} {currency.sign}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </CardContent>
+    </Card>
+  );
+}
 
 function PasswordCard() {
   const t = useTranslations("settings");
@@ -191,6 +245,7 @@ function AuthenticatorCard() {
             <TotpEnrolment
               qrDataUrl={start.data.qrDataUrl}
               manualKey={start.data.manualKey}
+              otpUri={start.data.otpUri}
               code={newCode}
               onCodeChange={setNewCode}
               onComplete={(value) => confirm.mutate({ code: value })}
@@ -322,6 +377,7 @@ export function SettingsView({ reenrolPrompt }: { reenrolPrompt: boolean }) {
             <AlertDescription>{t("reenrolPrompt")}</AlertDescription>
           </Alert>
         ) : null}
+        <PrimaryCurrencyCard />
         <AuthenticatorCard />
         <PasswordCard />
         <BackupCodesCard />

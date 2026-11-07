@@ -54,6 +54,7 @@ import { Skeleton } from "~/components/ui/skeleton";
 import { Switch } from "~/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { useLocalStorage } from "~/hooks/use-local-storage";
+import { usePrimaryCurrency } from "~/hooks/use-primary-currency";
 import {
   clampRange,
   RANGE_DEFAULT,
@@ -240,8 +241,9 @@ export function DashboardView() {
   );
 
   const accounts = useQuery(trpc.accounts.list.queryOptions());
+  const primary = usePrimaryCurrency();
 
-  // currencies of the active accounts, most used first (the list's order)
+  // currencies of the active accounts: the primary one, then most used first
   const currencies = useMemo(() => {
     const seen = new Map<string, { id: string; code: string; sign: string }>();
 
@@ -255,8 +257,12 @@ export function DashboardView() {
       }
     }
 
-    return [...seen.values()];
-  }, [accounts.data]);
+    return [...seen.values()].sort(
+      (a, b) =>
+        Number(b.id === primary.currencyId) -
+        Number(a.id === primary.currencyId),
+    );
+  }, [accounts.data, primary.currencyId]);
 
   const currency =
     currencies.find((c) => c.code === state.currency) ?? currencies[0];
@@ -281,11 +287,11 @@ export function DashboardView() {
       ...scopeInput(balanceScope),
       ...range,
     }),
-    enabled: !!currency && rangeReady && balanceReady,
+    enabled: !!currency && primary.ready && rangeReady && balanceReady,
   });
   const forecast = useQuery({
     ...trpc.dashboard.forecast.queryOptions(scopeInput(forecastScope)),
-    enabled: !!currency && forecastReady,
+    enabled: !!currency && primary.ready && forecastReady,
   });
   const nearest = useQuery(trpc.dashboard.nearest.queryOptions());
 

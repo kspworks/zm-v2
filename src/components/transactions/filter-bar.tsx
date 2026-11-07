@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { DatePicker } from "~/components/app/date-picker";
 import { MultiSelect } from "~/components/app/multi-select";
+import { PeriodPresets } from "~/components/app/period-presets";
 import type {
   FilterState,
   SetFilterState,
@@ -39,7 +40,7 @@ import { NO_CATEGORY } from "~/lib/validators/transactions";
 import { useTRPC } from "~/trpc/react";
 
 /** Applies a text value after 500 ms of quiet, and only while it's valid */
-const useDebouncedField = (
+export const useDebouncedField = (
   value: string | null,
   apply: (value: string | null) => void,
   isValid: (value: string) => boolean,
@@ -169,36 +170,45 @@ function FilterFields({
         />
       </Field>
       {withDates ? (
-        <div className="grid grid-cols-2 gap-3">
-          <Field data-invalid={reversed}>
-            <FieldLabel htmlFor="filter-from">{t("from")}</FieldLabel>
-            <DatePicker
-              id="filter-from"
-              value={state.startDate}
-              clearable
-              invalid={reversed}
-              placeholder="—"
-              onChange={(value) => void setState({ startDate: value })}
-            />
-            {reversed ? (
-              <FieldError>{te("start_date_lte_end_date")}</FieldError>
-            ) : null}
-          </Field>
-          <Field data-invalid={reversed}>
-            <FieldLabel htmlFor="filter-to">{t("to")}</FieldLabel>
-            <DatePicker
-              id="filter-to"
-              value={state.endDate}
-              clearable
-              invalid={reversed}
-              placeholder="—"
-              onChange={(value) => void setState({ endDate: value })}
-            />
-            {reversed ? (
-              <FieldError>{te("end_date_gte_start_date")}</FieldError>
-            ) : null}
-          </Field>
-        </div>
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <Field data-invalid={reversed}>
+              <FieldLabel htmlFor="filter-from">{t("from")}</FieldLabel>
+              <DatePicker
+                id="filter-from"
+                value={state.startDate}
+                clearable
+                invalid={reversed}
+                placeholder="—"
+                onChange={(value) => void setState({ startDate: value })}
+              />
+              {reversed ? (
+                <FieldError>{te("start_date_lte_end_date")}</FieldError>
+              ) : null}
+            </Field>
+            <Field data-invalid={reversed}>
+              <FieldLabel htmlFor="filter-to">{t("to")}</FieldLabel>
+              <DatePicker
+                id="filter-to"
+                value={state.endDate}
+                clearable
+                invalid={reversed}
+                placeholder="—"
+                onChange={(value) => void setState({ endDate: value })}
+              />
+              {reversed ? (
+                <FieldError>{te("end_date_gte_start_date")}</FieldError>
+              ) : null}
+            </Field>
+          </div>
+          <PeriodPresets
+            value={{
+              startDate: state.startDate ?? undefined,
+              endDate: state.endDate ?? undefined,
+            }}
+            onSelect={(period) => void setState(period)}
+          />
+        </>
       ) : null}
       <Field data-invalid={amountInvalid}>
         <FieldLabel htmlFor="filter-amount">{t("amount")}</FieldLabel>

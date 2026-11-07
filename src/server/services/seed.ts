@@ -1,8 +1,9 @@
+import { eq } from "drizzle-orm";
 import { Effect } from "effect";
 
 import type { Locale } from "~/i18n/config";
 import { query } from "~/server/db/database";
-import { currencies } from "~/server/db/schema";
+import { currencies, users } from "~/server/db/schema";
 import { serverTranslator } from "~/server/lib/i18n";
 import { insertAccount } from "~/server/services/accounts";
 import { insertCategory } from "~/server/services/categories";
@@ -25,6 +26,9 @@ export const SEED_CATEGORIES = [
   { key: "subscriptions", isExpense: true, isIncome: false },
 ] as const;
 
+/** Where a new user starts; Settings changes it */
+const PRIMARY_CURRENCY: Record<Locale, string> = { uk: "UAH", en: "USD" };
+
 /**
  * Gives a new user one "Cash" account per currency and the default
  * categories, named in their locale. Runs inside the registration transaction.
@@ -35,8 +39,23 @@ export const seedUserData = Effect.fn("seed.userData")(function* (
 ) {
   const t = yield* serverTranslator(locale);
   const allCurrencies = yield* query((db) =>
-    db.select({ id: currencies.id }).from(currencies).orderBy(currencies.code),
+    db
+      .select({ id: currencies.id, code: currencies.code })
+      .from(currencies)
+      .orderBy(currencies.code),
   );
+  const primary = allCurrencies.find(
+    (currency) => currency.code === PRIMARY_CURRENCY[locale],
+  );
+
+  if (primary) {
+    yield* query((db) =>
+      db
+        .update(users)
+        .set({ primaryCurrencyId: primary.id })
+        .where(eq(users.id, userId)),
+    );
+  }
 
   for (const currency of allCurrencies) {
     yield* insertAccount({

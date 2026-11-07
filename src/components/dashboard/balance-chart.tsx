@@ -73,11 +73,11 @@ function PointTooltip({
   }
 
   return (
-    <div className="bg-background grid w-64 max-w-[80vw] gap-2 rounded-lg border px-3 py-2 text-xs shadow-xl">
+    <div className="bg-background grid w-64 max-w-[calc(100vw-7rem)] grid-cols-[minmax(0,1fr)] gap-2 rounded-lg border px-3 py-2 text-xs shadow-xl">
       <div className="font-medium">
         {formatListDate(point.date, today, locale)}
       </div>
-      <div className="grid gap-0.5">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-0.5">
         {point.actual !== null ? (
           <div className="flex items-center justify-between gap-2">
             <span className="text-muted-foreground flex items-center gap-1.5">
@@ -97,7 +97,7 @@ function PointTooltip({
           </div>
         ) : null}
       </div>
-      <div className="grid gap-1 border-t pt-2">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-1 border-t pt-2">
         {point.items.length === 0 ? (
           <span className="text-muted-foreground">{t("noChanges")}</span>
         ) : (
@@ -109,10 +109,11 @@ function PointTooltip({
                 item.planned && "text-muted-foreground",
               )}
             >
-              <span className="min-w-0 truncate">
-                {label(item)}
+              {/* the name gives way first, so the overdue tag always shows */}
+              <span className="flex min-w-0 items-baseline gap-1">
+                <span className="min-w-0 truncate">{label(item)}</span>
                 {item.overdue ? (
-                  <span className="text-destructive ml-1">
+                  <span className="text-destructive shrink-0">
                     · {t("overdue")}
                   </span>
                 ) : null}

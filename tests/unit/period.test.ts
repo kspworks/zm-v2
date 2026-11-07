@@ -4,6 +4,7 @@ import {
   defaultPeriods,
   isWholeMonth,
   monthOf,
+  presetPeriod,
   sameDays,
   shiftPeriod,
 } from "~/lib/period";
@@ -67,6 +68,27 @@ describe("period", () => {
   it("leaves periods that are over alone", () => {
     expect(sameDays(defaultPeriods("2026-03-31"), "2026-03-31")).toBeNull();
     expect(sameDays(defaultPeriods("2026-03-15"), "2026-05-01")).toBeNull();
+  });
+
+  it("resolves the quick ranges", () => {
+    const today = "2026-03-15";
+
+    expect(presetPeriod("thisMonth", today)).toEqual({
+      startDate: "2026-03-01",
+      endDate: "2026-03-31",
+    });
+    expect(presetPeriod("lastMonth", today)).toEqual({
+      startDate: "2026-02-01",
+      endDate: "2026-02-28",
+    });
+    expect(presetPeriod("last30Days", today)).toEqual({
+      startDate: "2026-02-14",
+      endDate: today,
+    });
+    expect(presetPeriod("thisYear", today)).toEqual({
+      startDate: "2026-01-01",
+      endDate: "2026-12-31",
+    });
   });
 
   it("defaults to last month vs this month", () => {

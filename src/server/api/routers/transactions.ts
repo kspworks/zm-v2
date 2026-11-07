@@ -33,6 +33,8 @@ import {
   createTransaction,
   deleteTransaction,
   restoreTransaction,
+  submitPlanned,
+  unsubmitPlanned,
   updateTransaction,
 } from "~/server/services/transactions";
 
@@ -115,6 +117,20 @@ export const transactionsRouter = createTRPCRouter({
     .input(validate(Schema.Struct({ id: idSchema })))
     .mutation(({ ctx, input, signal }) =>
       runForTrpc(restoreTransaction(ctx.user.id, input.id), signal),
+    ),
+
+  /** Marks a planned row as paid, unchanged */
+  submit: protectedProcedure
+    .input(validate(Schema.Struct({ id: idSchema })))
+    .mutation(({ ctx, input, signal }) =>
+      runForTrpc(submitPlanned(ctx.user.id, input.id), signal),
+    ),
+
+  /** The Undo of `submit` */
+  unsubmit: protectedProcedure
+    .input(validate(Schema.Struct({ id: idSchema })))
+    .mutation(({ ctx, input, signal }) =>
+      runForTrpc(unsubmitPlanned(ctx.user.id, input.id), signal),
     ),
 
   /** Several transactions in one call and one DB transaction */

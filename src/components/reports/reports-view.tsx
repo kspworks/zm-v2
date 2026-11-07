@@ -64,7 +64,7 @@ import { filteredHref } from "~/lib/transaction-links";
 import { NO_CATEGORY } from "~/lib/validators/transactions";
 import { useTRPC } from "~/trpc/react";
 
-const SLOTS = 8;
+const SLOTS = 12;
 
 const viewSchema = Schema.Literals(["expense", "income"]);
 
@@ -76,11 +76,11 @@ const GROUP_BY_LABELS = {
 
 function TileName({ name, href }: { name: string; href: string | null }) {
   return href ? (
-    <Link href={href} className="touch:py-2 hover:underline">
+    <Link href={href} className="touch:py-2 truncate hover:underline">
       {name}
     </Link>
   ) : (
-    name
+    <span className="truncate">{name}</span>
   );
 }
 
@@ -92,6 +92,7 @@ export function ReportsView() {
   const today = useToday();
   const debtLabelText = useDebtLabelText();
   const { state, setState, filter } = useTransactionFilter();
+  const categories = useQuery(trpc.categories.list.queryOptions());
   const [view, setView] = useLocalStorage(
     "zm.reports.view",
     viewSchema,
@@ -149,18 +150,28 @@ export function ReportsView() {
     });
   }, [data.data, view, groupBy, t, tt, debtLabelText]);
 
-  // slots go to the largest tiles in the view, so the blocks that dominate
-  // the chart get distinct hues; the tail and "no category" are gray. Tiles
-  // carry a name label, so identity never depends on color alone
+  // one color per category wherever it appears, oldest first so a new one
+  // takes the next color; "no category" is gray
   const colorOf = useMemo(() => {
-    const slots = colorSlots(charts, SLOTS);
+    const order =
+      groupBy === "category"
+        ? (categories.data ?? [])
+            .filter((category) => category.parentId === null)
+            .sort(
+              (a, b) =>
+                a.createdAt.getTime() - b.createdAt.getTime() ||
+                a.id.localeCompare(b.id),
+            )
+            .map((category) => category.id)
+        : [];
+    const slots = colorSlots(charts, SLOTS, order);
 
     return (key: string) => {
       const slot = slots.get(key);
 
       return slot ? `var(--series-${slot})` : "var(--series-other)";
     };
-  }, [charts]);
+  }, [charts, categories.data, groupBy]);
 
   // the rows behind a tile, in this report's period and filters
   const hrefOf = useMemo(() => {
@@ -328,8 +339,9 @@ export function ReportsView() {
                   <TableBody>
                     {chart.tiles.map((tile) => (
                       <TableRow key={tile.key}>
-                        <TableCell>
-                          <span className="flex items-center gap-2">
+                        {/* the name gives way, so numbers are never cut off */}
+                        <TableCell className="w-full max-w-0">
+                          <span className="flex min-w-0 items-center gap-2">
                             <span
                               className="size-2.5 shrink-0 rounded-sm"
                               style={{ background: colorOf(tile.key) }}

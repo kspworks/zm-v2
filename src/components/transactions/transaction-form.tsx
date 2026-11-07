@@ -591,6 +591,7 @@ export function TransactionForm({
                   options={categoryItems}
                   value={field.value}
                   onChange={field.onChange}
+                  createKind={kind === "income" ? "income" : "expense"}
                 />
               </Field>
             )}

@@ -28,7 +28,7 @@ import {
   RATE_LIMITS,
   rateLimitKeys,
 } from "~/server/lib/rate-limit";
-import { generateTotpSecret, totpManualKey } from "~/server/lib/totp";
+import { generateTotpSecret, totpManualKey, totpUri } from "~/server/lib/totp";
 import { seedUserData } from "~/server/services/seed";
 
 export const ADMIN_INVITE_ID = "admin";
@@ -150,6 +150,7 @@ export const makeOtpQr = Effect.fn("invites.makeOtpQr")(function* (input: {
   return {
     qrDataUrl: yield* totpQrDataUrl(secret, input.email),
     manualKey: totpManualKey(secret),
+    otpUri: totpUri(secret, input.email),
   };
 });
 

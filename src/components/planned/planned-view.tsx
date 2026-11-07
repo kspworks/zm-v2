@@ -15,6 +15,7 @@ import {
   PlannedRowMenu,
 } from "~/components/planned/planned-row-actions";
 import { FilterButton } from "~/components/transactions/filter-bar";
+import { FilterSummary } from "~/components/transactions/filter-summary";
 import { TotalsBar } from "~/components/transactions/totals-bar";
 import {
   type TransactionDialogState,
@@ -79,6 +80,7 @@ export function PlannedView() {
         />
       }
     >
+      <FilterSummary state={state} setState={setState} reset={reset} />
       {filtering ? <TotalsBar filter={filter} planned /> : null}
 
       {list.isPending ? (

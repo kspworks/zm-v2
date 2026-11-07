@@ -845,6 +845,66 @@ describe("transactions.restore", () => {
   });
 });
 
+describe("transactions.submit", () => {
+  const plannedExpense = async (user: TestUser, accountId: string) => {
+    await callerFor(user).planned.create({
+      data: expense(accountId, { date: "2026-03-05" }),
+      schedule: { repeatType: "none", repeatInterval: 1 },
+    });
+    const [row] = await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.accountId, accountId));
+
+    return row?.id ?? "";
+  };
+
+  it("counts a planned row as it stands, and Undo sends it back", async () => {
+    const user = await createUser();
+    const account = await makeAccount(user, { initialBalance: 5000 });
+    const id = await plannedExpense(user, account.id);
+
+    expect(await balanceOf(user, account.id)).toBe(5000);
+
+    await callerFor(user).transactions.submit({ id });
+    const [paid] = await rowsOf([id]);
+
+    expect(paid?.isPlanned).toBe(false);
+    expect(paid?.date).toBe("2026-03-05");
+    expect(await balanceOf(user, account.id)).toBe(4000);
+
+    await callerFor(user).transactions.unsubmit({ id });
+    const [back] = await rowsOf([id]);
+
+    expect(back?.isPlanned).toBe(true);
+    expect(await balanceOf(user, account.id)).toBe(5000);
+  });
+
+  it("changes nothing when repeated", async () => {
+    const user = await createUser();
+    const account = await makeAccount(user);
+    const id = await plannedExpense(user, account.id);
+
+    await callerFor(user).transactions.submit({ id });
+
+    await expect(callerFor(user).transactions.submit({ id })).resolves.toEqual({
+      ids: [],
+    });
+  });
+
+  it("needs the rights of a delete", async () => {
+    const owner = await createUser();
+    const stranger = await createUser();
+    const account = await makeAccount(owner);
+    const id = await plannedExpense(owner, account.id);
+
+    await expectTRPCError(
+      callerFor(stranger).transactions.submit({ id }),
+      "FORBIDDEN",
+    );
+  });
+});
+
 describe("transactions.delete", () => {
   it("soft-deletes every leg of the batch and restores the balances", async () => {
     const user = await createUser();

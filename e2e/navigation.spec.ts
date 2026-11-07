@@ -180,3 +180,65 @@ test("an account row opens its transactions", async ({ page }) => {
 
   await expect(page).toHaveURL(/\/transactions\?accounts=/);
 });
+
+test("search and date presets show as chips that clear one by one", async ({
+  page,
+}) => {
+  await page.goto("/transactions");
+  await page.getByRole("searchbox", { name: "Search comments…" }).fill("zzz");
+  await expect(page).toHaveURL(/comment=zzz/);
+
+  await page.getByRole("button", { name: "Filters" }).click();
+  await page.getByRole("button", { name: "Last 30 days" }).click();
+  await page.keyboard.press("Escape");
+
+  await expect(
+    page.getByRole("button", { name: "Remove filter “zzz”" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Clear all" }).click();
+  await expect(page).toHaveURL(/\/transactions$/);
+});
+
+test("a category can be created from the picker", async ({ page }) => {
+  await page.goto("/transactions");
+  await page
+    .locator("main")
+    .getByRole("button", { name: "Add transaction" })
+    .click();
+
+  const dialog = page.getByRole("dialog", { name: "New transaction" });
+  await dialog.getByRole("combobox", { name: "Category" }).click();
+  await page.getByPlaceholder("Search category…").fill("Beekeeping");
+  await page.getByRole("option", { name: "Create “Beekeeping”" }).click();
+
+  await expect(dialog.getByRole("combobox", { name: "Category" })).toHaveText(
+    "Beekeeping",
+  );
+});
+
+test("a due planned row is paid in one click and can be undone", async ({
+  page,
+}) => {
+  await page.goto("/planned");
+  await page
+    .locator("main")
+    .getByRole("button", { name: "Plan a transaction" })
+    .click();
+
+  const dialog = page.getByRole("dialog", { name: "New planned transaction" });
+  await dialog.getByLabel("Amount").fill("7");
+  await dialog.getByLabel("Comment").fill("Pay me");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await dialog.getByRole("button", { name: "Close" }).first().click();
+  await expect(dialog).toBeHidden();
+
+  const row = page
+    .locator("main section > div > div", { hasText: "Pay me" })
+    .first();
+
+  await row.getByRole("button", { name: "Mark as paid" }).click();
+  await expect(page.locator("main").getByText("Pay me")).toBeHidden();
+
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(page.locator("main").getByText("Pay me")).toBeVisible();
+});

@@ -170,7 +170,7 @@ export function TransactionItem({
     // biome-ignore lint/a11y/useKeyWithClickEvents: the title button handles the keyboard
     <div
       className={cn(
-        "group flex items-start gap-3 px-3 py-2.5 sm:px-4",
+        "group flex items-start gap-3 px-3 py-2.5 sm:px-4 md:items-center md:py-1",
         onOpen && "hover:bg-accent/50 cursor-pointer transition-colors",
       )}
       onClick={
@@ -184,8 +184,9 @@ export function TransactionItem({
           : undefined
       }
     >
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-1.5">
+      {/* stacked on phones, one line from md up */}
+      <div className="min-w-0 flex-1 md:flex md:items-center md:gap-3">
+        <div className="flex min-w-0 items-center gap-1.5 md:max-w-[55%] md:shrink-0">
           {onOpen ? (
             <button
               type="button"
@@ -237,7 +238,7 @@ export function TransactionItem({
           comment.length > 50 ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <p className="text-muted-foreground line-clamp-1 text-sm">
+                <p className="text-muted-foreground line-clamp-1 text-sm md:min-w-0 md:flex-1">
                   {comment}
                 </p>
               </TooltipTrigger>
@@ -246,12 +247,12 @@ export function TransactionItem({
               </TooltipContent>
             </Tooltip>
           ) : (
-            <p className="text-muted-foreground line-clamp-1 text-sm">
+            <p className="text-muted-foreground line-clamp-1 text-sm md:min-w-0 md:flex-1">
               {comment}
             </p>
           )
         ) : null}
-        <p className="text-muted-foreground flex min-w-0 items-center gap-1 text-xs">
+        <p className="text-muted-foreground flex min-w-0 items-center gap-1 text-xs md:ml-auto md:max-w-48 md:shrink-0 md:justify-end">
           <span className="truncate">{accountName(row.account)}</span>
           {row.linked ? (
             <>

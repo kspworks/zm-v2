@@ -1,16 +1,17 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import { CalendarCogIcon, SendIcon, Trash2Icon } from "lucide-react";
+import { CalendarCogIcon, CheckIcon, SendIcon, Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "~/components/app/confirm-dialog";
 import { RowMenu } from "~/components/transactions/row-menu";
 import { useInvalidateMoney } from "~/components/transactions/transaction-form";
+import { useToday } from "~/components/transactions/transaction-groups";
 import type { TransactionRowData } from "~/components/transactions/transaction-item";
 import { AlertDialogAction } from "~/components/ui/alert-dialog";
-import { buttonVariants } from "~/components/ui/button";
+import { Button, buttonVariants } from "~/components/ui/button";
 import {
   DropdownMenuItem,
   DropdownMenuSeparator,
@@ -18,10 +19,63 @@ import {
 import { useToastError } from "~/hooks/use-toast-error";
 import { useTRPC } from "~/trpc/react";
 
+/** Long enough to notice a slip and reach the button */
+const UNDO_MS = 10_000;
+
 export const isRecurring = (row: TransactionRowData) =>
   row.plannedTransactionId !== null && row.schedule !== null;
 
-/** Submit with changes, Edit schedule (recurring only), Delete */
+/** Confirms the row exactly as planned, with Undo for a slip */
+function MarkPaidButton({ id }: { id: string }) {
+  const t = useTranslations("transactions");
+  const tc = useTranslations("common");
+  const trpc = useTRPC();
+  const toastError = useToastError();
+  const invalidate = useInvalidateMoney();
+
+  const unsubmit = useMutation(
+    trpc.transactions.unsubmit.mutationOptions({
+      onSuccess: async () => {
+        toast.success(t("toast.backToPlanned"));
+        await invalidate();
+      },
+      onError: toastError,
+    }),
+  );
+  const submit = useMutation(
+    trpc.transactions.submit.mutationOptions({
+      onSuccess: async () => {
+        toast.success(t("toast.paid"), {
+          duration: UNDO_MS,
+          action: {
+            label: tc("undo"),
+            onClick: () => unsubmit.mutate({ id }),
+          },
+        });
+        await invalidate();
+      },
+      onError: toastError,
+    }),
+  );
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={submit.isPending}
+      aria-label={t("markPaid")}
+      onClick={() => submit.mutate({ id })}
+    >
+      <CheckIcon />
+      <span className="max-sm:hidden">{t("markPaid")}</span>
+    </Button>
+  );
+}
+
+/**
+ * Mark as paid once the row is due, then Submit with changes, Edit schedule
+ * (recurring only), Delete
+ */
 export function PlannedRowMenu({
   row,
   onSubmit,
@@ -35,30 +89,31 @@ export function PlannedRowMenu({
 }) {
   const t = useTranslations("transactions");
   const tc = useTranslations("common");
+  const today = useToday();
 
   return (
-    <RowMenu>
-      <DropdownMenuItem onSelect={onSubmit}>
-        <SendIcon />
-        {t("submitWithChanges")}
-      </DropdownMenuItem>
-      {isRecurring(row) ? (
-        <DropdownMenuItem onSelect={onEditSchedule}>
-          <CalendarCogIcon />
-          {t("editSchedule")}
+    <div className="flex items-center gap-1">
+      {row.date <= today ? <MarkPaidButton id={row.id} /> : null}
+      <RowMenu>
+        <DropdownMenuItem onSelect={onSubmit}>
+          <SendIcon />
+          {t("submitWithChanges")}
         </DropdownMenuItem>
-      ) : null}
-      <DropdownMenuSeparator />
-      <DropdownMenuItem variant="destructive" onSelect={onDelete}>
-        <Trash2Icon />
-        {tc("delete")}
-      </DropdownMenuItem>
-    </RowMenu>
+        {isRecurring(row) ? (
+          <DropdownMenuItem onSelect={onEditSchedule}>
+            <CalendarCogIcon />
+            {t("editSchedule")}
+          </DropdownMenuItem>
+        ) : null}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem variant="destructive" onSelect={onDelete}>
+          <Trash2Icon />
+          {tc("delete")}
+        </DropdownMenuItem>
+      </RowMenu>
+    </div>
   );
 }
-
-/** Long enough to notice a slip and reach the button */
-const UNDO_MS = 10_000;
 
 /**
  * Deleting a row: a recurring planned occurrence asks "Only this one" or

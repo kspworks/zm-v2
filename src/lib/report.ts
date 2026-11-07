@@ -166,32 +166,38 @@ export const buildReport = (
     .sort((a, b) => b.total - a.total);
 };
 
+/** FNV-1a: small, and the same everywhere */
+const hashOf = (key: string) => {
+  let hash = 2166136261;
+
+  for (let index = 0; index < key.length; index++) {
+    hash ^= key.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return hash >>> 0;
+};
+
 /**
- * Color slot (1..slots) per tile key. The largest tiles in the view win, so
- * the blocks that dominate the chart are the ones told apart; totals are
- * summed across currencies so a tile keeps one color in every chart.
- * "No category" / "No counterparty" and the tail past `slots` get no slot
- * (gray).
+ * Color slot (1..slots) per tile key, never from its size, so a category keeps
+ * its color from one report, period or currency to the next. Keys in `order`
+ * take turns through the slots, which keeps neighbours apart; `order` must only
+ * grow at its end, so give it oldest first. Other keys hash. Tiles carry name
+ * labels, so identity never depends on color. "No category" / "No
+ * counterparty" get no slot (gray).
  */
 export const colorSlots = (
   charts: ReportChart[],
   slots: number,
+  order: readonly string[] = [],
 ): Map<string, number> => {
-  const totals = new Map<string, number>();
-
-  for (const chart of charts) {
-    for (const tile of chart.tiles) {
-      if (tile.key !== NONE_KEY) {
-        totals.set(tile.key, (totals.get(tile.key) ?? 0) + tile.value);
-      }
-    }
-  }
+  const keys = charts.flatMap((chart) => chart.tiles.map((tile) => tile.key));
+  const position = new Map(order.map((key, index) => [key, index]));
 
   return new Map(
-    [...totals.entries()]
-      .sort(([a, x], [b, y]) => y - x || (a < b ? -1 : a > b ? 1 : 0))
-      .slice(0, slots)
-      .map(([key], index) => [key, index + 1]),
+    keys
+      .filter((key) => key !== NONE_KEY)
+      .map((key) => [key, ((position.get(key) ?? hashOf(key)) % slots) + 1]),
   );
 };
 

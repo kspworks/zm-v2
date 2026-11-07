@@ -38,7 +38,7 @@ export function DayHeading({
         : t(relative.kind);
 
   return (
-    <div className="flex items-baseline gap-2 px-3 pt-4 pb-1.5 sm:px-4">
+    <div className="flex items-baseline gap-2 px-3 pt-4 pb-1.5 sm:px-4 md:pt-2.5 md:pb-1">
       <span className="text-sm font-semibold">
         {formatListDate(date, today, locale)}
       </span>

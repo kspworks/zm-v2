@@ -80,6 +80,31 @@ export const sameDays = (
   return { periods: [cut(a), cut(b)], days };
 };
 
+export const PERIOD_PRESETS = [
+  "thisMonth",
+  "lastMonth",
+  "last30Days",
+  "thisYear",
+] as const;
+
+export type PeriodPreset = (typeof PERIOD_PRESETS)[number];
+
+export const presetPeriod = (preset: PeriodPreset, today: string): Period => {
+  switch (preset) {
+    case "thisMonth":
+      return monthOf(today);
+    case "lastMonth":
+      return shiftPeriod(monthOf(today), -1);
+    case "last30Days":
+      return { startDate: iso(addDays(parseISO(today), -29)), endDate: today };
+    case "thisYear":
+      return {
+        startDate: `${today.slice(0, 4)}-01-01`,
+        endDate: `${today.slice(0, 4)}-12-31`,
+      };
+  }
+};
+
 /** Last month vs this month */
 export const defaultPeriods = (today: string): [Period, Period] => {
   const current = monthOf(today);

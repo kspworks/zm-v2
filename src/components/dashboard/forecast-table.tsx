@@ -5,13 +5,13 @@ import { useLocale, useTranslations } from "next-intl";
 
 import { Money } from "~/components/app/money";
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
+import { useEdgeFade } from "~/hooks/use-edge-fade";
 import type { Locale } from "~/i18n/config";
 import type { ForecastMonth } from "~/lib/dashboard";
 import { dateFnsLocale } from "~/lib/dates";
@@ -31,6 +31,8 @@ export function ForecastTable({
   const locale = useLocale() as Locale;
   const current = today.slice(0, 7);
   const year = today.slice(0, 4);
+  // the sticky first column must stay readable, so only the far edge fades
+  const fade = useEdgeFade({ left: false });
 
   const rows = [
     {
@@ -52,56 +54,58 @@ export function ForecastTable({
   ] as const;
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead className={sticky} />
-          {months.map((m) => (
-            <TableHead
-              key={m.month}
-              className={cn(
-                "h-auto py-2 text-right align-bottom",
-                m.month === current && "bg-muted/50",
-              )}
-            >
-              <div className="first-letter:uppercase">
-                {format(parseISO(`${m.month}-01`), "LLLL", {
-                  locale: dateFnsLocale(locale),
-                })}
-              </div>
-              {m.month.slice(0, 4) !== year ? (
-                <div className="text-muted-foreground text-xs font-normal">
-                  {m.month.slice(0, 4)}
-                </div>
-              ) : null}
-            </TableHead>
-          ))}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map((row) => (
-          <TableRow key={row.key} className="hover:bg-transparent">
-            <TableCell className={cn(sticky, "font-medium")}>
-              {t(row.key)}
-            </TableCell>
+    <div ref={fade.ref} className="overflow-x-auto" style={fade.style}>
+      <table className="w-full caption-bottom text-sm">
+        <TableHeader>
+          <TableRow>
+            <TableHead className={sticky} />
             {months.map((m) => (
-              <TableCell
+              <TableHead
                 key={m.month}
                 className={cn(
-                  "text-right",
+                  "h-auto py-2 text-right align-bottom",
                   m.month === current && "bg-muted/50",
-                  row.value(m) !== 0 && row.className(m),
-                  row.value(m) === 0 &&
-                    row.key !== "balance" &&
-                    "text-muted-foreground",
                 )}
               >
-                <Money amount={row.value(m)} />
-              </TableCell>
+                <div className="first-letter:uppercase">
+                  {format(parseISO(`${m.month}-01`), "LLLL", {
+                    locale: dateFnsLocale(locale),
+                  })}
+                </div>
+                {m.month.slice(0, 4) !== year ? (
+                  <div className="text-muted-foreground text-xs font-normal">
+                    {m.month.slice(0, 4)}
+                  </div>
+                ) : null}
+              </TableHead>
             ))}
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => (
+            <TableRow key={row.key} className="hover:bg-transparent">
+              <TableCell className={cn(sticky, "font-medium")}>
+                {t(row.key)}
+              </TableCell>
+              {months.map((m) => (
+                <TableCell
+                  key={m.month}
+                  className={cn(
+                    "text-right",
+                    m.month === current && "bg-muted/50",
+                    row.value(m) !== 0 && row.className(m),
+                    row.value(m) === 0 &&
+                      row.key !== "balance" &&
+                      "text-muted-foreground",
+                  )}
+                >
+                  <Money amount={row.value(m)} />
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </table>
+    </div>
   );
 }

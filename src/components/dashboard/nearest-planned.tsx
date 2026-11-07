@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useState } from "react";
 
 import { Money } from "~/components/app/money";
 import { useEntryLabel } from "~/components/dashboard/use-entry-label";
@@ -17,6 +16,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
+import { useEdgeFade } from "~/hooks/use-edge-fade";
 import type { Locale } from "~/i18n/config";
 import { formatListDate, relativeDay } from "~/lib/dates";
 import { filteredHref } from "~/lib/transaction-links";
@@ -91,52 +91,6 @@ const COLUMN_REM = 13;
 
 /** Room between columns: the first and last keep flush with the card */
 const gap = "px-4 first:pl-0 last:pr-0";
-
-const FADE = "3rem";
-
-/**
- * Fades the edges of a horizontal scroller that has more content past them,
- * so it is clear there is something to scroll to.
- */
-const useEdgeFade = () => {
-  const [node, setNode] = useState<HTMLDivElement | null>(null);
-  const [edges, setEdges] = useState({ left: false, right: false });
-
-  useEffect(() => {
-    if (!node) {
-      return;
-    }
-
-    const update = () => {
-      const max = node.scrollWidth - node.clientWidth;
-
-      setEdges({
-        left: node.scrollLeft > 1,
-        right: node.scrollLeft < max - 1,
-      });
-    };
-
-    update();
-    node.addEventListener("scroll", update, { passive: true });
-    const observer = new ResizeObserver(update);
-    observer.observe(node);
-
-    return () => {
-      node.removeEventListener("scroll", update);
-      observer.disconnect();
-    };
-  }, [node]);
-
-  const mask =
-    edges.left || edges.right
-      ? `linear-gradient(to right, ${edges.left ? "transparent" : "black"}, black ${FADE}, black calc(100% - ${FADE}), ${edges.right ? "transparent" : "black"})`
-      : undefined;
-
-  return {
-    ref: setNode,
-    style: mask ? { maskImage: mask, WebkitMaskImage: mask } : undefined,
-  };
-};
 
 /**
  * Planned transactions on the nearest dates that have any: a date per column

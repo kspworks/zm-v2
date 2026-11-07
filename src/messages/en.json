@@ -129,7 +129,10 @@
       "backupTitle": "Save your backup codes",
       "backupHint": "Each code signs you in once if you lose your authenticator. They are shown only now.",
       "backupConfirm": "I have saved my backup codes",
-      "finish": "Go to ZM"
+      "finish": "Go to ZM",
+      "copyKey": "Copy key",
+      "copyFailed": "Could not copy. Select the key and copy it by hand.",
+      "openAuthenticator": "Open authenticator app"
     },
     "forgot": {
       "title": "Reset password",
@@ -352,9 +355,12 @@
       "created": "Saved",
       "negative": "Account \"{name}\" has negative balance",
       "deleted": "Deleted",
-      "restored": "Restored"
+      "restored": "Restored",
+      "paid": "Marked as paid",
+      "backToPlanned": "Back in planned"
     },
-    "loadMore": "Load more"
+    "loadMore": "Load more",
+    "markPaid": "Mark as paid"
   },
   "filters": {
     "title": "Filters",
@@ -371,7 +377,16 @@
     "any": "Any",
     "selected": "{count} selected",
     "search": "Search…",
-    "apply": "Show results"
+    "apply": "Show results",
+    "searchComments": "Search comments…",
+    "removeFilter": "Remove filter {name}",
+    "clearAll": "Clear all",
+    "presets": {
+      "thisMonth": "This month",
+      "lastMonth": "Last month",
+      "last30Days": "Last 30 days",
+      "thisYear": "This year"
+    }
   },
   "sidebar": {
     "title": "Balances",
@@ -448,7 +463,8 @@
       "5": "Fri",
       "6": "Sat",
       "7": "Sun"
-    }
+    },
+    "createCategory": "Create “{name}”"
   },
   "planned": {
     "title": "Planned",
@@ -654,7 +670,10 @@
     "backupCodes": "Backup codes",
     "backupHint": "Generate a new set. The old codes stop working.",
     "regenerate": "Generate new codes",
-    "newCodes": "Your new backup codes"
+    "newCodes": "Your new backup codes",
+    "primaryCurrency": "Primary currency",
+    "primaryCurrencyHint": "Shown first and opened by default on the dashboard.",
+    "primaryCurrencyAuto": "Most used"
   },
   "recover": {
     "title": "Recover your account",

@@ -61,6 +61,10 @@
   --series-6: #008300;
   --series-7: #4a3aa7;
   --series-8: #e34948;
+  --series-9: #0e8fa3;
+  --series-10: #8a8a1e;
+  --series-11: #a4623a;
+  --series-12: #6478b4;
   --series-other: #9a9a94;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -106,6 +110,10 @@
   --series-6: #008300;
   --series-7: #9085e9;
   --series-8: #e66767;
+  --series-9: #2aa9bd;
+  --series-10: #a3a32e;
+  --series-11: #bd7a50;
+  --series-12: #7f93cf;
   --series-other: #6b6b66;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);

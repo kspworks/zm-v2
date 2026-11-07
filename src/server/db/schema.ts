@@ -73,6 +73,8 @@ export const users = pgTable(
     banExpires: tz(),
     // app fields
     locale: text().notNull().default("uk"),
+    /** Listed first and opened by default; null until the user has one */
+    primaryCurrencyId: text().references(() => currencies.id, restrict),
     deletedAt: tz(),
     /**
      * A soft-deleted user's address moves here and `email` gets a unique

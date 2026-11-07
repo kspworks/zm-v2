@@ -18,6 +18,7 @@ import {
 } from "~/components/planned/planned-form-dialog";
 import { DeleteTransactionDialog } from "~/components/planned/planned-row-actions";
 import { FilterButton } from "~/components/transactions/filter-bar";
+import { FilterSummary } from "~/components/transactions/filter-summary";
 import { OverdueBlock } from "~/components/transactions/overdue-block";
 import { RowMenu } from "~/components/transactions/row-menu";
 import { TotalsBar } from "~/components/transactions/totals-bar";
@@ -104,6 +105,7 @@ export function TransactionsView({
         />
       }
     >
+      <FilterSummary state={state} setState={setState} reset={reset} />
       {filtering ? <TotalsBar filter={filter} /> : null}
 
       <OverdueBlock

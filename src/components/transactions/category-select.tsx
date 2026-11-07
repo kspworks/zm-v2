@@ -1,6 +1,7 @@
 "use client";
 
-import { CheckIcon, ChevronsUpDownIcon } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { CheckIcon, ChevronsUpDownIcon, PlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { type KeyboardEvent, useRef, useState } from "react";
 
@@ -18,12 +19,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "~/components/ui/popover";
+import { useToastError } from "~/hooks/use-toast-error";
 import type { CategoryOption } from "~/lib/category-options";
 import { lastInputWasPointer } from "~/lib/input-modality";
 import { matchesAnyLayout } from "~/lib/keyboard-layouts";
 import { cn } from "~/lib/utils";
+import { useTRPC } from "~/trpc/react";
 
 const NONE = "__none__";
+const CREATE = "__create__";
 
 const FOCUSABLE =
   'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -46,7 +50,8 @@ export const focusNeighbour = (from: HTMLElement | null, step: 1 | -1) => {
 
 /**
  * Single-select category combobox. Search is keyboard-layout-agnostic, and
- * Tab / Shift+Tab leave the open list for the neighbouring fields.
+ * Tab / Shift+Tab leave the open list for the neighbouring fields. With
+ * `createKind`, a search that names no category offers to create it.
  */
 export function CategorySelect({
   id,
@@ -54,12 +59,14 @@ export function CategorySelect({
   value,
   onChange,
   invalid,
+  createKind,
 }: {
   id?: string;
   options: CategoryOption[];
   value: string | null;
   onChange: (value: string | null) => void;
   invalid?: boolean;
+  createKind?: "expense" | "income";
 }) {
   const t = useTranslations("form");
   const tt = useTranslations("transactions");
@@ -69,6 +76,38 @@ export function CategorySelect({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const tabStep = useRef<1 | -1 | null>(null);
   const selected = options.find((option) => option.id === value);
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const toastError = useToastError();
+  const create = useMutation(
+    trpc.categories.create.mutationOptions({ onError: toastError }),
+  );
+
+  const name = search.trim();
+  const canCreate =
+    !!createKind &&
+    name !== "" &&
+    !options.some(
+      (option) => option.name.toLocaleLowerCase() === name.toLocaleLowerCase(),
+    );
+
+  const createCategory = () =>
+    create.mutate(
+      {
+        name,
+        parentId: null,
+        isExpense: createKind === "expense",
+        isIncome: createKind === "income",
+      },
+      {
+        onSuccess: async (category) => {
+          // the select must know the new option before it is chosen
+          await queryClient.invalidateQueries(trpc.categories.pathFilter());
+          onChange(category.id);
+          setOpen(false);
+        },
+      },
+    );
 
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.key !== "Tab") {
@@ -76,6 +115,11 @@ export function CategorySelect({
     }
 
     event.preventDefault();
+
+    if (highlighted === CREATE) {
+      createCategory();
+      return;
+    }
 
     // after typing a search, Tab accepts the highlighted option
     if (search.trim() && highlighted) {
@@ -137,6 +181,10 @@ export function CategorySelect({
           value={highlighted}
           onValueChange={setHighlighted}
           filter={(itemValue, search) => {
+            if (itemValue === CREATE) {
+              return 1;
+            }
+
             if (itemValue === NONE) {
               return matchesAnyLayout(t("noCategory"), search) ? 1 : 0;
             }
@@ -185,6 +233,18 @@ export function CategorySelect({
                   <span className="truncate">{option.label}</span>
                 </CommandItem>
               ))}
+              {canCreate ? (
+                <CommandItem
+                  value={CREATE}
+                  disabled={create.isPending}
+                  onSelect={createCategory}
+                >
+                  <PlusIcon className="size-4" />
+                  <span className="truncate">
+                    {t("createCategory", { name })}
+                  </span>
+                </CommandItem>
+              ) : null}
             </CommandGroup>
           </CommandList>
         </Command>

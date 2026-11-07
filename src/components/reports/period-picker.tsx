@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useId, useState } from "react";
 
 import { DatePicker } from "~/components/app/date-picker";
+import { PeriodPresets } from "~/components/app/period-presets";
 import { Button } from "~/components/ui/button";
 import { Field, FieldError, FieldLabel } from "~/components/ui/field";
 import {
@@ -172,6 +173,13 @@ export function PeriodPicker({
               );
             })}
           </div>
+          <PeriodPresets
+            value={value}
+            onSelect={(period) => {
+              onChange(period);
+              setOpen(false);
+            }}
+          />
           <Separator />
           <span className="text-sm font-medium">{t("customRange")}</span>
           <div className="grid grid-cols-2 gap-2">

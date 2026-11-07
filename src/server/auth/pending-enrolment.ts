@@ -45,6 +45,7 @@ export const startPendingEnrolment = Effect.fn("pendingEnrolment.start")(
     return {
       qrDataUrl: yield* totpQrDataUrl(secret, email),
       manualKey: totpManualKey(secret),
+      otpUri: totpUri(secret, email),
     };
   },
 );
