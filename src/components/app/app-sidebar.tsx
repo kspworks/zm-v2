@@ -4,9 +4,19 @@ import { ChevronRightIcon, PlusIcon } from "lucide-react";
 import Link, { useLinkStatus } from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { type ComponentProps, type ReactNode, Suspense, useState } from "react";
+import {
+  type ComponentProps,
+  type ReactNode,
+  Suspense,
+  useCallback,
+  useState,
+} from "react";
 
 import { BottomNav } from "~/components/app/bottom-nav";
+import {
+  ShortcutsDialog,
+  useKeyboardShortcuts,
+} from "~/components/app/keyboard-shortcuts";
 import { Logo } from "~/components/app/logo";
 import { NavIcon } from "~/components/app/nav-icon";
 import {
@@ -67,11 +77,21 @@ export function AppSidebar({
   const [quickAdd, setQuickAdd] = useState<QuickAddKey | null>(null);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
 
-  const openQuickAdd = (key: QuickAddKey) => {
-    setOpenMobile(false);
-    setQuickAdd(key);
-    setQuickAddOpen(true);
-  };
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+
+  const openQuickAdd = useCallback(
+    (key: QuickAddKey) => {
+      setOpenMobile(false);
+      setQuickAdd(key);
+      setQuickAddOpen(true);
+    },
+    [setOpenMobile],
+  );
+
+  useKeyboardShortcuts({
+    onAdd: useCallback(() => openQuickAdd("transactions"), [openQuickAdd]),
+    onHelp: useCallback(() => setShortcutsOpen(true), []),
+  });
 
   return (
     <>
@@ -101,59 +121,62 @@ export function AppSidebar({
         <SidebarContent>
           <SidebarGroup>
             <SidebarGroupContent>
-              <SidebarMenu>
-                {NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin).map(
-                  (item) =>
-                    item.items ? (
-                      <NavGroup
-                        key={item.key}
-                        label={t(`nav.${item.key}`)}
-                        icon={<item.icon />}
-                        items={item.items}
-                        isActive={pathname.startsWith(item.href)}
-                        // icon-only: sub-items have no room, so they pop out
-                        asMenu={state === "collapsed" && !isMobile}
-                        onNavigate={() => setOpenMobile(false)}
-                      />
-                    ) : (
-                      <SidebarMenuItem key={item.key}>
-                        <SidebarMenuButton
-                          asChild
+              <nav aria-label={t("nav.sections")}>
+                <SidebarMenu>
+                  {NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin).map(
+                    (item) =>
+                      item.items ? (
+                        <NavGroup
+                          key={item.key}
+                          label={t(`nav.${item.key}`)}
+                          icon={<item.icon />}
+                          items={item.items}
                           isActive={pathname.startsWith(item.href)}
-                          className={ACTIVE_BUTTON}
-                          tooltip={t(`nav.${item.key}`)}
-                        >
-                          <Link
-                            href={item.href}
-                            onClick={() => setOpenMobile(false)}
+                          // icon-only: sub-items have no room, so they pop out
+                          asMenu={state === "collapsed" && !isMobile}
+                          onNavigate={() => setOpenMobile(false)}
+                        />
+                      ) : (
+                        <SidebarMenuItem key={item.key}>
+                          <SidebarMenuButton
+                            asChild
+                            isActive={pathname.startsWith(item.href)}
+                            className={ACTIVE_BUTTON}
+                            tooltip={t(`nav.${item.key}`)}
                           >
-                            <NavIcon icon={item.icon} />
-                            <span>{t(`nav.${item.key}`)}</span>
-                          </Link>
-                        </SidebarMenuButton>
-                        {item.quickAdd ? (
-                          <SidebarMenuAction
-                            aria-label={t(`${item.key}.add`)}
-                            title={t(`${item.key}.add`)}
-                            className="peer-data-active/menu-button:text-sidebar-primary-foreground peer-data-active/menu-button:hover:bg-sidebar-primary-foreground/15 peer-data-active/menu-button:hover:text-sidebar-primary-foreground"
-                            onClick={() => openQuickAdd(item.key)}
-                          >
-                            <PlusIcon />
-                          </SidebarMenuAction>
-                        ) : null}
-                      </SidebarMenuItem>
-                    ),
-                )}
-              </SidebarMenu>
+                            <Link
+                              href={item.href}
+                              onClick={() => setOpenMobile(false)}
+                            >
+                              <NavIcon icon={item.icon} />
+                              <span>{t(`nav.${item.key}`)}</span>
+                            </Link>
+                          </SidebarMenuButton>
+                          {item.quickAdd ? (
+                            <SidebarMenuAction
+                              aria-label={t(`${item.key}.add`)}
+                              title={t(`${item.key}.add`)}
+                              className="peer-data-active/menu-button:text-sidebar-primary-foreground peer-data-active/menu-button:hover:bg-sidebar-primary-foreground/15 peer-data-active/menu-button:hover:text-sidebar-primary-foreground"
+                              onClick={() => openQuickAdd(item.key)}
+                            >
+                              <PlusIcon />
+                            </SidebarMenuAction>
+                          ) : null}
+                        </SidebarMenuItem>
+                      ),
+                  )}
+                </SidebarMenu>
+              </nav>
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
         <SidebarFooter>
-          <UserMenu user={user} />
+          <UserMenu user={user} onShortcuts={() => setShortcutsOpen(true)} />
         </SidebarFooter>
         <SidebarRail />
       </Sidebar>
       <BottomNav onAdd={() => openQuickAdd("transactions")} />
+      <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       {/* outside the sidebar: on phones it is a sheet that unmounts on close */}
       <QuickAddDialogs
         kind={quickAdd}

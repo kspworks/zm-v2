@@ -37,7 +37,8 @@
     "deleted": "Deleted",
     "createAccountLink": "Create an account",
     "share": "Share",
-    "undo": "Undo"
+    "undo": "Undo",
+    "moreActions": "More actions"
   },
   "seed": {
     "cash": "Cash",
@@ -83,7 +84,10 @@
     "openMenu": "Open menu",
     "build": "Build {id} · {env}",
     "primary": "Main navigation",
-    "menu": "Menu"
+    "menu": "Menu",
+    "budgets": "Budgets",
+    "sections": "Sections",
+    "skip": "Skip to content"
   },
   "auth": {
     "login": {
@@ -491,7 +495,7 @@
   },
   "bulk": {
     "title": "Bulk entry",
-    "description": "Add several transactions at once.",
+    "description": "Add several transactions at once. Enter in an amount moves to the next row.",
     "addRow": "Add row",
     "removeRow": "Remove row",
     "date": "Date",
@@ -560,6 +564,17 @@
       "accountsHint": "Add your cards, savings and opening balances",
       "planned": "Plan regular payments",
       "plannedHint": "Salary, rent and subscriptions feed the forecast"
+    },
+    "month": {
+      "title": "This month",
+      "comparedDays": "Compared with the first {days, plural, one {# day} other {# days}} of last month",
+      "comparedMonth": "Compared with last month",
+      "income": "Income",
+      "expenses": "Expenses",
+      "net": "Net",
+      "vsLast": "{change} vs last month",
+      "allBudgets": "All budgets",
+      "setBudget": "Set a budget"
     }
   },
   "reports": {
@@ -673,7 +688,15 @@
     "newCodes": "Your new backup codes",
     "primaryCurrency": "Primary currency",
     "primaryCurrencyHint": "Shown first and opened by default on the dashboard.",
-    "primaryCurrencyAuto": "Most used"
+    "primaryCurrencyAuto": "Most used",
+    "appearance": "Appearance",
+    "checkTitle": "Confirm it’s you",
+    "checkHint": "Enter your password and a fresh code once, then make any change below.",
+    "tabs": {
+      "general": "General",
+      "security": "Security",
+      "data": "Data"
+    }
   },
   "recover": {
     "title": "Recover your account",
@@ -706,5 +729,64 @@
       "ignore": "If it wasn't you, ignore this email: your password stays the same."
     },
     "footer": "ZM Notifications"
+  },
+  "budgets": {
+    "title": "Budgets",
+    "add": "Add budget",
+    "hint": "A monthly limit per expense category. A budget on a category includes its subcategories, and only spending in its currency counts.",
+    "newTitle": "New budget",
+    "editTitle": "Edit budget",
+    "formHint": "The limit resets on the 1st of every month.",
+    "category": "Category",
+    "amount": "Monthly limit",
+    "currency": "Currency",
+    "left": "Left",
+    "over": "Over by",
+    "empty": "No budgets yet",
+    "emptyHint": "Set a monthly limit on the categories you want to keep an eye on.",
+    "deleteTitle": "Delete the budget for “{name}”?"
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "hint": "Shortcuts work anywhere outside a text field or dialog.",
+    "then": "then",
+    "add": "Add a transaction",
+    "search": "Search transactions",
+    "dashboard": "Go to Dashboard",
+    "transactions": "Go to Transactions",
+    "planned": "Go to Planned",
+    "reports": "Go to Reports",
+    "budgets": "Go to Budgets",
+    "accounts": "Go to Accounts",
+    "categories": "Go to Categories",
+    "settings": "Go to Settings",
+    "help": "Show this list"
+  },
+  "exports": {
+    "title": "Export your data",
+    "hint": "Download every transaction you can see. CSV opens in a spreadsheet; JSON also has your accounts and categories. Neither is a format ZM imports back.",
+    "csv": "Transactions (CSV)",
+    "json": "Full copy (JSON)"
+  },
+  "history": {
+    "title": "History",
+    "hint": "Changes you made, newest first.",
+    "empty": "Nothing changed yet",
+    "more": "Show more",
+    "count": "{count} items",
+    "actions": {
+      "create": "Created",
+      "update": "Changed",
+      "delete": "Deleted",
+      "restore": "Restored"
+    },
+    "types": {
+      "transaction": "Transaction",
+      "schedule": "Planned series",
+      "account": "Account",
+      "category": "Category",
+      "counterparty": "Counterparty",
+      "budget": "Budget"
+    }
   }
 }

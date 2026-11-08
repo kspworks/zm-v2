@@ -18,6 +18,7 @@ import { BalanceChart } from "~/components/dashboard/balance-chart";
 import { BalanceSummary } from "~/components/dashboard/balance-summary";
 import { ForecastTable } from "~/components/dashboard/forecast-table";
 import { GettingStarted } from "~/components/dashboard/getting-started";
+import { MonthSummary } from "~/components/dashboard/month-summary";
 import { NearestPlanned } from "~/components/dashboard/nearest-planned";
 import {
   type TransactionDialogState,
@@ -360,6 +361,7 @@ export function DashboardView() {
         <GettingStarted onAdd={() => setDialog({ mode: "create" })} />
       ) : (
         <>
+          {currency ? <MonthSummary currencyId={currency.id} /> : null}
           <Card className="gap-2">
             <CardHeader>
               <CardTitle>{t("balance.title")}</CardTitle>

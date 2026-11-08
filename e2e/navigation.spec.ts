@@ -10,11 +10,13 @@ const PAGES = [
   "Dashboard",
   "Transactions",
   "Planned",
+  "Budgets",
   "Accounts",
   "Categories",
   "Counterparties",
   // admin-only, and the setup user is the bootstrap admin
   "Users",
+  "Settings",
 ];
 
 test("the sidebar reaches every page", async ({ page }) => {
@@ -91,8 +93,12 @@ test("settings are in the user menu", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Settings", level: 1 }),
   ).toBeVisible();
-  // import lives at the bottom of settings, not in the sidebar
+  // import, export and history live together on the Data tab
+  await page.getByRole("tab", { name: "Data" }).click();
   await expect(page.getByText("Import a ZenMoney export")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Transactions (CSV)" }),
+  ).toBeVisible();
 });
 
 test("switches the language and back", async ({ page }) => {
@@ -241,4 +247,56 @@ test("a due planned row is paid in one click and can be undone", async ({
 
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(page.locator("main").getByText("Pay me")).toBeVisible();
+});
+
+test("keyboard: N adds, ? lists the shortcuts, G then B opens Budgets", async ({
+  page,
+}) => {
+  await page.goto("/dashboard");
+  await page.locator("main h1").click();
+
+  await page.keyboard.press("n");
+  const add = page.getByRole("dialog", { name: "New transaction" });
+  await expect(add).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(add).toBeHidden();
+
+  await page.keyboard.press("Shift+Slash");
+  await expect(
+    page.getByRole("dialog", { name: "Keyboard shortcuts" }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await page.keyboard.press("g");
+  await page.keyboard.press("b");
+  await expect(page).toHaveURL(/\/budgets$/);
+});
+
+test("the skip link jumps past the sidebar", async ({ page }) => {
+  await page.goto("/dashboard");
+  await page.keyboard.press("Tab");
+  const skip = page.getByRole("link", { name: "Skip to content" });
+
+  await expect(skip).toBeFocused();
+  await skip.press("Enter");
+  await expect(page.locator("main#main")).toBeFocused();
+});
+
+test("a budget shows its progress on the dashboard", async ({ page }) => {
+  await page.goto("/budgets");
+  await page
+    .locator("main")
+    .getByRole("button", { name: "Add budget" })
+    .first()
+    .click();
+
+  const dialog = page.getByRole("dialog", { name: "New budget" });
+  await dialog.getByRole("combobox", { name: "Category" }).click();
+  await page.getByPlaceholder("Search category…").fill("Pets");
+  await page.getByRole("option", { name: "Pets", exact: true }).click();
+  await dialog.getByLabel("Monthly limit").fill("1000");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toBeHidden();
+
+  await expect(page.getByRole("meter", { name: "Pets" })).toBeVisible();
 });

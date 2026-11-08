@@ -5,6 +5,8 @@ import {
   FolderTreeIcon,
   LayoutDashboardIcon,
   type LucideIcon,
+  SettingsIcon,
+  TargetIcon,
   UsersIcon,
   UsersRoundIcon,
   WalletIcon,
@@ -15,10 +17,12 @@ export type NavKey =
   | "transactions"
   | "planned"
   | "reports"
+  | "budgets"
   | "accounts"
   | "categories"
   | "counterparties"
-  | "users";
+  | "users"
+  | "settings";
 
 /** Items whose sidebar entry carries a "+" that opens the page's create dialog */
 export type QuickAddKey = Extract<
@@ -61,6 +65,7 @@ export const NAV_ITEMS: NavItem[] = [
       { href: "/reports/compare", label: "reports.comparison" },
     ],
   },
+  { key: "budgets", href: "/budgets", icon: TargetIcon },
   { key: "accounts", href: "/accounts", icon: WalletIcon, quickAdd: true },
   {
     key: "categories",
@@ -70,4 +75,5 @@ export const NAV_ITEMS: NavItem[] = [
   },
   { key: "counterparties", href: "/counterparties", icon: UsersRoundIcon },
   { key: "users", href: "/users", icon: UsersIcon, adminOnly: true },
+  { key: "settings", href: "/settings", icon: SettingsIcon },
 ];

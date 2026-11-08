@@ -180,6 +180,17 @@ Per entity, through the member tables, with `canRead` / `canWrite`:
   it that have passed (`sameDays` in `~/lib/period`), so a part of a month is
   never set against a whole one.
 
+## Budgets, history and export
+
+- A **budget** is a monthly limit per (user, expense category, currency); saving
+  the same pair again changes the amount. Spending is this calendar month's
+  submitted expenses on readable accounts in that currency, a parent counting
+  its subcategories, computed on read.
+- **History** reads `history_logs` for the signed-in user only. Rows written in
+  one transaction share `created_at` and show as one entry with a count.
+- **Export** (CSV and JSON) covers submitted legs on readable accounts. Text
+  cells that a spreadsheet would run as a formula get a leading apostrophe.
+
 ## Planned transactions
 
 - Generation is **idempotent**: the horizon is `min(endDate, today + 1 year)`,

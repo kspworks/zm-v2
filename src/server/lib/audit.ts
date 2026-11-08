@@ -9,6 +9,7 @@ export type AuditEntity =
   | "transaction"
   | "schedule"
   | "counterparty"
+  | "budget"
   | "user"
   | "import";
 

@@ -489,6 +489,33 @@ export const rateLimits = pgTable("rate_limits", {
   windowStart: tz().notNull(),
 });
 
+export const budgets = pgTable(
+  "budgets",
+  {
+    id: id(),
+    userId: text()
+      .notNull()
+      .references(() => users.id, restrict),
+    categoryId: text()
+      .notNull()
+      .references(() => categories.id, restrict),
+    currencyId: text()
+      .notNull()
+      .references(() => currencies.id, restrict),
+    /** The monthly limit, positive */
+    amount: money().notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    deletedAt: tz(),
+  },
+  (t) => [
+    uniqueIndex("budgets_user_category_currency_live_uq")
+      .on(t.userId, t.categoryId, t.currencyId)
+      .where(live(t.deletedAt)),
+    check("budgets_amount_ck", sql`${t.amount} > 0`),
+  ],
+);
+
 export const historyLogs = pgTable(
   "history_logs",
   {
@@ -500,5 +527,8 @@ export const historyLogs = pgTable(
     payload: jsonb().notNull(),
     createdAt: createdAt(),
   },
-  (t) => [index("history_logs_entity_idx").on(t.entityType, t.entityId)],
+  (t) => [
+    index("history_logs_entity_idx").on(t.entityType, t.entityId),
+    index("history_logs_user_idx").on(t.userId, t.createdAt),
+  ],
 );

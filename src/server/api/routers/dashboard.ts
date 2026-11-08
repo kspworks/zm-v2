@@ -16,6 +16,7 @@ import { runForTrpc } from "~/server/effect/runtime";
 import {
   balanceSeries,
   forecast,
+  monthSummary,
   nearestPlanned,
 } from "~/server/services/dashboard";
 
@@ -45,6 +46,10 @@ export const dashboardRouter = createTRPCRouter({
     .query(({ ctx, input, signal }) =>
       runForTrpc(forecast(ctx.user.id, input), signal),
     ),
+
+  month: protectedProcedure.query(({ ctx, signal }) =>
+    runForTrpc(monthSummary(ctx.user.id), signal),
+  ),
 
   nearest: protectedProcedure.query(({ ctx, signal }) =>
     runForTrpc(nearestPlanned(ctx.user.id), signal),

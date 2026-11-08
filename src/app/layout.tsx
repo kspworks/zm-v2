@@ -24,6 +24,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: { default: "ZM", template: "%s · ZM" },
   description: "Personal budget manager",
+  appleWebApp: { capable: true, title: "ZM" },
 };
 
 export const viewport: Viewport = {

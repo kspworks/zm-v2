@@ -18,6 +18,7 @@ import {
 /** The Transactions page with its secondary entry points */
 export function TransactionsPage() {
   const t = useTranslations("transactions");
+  const tc = useTranslations("common");
   const [bulkOpen, setBulkOpen] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
 
@@ -27,7 +28,11 @@ export function TransactionsPage() {
         extraActions={
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon-sm" aria-label={t("bulk")}>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                aria-label={tc("moreActions")}
+              >
                 <EllipsisIcon />
               </Button>
             </DropdownMenuTrigger>

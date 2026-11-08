@@ -2,13 +2,18 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { InfoIcon } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { useTheme } from "next-themes";
+import { parseAsStringLiteral, useQueryState } from "nuqs";
 import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
 
+import { useSwitchLocale } from "~/components/app/language-switcher";
 import { PageHeader } from "~/components/app/page-header";
 import { BackupCodes } from "~/components/auth/backup-codes";
 import { TotpEnrolment } from "~/components/auth/totp-enrolment";
+import { ExportCard } from "~/components/settings/export-card";
+import { HistoryCard } from "~/components/settings/history-card";
 import { ImportCard } from "~/components/settings/import-card";
 import { Alert, AlertDescription } from "~/components/ui/alert";
 import { Button } from "~/components/ui/button";
@@ -29,8 +34,10 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { Spinner } from "~/components/ui/spinner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { usePrimaryCurrency } from "~/hooks/use-primary-currency";
 import { useToastError } from "~/hooks/use-toast-error";
+import { isLocale, LOCALES } from "~/i18n/config";
 import { useTRPC } from "~/trpc/react";
 
 function TextField({
@@ -116,96 +123,43 @@ function PrimaryCurrencyCard() {
   );
 }
 
-function PasswordCard() {
-  const t = useTranslations("settings");
-  const trpc = useTRPC();
-  const toastError = useToastError();
-  const [current, setCurrent] = useState("");
-  const [next, setNext] = useState("");
-  const [code, setCode] = useState("");
-
-  const change = useMutation(
-    trpc.settings.changePassword.mutationOptions({
-      onSuccess: () => {
-        toast.success(t("passwordChanged"));
-        setCurrent("");
-        setNext("");
-        setCode("");
-      },
-      onError: toastError,
-    }),
-  );
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("password")}</CardTitle>
-        <CardDescription>{t("passwordHint")}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form
-          method="post"
-          onSubmit={submitWith(() =>
-            change.mutate({
-              currentPassword: current,
-              newPassword: next,
-              code,
-            }),
-          )}
-        >
-          <FieldGroup>
-            <TextField
-              id="pw-current"
-              label={t("currentPassword")}
-              type="password"
-              autoComplete="current-password"
-              value={current}
-              onChange={setCurrent}
-            />
-            <TextField
-              id="pw-new"
-              label={t("newPassword")}
-              type="password"
-              autoComplete="new-password"
-              value={next}
-              onChange={setNext}
-            />
-            <TextField
-              id="pw-code"
-              label={t("code")}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              value={code}
-              onChange={setCode}
-            />
-            <Button
-              type="submit"
-              className="self-start"
-              disabled={
-                change.isPending || next.length < 6 || code.length !== 6
-              }
-            >
-              {change.isPending ? <Spinner /> : null}
-              {t("changePassword")}
-            </Button>
-          </FieldGroup>
-        </form>
-      </CardContent>
-    </Card>
-  );
-}
-
-function AuthenticatorCard() {
+/**
+ * Password, authenticator and backup codes behind one check: the password and
+ * a code are asked once, then any of the three changes can be made.
+ */
+function SecurityPanel() {
   const t = useTranslations("settings");
   const trpc = useTRPC();
   const toastError = useToastError();
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
+  const [next, setNext] = useState("");
   const [newCode, setNewCode] = useState("");
   const [codes, setCodes] = useState<string[] | null>(null);
 
+  const clearCheck = () => {
+    setPassword("");
+    setCode("");
+  };
+  // an authenticator code works once; the re-enrolment also takes a backup code
+  const checked = !!password && /^\d{6}$/.test(code.trim());
+  const checkedOrBackup = !!password && code.trim().length >= 6;
+
+  const change = useMutation(
+    trpc.settings.changePassword.mutationOptions({
+      onSuccess: () => {
+        toast.success(t("passwordChanged"));
+        clearCheck();
+        setNext("");
+      },
+      onError: toastError,
+    }),
+  );
   const start = useMutation(
-    trpc.settings.startReenrol.mutationOptions({ onError: toastError }),
+    trpc.settings.startReenrol.mutationOptions({
+      onSuccess: clearCheck,
+      onError: toastError,
+    }),
   );
   const confirm = useMutation(
     trpc.settings.confirmReenrol.mutationOptions({
@@ -213,8 +167,6 @@ function AuthenticatorCard() {
         toast.success(t("reenrolled"));
         setCodes(result.backupCodes);
         start.reset();
-        setPassword("");
-        setCode("");
         setNewCode("");
       },
       onError: (error) => {
@@ -223,115 +175,28 @@ function AuthenticatorCard() {
       },
     }),
   );
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("authenticator")}</CardTitle>
-        <CardDescription>{t("authenticatorHint")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        {codes ? (
-          <>
-            <p className="text-sm font-medium">{t("newCodes")}</p>
-            <BackupCodes codes={codes} />
-          </>
-        ) : start.data ? (
-          <form
-            method="post"
-            className="flex flex-col gap-4"
-            onSubmit={submitWith(() => confirm.mutate({ code: newCode }))}
-          >
-            <TotpEnrolment
-              qrDataUrl={start.data.qrDataUrl}
-              manualKey={start.data.manualKey}
-              otpUri={start.data.otpUri}
-              code={newCode}
-              onCodeChange={setNewCode}
-              onComplete={(value) => confirm.mutate({ code: value })}
-            />
-            <Button
-              type="submit"
-              className="self-center"
-              disabled={confirm.isPending || newCode.length !== 6}
-            >
-              {confirm.isPending ? <Spinner /> : null}
-              {t("confirm")}
-            </Button>
-          </form>
-        ) : (
-          <form
-            method="post"
-            onSubmit={submitWith(() => start.mutate({ password, code }))}
-          >
-            <FieldGroup>
-              <TextField
-                id="re-password"
-                label={t("currentPassword")}
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={setPassword}
-              />
-              <TextField
-                id="re-code"
-                label={t("codeOrBackup")}
-                autoComplete="one-time-code"
-                value={code}
-                onChange={setCode}
-              />
-              <Button
-                type="submit"
-                className="self-start"
-                disabled={
-                  start.isPending || !password || code.trim().length < 6
-                }
-              >
-                {start.isPending ? <Spinner /> : null}
-                {t("reenrol")}
-              </Button>
-            </FieldGroup>
-          </form>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function BackupCodesCard() {
-  const t = useTranslations("settings");
-  const trpc = useTRPC();
-  const toastError = useToastError();
-  const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
-
   const regenerate = useMutation(
     trpc.settings.backupCodes.mutationOptions({
-      onSuccess: () => {
-        setPassword("");
-        setCode("");
+      onSuccess: (result) => {
+        setCodes(result.backupCodes);
+        clearCheck();
       },
       onError: toastError,
     }),
   );
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("backupCodes")}</CardTitle>
-        <CardDescription>{t("backupHint")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        {regenerate.data ? (
-          <BackupCodes codes={regenerate.data.backupCodes} />
-        ) : (
-          <form
-            method="post"
-            onSubmit={submitWith(() => regenerate.mutate({ password, code }))}
-          >
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("checkTitle")}</CardTitle>
+          <CardDescription>{t("checkHint")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form method="post" onSubmit={submitWith(() => undefined)}>
             <FieldGroup>
               <TextField
-                id="bc-password"
+                id="check-password"
                 label={t("currentPassword")}
                 type="password"
                 autoComplete="current-password"
@@ -339,33 +204,196 @@ function BackupCodesCard() {
                 onChange={setPassword}
               />
               <TextField
-                id="bc-code"
-                label={t("code")}
-                inputMode="numeric"
+                id="check-code"
+                label={t("codeOrBackup")}
                 autoComplete="one-time-code"
                 value={code}
                 onChange={setCode}
               />
+            </FieldGroup>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("password")}</CardTitle>
+          <CardDescription>{t("passwordHint")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            method="post"
+            onSubmit={submitWith(() =>
+              change.mutate({
+                currentPassword: password,
+                newPassword: next,
+                code: code.trim(),
+              }),
+            )}
+          >
+            <FieldGroup>
+              <TextField
+                id="pw-new"
+                label={t("newPassword")}
+                type="password"
+                autoComplete="new-password"
+                value={next}
+                onChange={setNext}
+              />
               <Button
                 type="submit"
                 className="self-start"
-                disabled={
-                  regenerate.isPending || !password || code.length !== 6
-                }
+                disabled={change.isPending || !checked || next.length < 6}
               >
-                {regenerate.isPending ? <Spinner /> : null}
-                {t("regenerate")}
+                {change.isPending ? <Spinner /> : null}
+                {t("changePassword")}
               </Button>
             </FieldGroup>
           </form>
-        )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("authenticator")}</CardTitle>
+          <CardDescription>{t("authenticatorHint")}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          {start.data ? (
+            <form
+              method="post"
+              className="flex flex-col gap-4"
+              onSubmit={submitWith(() => confirm.mutate({ code: newCode }))}
+            >
+              <TotpEnrolment
+                qrDataUrl={start.data.qrDataUrl}
+                manualKey={start.data.manualKey}
+                otpUri={start.data.otpUri}
+                code={newCode}
+                onCodeChange={setNewCode}
+                onComplete={(value) => confirm.mutate({ code: value })}
+              />
+              <Button
+                type="submit"
+                className="self-center"
+                disabled={confirm.isPending || newCode.length !== 6}
+              >
+                {confirm.isPending ? <Spinner /> : null}
+                {t("confirm")}
+              </Button>
+            </form>
+          ) : (
+            <Button
+              className="self-start"
+              disabled={start.isPending || !checkedOrBackup}
+              onClick={() => start.mutate({ password, code: code.trim() })}
+            >
+              {start.isPending ? <Spinner /> : null}
+              {t("reenrol")}
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("backupCodes")}</CardTitle>
+          <CardDescription>{t("backupHint")}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          {codes ? (
+            <>
+              <p className="text-sm font-medium">{t("newCodes")}</p>
+              <BackupCodes codes={codes} />
+            </>
+          ) : (
+            <Button
+              className="self-start"
+              disabled={regenerate.isPending || !checked}
+              onClick={() => regenerate.mutate({ password, code: code.trim() })}
+            >
+              {regenerate.isPending ? <Spinner /> : null}
+              {t("regenerate")}
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    </>
+  );
+}
+
+/** Language and theme, which were two levels deep in the user menu */
+function AppearanceCard() {
+  const t = useTranslations();
+  const locale = useLocale();
+  const { theme, setTheme } = useTheme();
+  const { switchLocale, pending } = useSwitchLocale(true);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("settings.appearance")}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <FieldGroup className="grid gap-4 sm:grid-cols-2">
+          <Field>
+            <FieldLabel htmlFor="settings-language">
+              {t("common.language")}
+            </FieldLabel>
+            <Select
+              value={locale}
+              disabled={pending}
+              onValueChange={(value) => {
+                if (isLocale(value)) {
+                  void switchLocale(value);
+                }
+              }}
+            >
+              <SelectTrigger id="settings-language" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {LOCALES.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {t(`locales.${option}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="settings-theme">
+              {t("common.theme")}
+            </FieldLabel>
+            <Select value={theme ?? "dark"} onValueChange={setTheme}>
+              <SelectTrigger id="settings-theme" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(["system", "light", "dark"] as const).map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {t(`theme.${option}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        </FieldGroup>
       </CardContent>
     </Card>
   );
 }
 
+const TABS = ["general", "security", "data"] as const;
+
 export function SettingsView({ reenrolPrompt }: { reenrolPrompt: boolean }) {
   const t = useTranslations("settings");
+  const [tab, setTab] = useQueryState(
+    "tab",
+    parseAsStringLiteral(TABS).withDefault(
+      reenrolPrompt ? "security" : "general",
+    ),
+  );
 
   return (
     <>
@@ -377,11 +405,30 @@ export function SettingsView({ reenrolPrompt }: { reenrolPrompt: boolean }) {
             <AlertDescription>{t("reenrolPrompt")}</AlertDescription>
           </Alert>
         ) : null}
-        <PrimaryCurrencyCard />
-        <AuthenticatorCard />
-        <PasswordCard />
-        <BackupCodesCard />
-        <ImportCard />
+        <Tabs
+          value={tab}
+          onValueChange={(value) => void setTab(value as (typeof TABS)[number])}
+        >
+          <TabsList className="w-full">
+            {TABS.map((value) => (
+              <TabsTrigger key={value} value={value}>
+                {t(`tabs.${value}`)}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <TabsContent value="general" className="flex flex-col gap-6 pt-4">
+            <PrimaryCurrencyCard />
+            <AppearanceCard />
+          </TabsContent>
+          <TabsContent value="security" className="flex flex-col gap-6 pt-4">
+            <SecurityPanel />
+          </TabsContent>
+          <TabsContent value="data" className="flex flex-col gap-6 pt-4">
+            <ExportCard />
+            <ImportCard />
+            <HistoryCard />
+          </TabsContent>
+        </Tabs>
       </div>
     </>
   );

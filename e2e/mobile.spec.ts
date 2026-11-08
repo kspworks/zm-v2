@@ -18,12 +18,14 @@ const PAGES = [
   ["Dashboard", "/dashboard"],
   ["Transactions", "/transactions"],
   ["Planned", "/planned"],
+  ["Budgets", "/budgets"],
   ["Map", "/reports/map", "Reports / Map", "Reports"],
   ["Period comparison", "/reports/compare", "Reports / Period comparison"],
   ["Accounts", "/accounts"],
   ["Categories", "/categories"],
   ["Counterparties", "/counterparties"],
   ["Users", "/users"],
+  ["Settings", "/settings"],
 ] as [string, string, string?, string?][];
 
 test.describe("signed out", () => {

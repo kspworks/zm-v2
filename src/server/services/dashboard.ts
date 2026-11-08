@@ -12,6 +12,7 @@ import {
   forecastWindow,
   NEAREST_DAYS,
 } from "~/lib/dashboard";
+import { monthOf, sameDays, shiftPeriod } from "~/lib/period";
 import { type Database, query, type SqlError } from "~/server/db/database";
 import { accounts, transactions } from "~/server/db/schema";
 import type { AppConfig } from "~/server/effect/app-config";
@@ -20,6 +21,7 @@ import { readableAccounts } from "~/server/services/accounts";
 import {
   type DashboardPairRow,
   dashboardPairs,
+  filteredTotals,
   nearestPlannedDates,
 } from "~/server/services/transaction-queries";
 
@@ -258,4 +260,31 @@ export const nearestPlanned = Effect.fn("dashboard.nearestPlanned")(function* (
   }
 
   return dates.map((date) => ({ date, items: days.get(date) ?? [] }));
+});
+
+/**
+ * This month's income and expenses per currency against the same days of
+ * last month (all of it on the last day), counted like the totals bar.
+ */
+export const monthSummary = Effect.fn("dashboard.monthSummary")(function* (
+  userId: string,
+  todayOverride?: string,
+) {
+  const date = todayOverride ?? (yield* todayInAppZone);
+  const current = monthOf(date);
+  const running = sameDays([shiftPeriod(current, -1), current], date);
+  const [previous, now] = running?.periods ?? [
+    shiftPeriod(current, -1),
+    current,
+  ];
+  const [previousTotals, currentTotals] = yield* Effect.all(
+    [filteredTotals(userId, previous), filteredTotals(userId, now)],
+    { concurrency: "unbounded" },
+  );
+
+  return {
+    days: running?.days ?? null,
+    current: currentTotals,
+    previous: previousTotals,
+  };
 });

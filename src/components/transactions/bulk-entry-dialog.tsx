@@ -3,7 +3,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { MinusIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { DatePicker } from "~/components/app/date-picker";
@@ -36,17 +36,20 @@ type Row = {
   date: string | null;
   /** `""` is the default account */
   accountId: string;
+  comment: string;
 };
 
 let nextKey = 1;
 
-const emptyRow = (kind: Row["kind"] = "expense"): Row => ({
+/** A new row repeats the last one's type, date and account */
+const emptyRow = (after?: Row): Row => ({
   key: nextKey++,
-  kind,
+  kind: after?.kind ?? "expense",
   amount: "",
   categoryId: null,
-  date: null,
-  accountId: "",
+  date: after?.date ?? null,
+  accountId: after?.accountId ?? "",
+  comment: "",
 });
 
 /** Several rows, each with its own date and account, saved in one call */
@@ -74,6 +77,32 @@ export function BulkEntryDialog({
   );
   const [rows, setRows] = useState<Row[]>(() => [emptyRow(), emptyRow()]);
   const [showErrors, setShowErrors] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const focusAmount = useCallback(
+    (index: number) =>
+      requestAnimationFrame(() =>
+        formRef.current
+          ?.querySelectorAll<HTMLInputElement>("[data-bulk-amount]")
+          [index]?.focus(),
+      ),
+    [],
+  );
+
+  // start on the first amount, not the date: that is what changes most
+  useEffect(() => {
+    if (open) {
+      focusAmount(0);
+    }
+  }, [open, focusAmount]);
+
+  /** Enter in an amount goes to the next row's, adding one at the end */
+  const nextRow = (index: number) => {
+    if (index === rows.length - 1) {
+      setRows((current) => [...current, emptyRow(current.at(-1))]);
+    }
+
+    focusAmount(index + 1);
+  };
   const accountOf = (row: Row) => row.accountId || accountOptions[0]?.id || "";
 
   const options = useMemo(
@@ -134,6 +163,7 @@ export function BulkEntryDialog({
         amount: parseAmountInput(row.amount) ?? 0,
         accountId: accountOf(row),
         categoryId: row.categoryId,
+        comment: row.comment.trim() || null,
       })),
     });
   };
@@ -144,7 +174,7 @@ export function BulkEntryDialog({
       onOpenChange={onOpenChange}
       title={t("title")}
       description={t("description")}
-      className="sm:max-w-4xl"
+      className="sm:max-w-5xl"
       footer={
         <>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -161,6 +191,7 @@ export function BulkEntryDialog({
       }
     >
       <form
+        ref={formRef}
         className="flex flex-col gap-4"
         onSubmit={(event) => {
           event.preventDefault();
@@ -177,7 +208,7 @@ export function BulkEntryDialog({
           {rows.map((row, index) => (
             <div
               key={row.key}
-              className="grid grid-cols-[auto_1fr_auto] gap-2 rounded-lg border p-2 sm:grid-cols-[9rem_auto_7rem_minmax(0,1fr)_minmax(0,1fr)_auto] sm:border-0 sm:p-0"
+              className="grid grid-cols-[auto_1fr_auto] gap-2 rounded-lg border p-2 sm:grid-cols-[9rem_auto_7rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] sm:border-0 sm:p-0"
             >
               <DatePicker
                 className="col-span-3 max-sm:order-1 sm:col-span-1"
@@ -208,8 +239,18 @@ export function BulkEntryDialog({
                 placeholder={tf("amount")}
                 inputMode="decimal"
                 autoComplete="off"
-                autoFocus={index === 0}
+                data-bulk-amount
                 className={cn("tabular-nums")}
+                onKeyDown={(event) => {
+                  if (
+                    event.key === "Enter" &&
+                    !event.ctrlKey &&
+                    !event.metaKey
+                  ) {
+                    event.preventDefault();
+                    nextRow(index);
+                  }
+                }}
                 aria-invalid={showErrors && invalidKeys.has(row.key)}
                 value={row.amount}
                 onChange={(event) =>
@@ -241,6 +282,16 @@ export function BulkEntryDialog({
                   ))}
                 </SelectContent>
               </Select>
+              <Input
+                aria-label={tf("comment")}
+                placeholder={tf("comment")}
+                autoComplete="off"
+                className="col-span-3 max-sm:order-1 sm:col-span-1"
+                value={row.comment}
+                onChange={(event) =>
+                  update(row.key, { comment: event.target.value })
+                }
+              />
               <Button
                 type="button"
                 variant="ghost"
@@ -263,7 +314,7 @@ export function BulkEntryDialog({
           variant="outline"
           className="self-start"
           onClick={() =>
-            setRows((current) => [...current, emptyRow(current.at(-1)?.kind)])
+            setRows((current) => [...current, emptyRow(current.at(-1))])
           }
         >
           <PlusIcon />

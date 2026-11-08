@@ -29,6 +29,13 @@
       "when": 1794081870011,
       "tag": "0003_user_primary_currency",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794090895806,
+      "tag": "0004_budgets_and_history_index",
+      "breakpoints": true
     }
   ]
 }

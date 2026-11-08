@@ -149,7 +149,7 @@ export function TransactionsView({
                 </Button>
               )}
               <Button variant="link" asChild>
-                <Link href="/settings#import">{t("orImport")}</Link>
+                <Link href="/settings?tab=data#import">{t("orImport")}</Link>
               </Button>
             </EmptyContent>
           )}

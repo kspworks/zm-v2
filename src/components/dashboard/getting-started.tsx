@@ -70,7 +70,7 @@ export function GettingStarted({ onAdd }: { onAdd: () => void }) {
             icon={FileUpIcon}
             title={t("import")}
             hint={t("importHint")}
-            href="/settings#import"
+            href="/settings?tab=data#import"
           />
           <Step
             icon={WalletIcon}

@@ -2,6 +2,7 @@
 
 import {
   ChevronsUpDownIcon,
+  KeyboardIcon,
   LanguagesIcon,
   LogOutIcon,
   MonitorIcon,
@@ -53,7 +54,13 @@ const initials = (name: string) =>
     .map((part) => part[0]?.toUpperCase())
     .join("");
 
-export function UserMenu({ user }: { user: MenuUser }) {
+export function UserMenu({
+  user,
+  onShortcuts,
+}: {
+  user: MenuUser;
+  onShortcuts: () => void;
+}) {
   const t = useTranslations();
   const locale = useLocale();
   const router = useRouter();
@@ -164,6 +171,11 @@ export function UserMenu({ user }: { user: MenuUser }) {
                   </DropdownMenuRadioGroup>
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
+              {/* keyboard only: hidden where a touch screen or phone width is */}
+              <DropdownMenuItem className="touch:hidden" onSelect={onShortcuts}>
+                <KeyboardIcon />
+                {t("shortcuts.title")}
+              </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href="/settings">
                   <SettingsIcon />
