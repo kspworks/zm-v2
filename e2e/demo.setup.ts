@@ -11,6 +11,7 @@ import { expect, test as setup } from "./helpers";
  * would have written. Dates are relative to today, so the dashboard and the
  * report look lived-in whenever this runs. A few categories get subcategories,
  * so the nested labels and the report's roll-up have something to show.
+ * The books are in hryvnias, so the seed makes UAH the primary currency.
  */
 
 type Procedure = (path: string, input?: unknown) => Promise<unknown>;
@@ -59,6 +60,10 @@ setup("seed the demo books", async ({ request }) => {
     expect(found, code).toBeDefined();
     return found?.id ?? "";
   };
+
+  // an English sign-up starts on USD; these books are in hryvnias, so pick
+  // UAH the way Settings does, or the dashboard and reports open on dollars
+  await mutate("me.setPrimaryCurrency", { currencyId: currency("UAH") });
 
   const addAccount = async (
     name: string,
