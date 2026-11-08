@@ -57,7 +57,7 @@ export const createAdmin = (
 /** A user who can sign in: password credential plus an enrolled authenticator */
 export const createUserWithCredentials = async (
   overrides: Partial<typeof users.$inferInsert> = {},
-  password = "secret123",
+  password = "secret-1234",
 ) => {
   const user = await createUser(overrides);
   const secret = generateTotpSecret();

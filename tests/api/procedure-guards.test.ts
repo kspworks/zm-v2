@@ -152,7 +152,7 @@ const PROTECTED: [string, (caller: Caller) => Promise<unknown>][] = [
     (c) =>
       c.settings.changePassword({
         currentPassword: "x",
-        newPassword: "secret123",
+        newPassword: "secret-1234",
         code: "123456",
       }),
   ],

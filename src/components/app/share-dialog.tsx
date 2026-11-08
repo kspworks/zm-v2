@@ -47,6 +47,9 @@ export function ShareDialog({
     ...trpc.sharing.list.queryOptions(input),
     enabled: target !== null,
   });
+  // only the owner changes who has access; other writers see the list
+  const isOwner =
+    members.data?.some((member) => member.isSelf && member.isOwner) ?? false;
 
   const invalidate = async () => {
     await queryClient.invalidateQueries(trpc.sharing.list.queryFilter(input));
@@ -81,48 +84,54 @@ export function ShareDialog({
       open={target !== null}
       onOpenChange={onOpenChange}
       title={t("title", { name: target?.name ?? "" })}
-      description={t("description")}
+      description={
+        members.isPending || isOwner ? t("description") : t("ownerOnly")
+      }
     >
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
+      {isOwner ? (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
 
-          if (target && email.trim()) {
-            add.mutate({ ...input, email: email.trim(), canWrite });
-          }
-        }}
-      >
-        <FieldGroup>
-          <Field>
-            <FieldLabel htmlFor="share-email">{t("email")}</FieldLabel>
-            <div className="flex gap-2">
-              <Input
-                id="share-email"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                autoComplete="off"
+            if (target && email.trim()) {
+              add.mutate({ ...input, email: email.trim(), canWrite });
+            }
+          }}
+        >
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="share-email">{t("email")}</FieldLabel>
+              <div className="flex gap-2">
+                <Input
+                  id="share-email"
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  autoComplete="off"
+                />
+                <Button type="submit" disabled={add.isPending || !email.trim()}>
+                  {add.isPending ? <Spinner /> : null}
+                  {t("add")}
+                </Button>
+              </div>
+            </Field>
+            <Field orientation="horizontal">
+              <Switch
+                id="share-write"
+                checked={canWrite}
+                onCheckedChange={setCanWrite}
               />
-              <Button type="submit" disabled={add.isPending || !email.trim()}>
-                {add.isPending ? <Spinner /> : null}
-                {t("add")}
-              </Button>
-            </div>
-          </Field>
-          <Field orientation="horizontal">
-            <Switch
-              id="share-write"
-              checked={canWrite}
-              onCheckedChange={setCanWrite}
-            />
-            <FieldLabel htmlFor="share-write" className="font-normal">
-              {t("canWrite")}
-            </FieldLabel>
-          </Field>
-        </FieldGroup>
-      </form>
+              <FieldLabel htmlFor="share-write" className="font-normal">
+                {t("canWrite")}
+              </FieldLabel>
+            </Field>
+          </FieldGroup>
+        </form>
+      ) : null}
 
-      <div className="mt-6 flex flex-col gap-2">
+      <div
+        className={isOwner ? "mt-6 flex flex-col gap-2" : "flex flex-col gap-2"}
+      >
         <h3 className="text-muted-foreground text-sm font-medium">
           {t("members")}
         </h3>
@@ -151,17 +160,19 @@ export function ShareDialog({
                       <Badge variant="outline">
                         {member.canWrite ? t("readWrite") : t("readOnly")}
                       </Badge>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={t("revoke")}
-                        disabled={revoke.isPending}
-                        onClick={() =>
-                          revoke.mutate({ ...input, userId: member.userId })
-                        }
-                      >
-                        <UserMinusIcon />
-                      </Button>
+                      {isOwner ? (
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={t("revoke")}
+                          disabled={revoke.isPending}
+                          onClick={() =>
+                            revoke.mutate({ ...input, userId: member.userId })
+                          }
+                        >
+                          <UserMinusIcon />
+                        </Button>
+                      ) : null}
                     </>
                   )}
                 </ItemActions>

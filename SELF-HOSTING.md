@@ -164,6 +164,11 @@ read-only filesystem can't hold the file.
    front of Apache (Cloudflare, a load balancer), add its address ranges to
    `advanced.ipAddress.trustedProxies` in `src/server/auth/index.ts`.
    Otherwise every visitor is counted under that proxy's address.
+
+   The app sends its own security headers (`X-Frame-Options`, HSTS,
+   `nosniff`, `Referrer-Policy`, a framing CSP; see `next.config.ts`), so
+   the vhost doesn't need to add them. If it does, keep the values the
+   same, or the browser sees two conflicting copies.
 10. **Switch over.** Run the pipeline on `main`, then check
     `curl -I http://127.0.0.1:8092/auth/login`. Once it answers,
     `apachectl configtest && sudo systemctl reload apache2`. Then stop the

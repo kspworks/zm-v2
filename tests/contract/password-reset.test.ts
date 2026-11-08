@@ -83,6 +83,20 @@ describe("password reset by email", () => {
     ).toBe(true);
   });
 
+  it("refuses a new password shorter than 10 characters", async () => {
+    const { user, password, secret } = await createUserWithCredentials();
+    await requestReset(user.email);
+
+    const short = await new AuthSession().post("/reset-password", {
+      token: await resetToken(),
+      newPassword: "123456789",
+      code: generateTotp(secret),
+    });
+
+    expect(short.status).toBe(400);
+    expect(await signIn(user.email, password, generateTotp(secret))).toBe(true);
+  });
+
   it("accepts a backup code instead of the TOTP", async () => {
     const { user, secret, backupCodes } = await createUserWithCredentials();
     await requestReset(user.email);

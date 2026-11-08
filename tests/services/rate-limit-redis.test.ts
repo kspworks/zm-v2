@@ -7,6 +7,7 @@ import { rateLimits } from "~/server/db/schema";
 import { Redis, type RedisClient } from "~/server/effect/redis";
 import {
   hitRateLimit,
+  postgresRateLimitKey,
   redisRateLimitKey,
   resetRateLimit,
 } from "~/server/lib/rate-limit";
@@ -47,7 +48,12 @@ const withRedis = (run: (redis: RedisClient) => Promise<unknown>) =>
   Effect.flatMap(client, (redis) => Effect.promise(() => run(redis)));
 
 const pgRow = (key: string) =>
-  query((db) => db.select().from(rateLimits).where(eq(rateLimits.key, key)));
+  query((db) =>
+    db
+      .select()
+      .from(rateLimits)
+      .where(eq(rateLimits.key, postgresRateLimitKey(key))),
+  );
 
 layer(
   Layer.mergeAll(

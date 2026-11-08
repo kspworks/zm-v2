@@ -38,6 +38,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { usePrimaryCurrency } from "~/hooks/use-primary-currency";
 import { useToastError } from "~/hooks/use-toast-error";
 import { isLocale, LOCALES } from "~/i18n/config";
+import { MIN_PASSWORD_LENGTH } from "~/lib/validators/auth";
 import { useTRPC } from "~/trpc/react";
 
 function TextField({
@@ -243,7 +244,11 @@ function SecurityPanel() {
               <Button
                 type="submit"
                 className="self-start"
-                disabled={change.isPending || !checked || next.length < 6}
+                disabled={
+                  change.isPending ||
+                  !checked ||
+                  next.length < MIN_PASSWORD_LENGTH
+                }
               >
                 {change.isPending ? <Spinner /> : null}
                 {t("changePassword")}

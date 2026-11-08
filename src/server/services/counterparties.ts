@@ -12,7 +12,7 @@ import {
 } from "~/server/db/schema";
 import { audit } from "~/server/lib/audit";
 import { now } from "~/server/lib/clock";
-import { badRequest, notFound } from "~/server/lib/errors";
+import { badRequest, forbidden, notFound } from "~/server/lib/errors";
 import { newId } from "~/server/lib/ids";
 
 /** Trims and collapses inner whitespace, so "  Alex   K " matches "Alex K" */
@@ -89,7 +89,7 @@ export const resolveCounterpartyRef = Effect.fn("counterparties.resolveRef")(
       );
 
       if (!row) {
-        return yield* badRequest("forbidden");
+        return yield* forbidden();
       }
 
       return row.id;

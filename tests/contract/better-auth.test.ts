@@ -5,6 +5,7 @@ import { consumeAuthRateLimit } from "~/server/auth";
 import { issueSignInTicket } from "~/server/auth/sign-in-ticket";
 import { db } from "~/server/db";
 import { rateLimits, sessions, users } from "~/server/db/schema";
+import { postgresRateLimitKey, rateLimitKeys } from "~/server/lib/rate-limit";
 import { generateTotp } from "~/server/lib/totp";
 import { AuthSession } from "../helpers/auth-http";
 import {
@@ -138,7 +139,7 @@ describe("better-auth sign-in with TOTP", () => {
   it("refuses public sign-up", async () => {
     const response = await new AuthSession().post("/sign-up/email", {
       email: "x@example.com",
-      password: "secret123",
+      password: "secret-1234",
       name: "X",
     });
 
@@ -188,7 +189,12 @@ describe("login rate limit", () => {
       await db
         .select()
         .from(rateLimits)
-        .where(eq(rateLimits.key, `login:email:${user.email}`)),
+        .where(
+          eq(
+            rateLimits.key,
+            postgresRateLimitKey(rateLimitKeys.login(user.email)),
+          ),
+        ),
     ).toHaveLength(0);
   });
 });
@@ -215,7 +221,12 @@ describe("better-auth rate limiter", () => {
     const [row] = await db
       .select()
       .from(rateLimits)
-      .where(eq(rateLimits.key, "auth:127.0.0.1|/sign-in/email"));
+      .where(
+        eq(
+          rateLimits.key,
+          postgresRateLimitKey("auth:127.0.0.1|/sign-in/email"),
+        ),
+      );
     expect(row?.count).toBe(4);
   });
 });

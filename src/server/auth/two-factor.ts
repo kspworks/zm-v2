@@ -5,6 +5,7 @@ import { Effect } from "effect";
 import { auth } from "~/server/auth";
 import { query } from "~/server/db/database";
 import { twoFactors, users } from "~/server/db/schema";
+import { AppConfig } from "~/server/effect/app-config";
 import { now } from "~/server/lib/clock";
 import { randomString } from "~/server/lib/ids";
 import { verifyTotp } from "~/server/lib/totp";
@@ -70,14 +71,18 @@ export const verifyPasswordHash = Effect.fnUntraced(function* (
   return yield* Effect.promise(() => hasher.verify({ hash, password }));
 });
 
-/** Whether `code` is a valid TOTP for `secret` right now (Clock time) */
+/**
+ * Whether `code` is a valid TOTP for `secret` right now (Clock time); in
+ * development the literal DEV_OTP passes too
+ */
 export const totpMatches = Effect.fnUntraced(function* (
   secret: string,
   code: string,
 ) {
   const at = yield* now;
+  const { isDev } = yield* AppConfig;
 
-  return verifyTotp(secret, code, at.getTime());
+  return verifyTotp(secret, code, at.getTime(), isDev);
 });
 
 /**

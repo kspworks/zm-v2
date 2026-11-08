@@ -17,6 +17,7 @@ import {
   transaction,
 } from "~/server/db/database";
 import { authAccounts, invites, users } from "~/server/db/schema";
+import { now } from "~/server/lib/clock";
 import {
   badRequest,
   type Forbidden,
@@ -115,6 +116,7 @@ const ensureInviteSecret = Effect.fnUntraced(function* (invite: ValidInvite) {
 
   // keeps the secret of an unclaimed row, so the QR code stays stable; a
   // claimed row (bootstrap re-opened) gets a fresh secret
+  const at = yield* now;
   const [row] = yield* query((db) =>
     db
       .insert(invites)
@@ -123,13 +125,15 @@ const ensureInviteSecret = Effect.fnUntraced(function* (invite: ValidInvite) {
         otpSecret: generateTotpSecret(),
         comment: "Admin bootstrap",
         createdBy: SYSTEM_USER,
+        createdAt: at,
+        updatedAt: at,
       })
       .onConflictDoUpdate({
         target: invites.id,
         set: {
           otpSecret: sql`CASE WHEN ${invites.userId} IS NULL AND ${invites.otpSecret} IS NOT NULL THEN ${invites.otpSecret} ELSE excluded.otp_secret END`,
           userId: null,
-          updatedAt: sql`now()`,
+          updatedAt: at,
         },
       })
       .returning({ otpSecret: invites.otpSecret }),

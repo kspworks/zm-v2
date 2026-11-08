@@ -14,10 +14,11 @@ import {
 } from "~/server/services/access";
 
 /**
- * Sharing works through the member tables: any member with write access can
- * add another existing user as read-only or read+write, list the members and
- * revoke them. The creator's own row can't be revoked, and debt accounts are
- * never shared.
+ * Sharing works through the member tables. Any member with write access can
+ * list the members; only the creator (the owner) can add another existing
+ * user as read-only or read+write and revoke them, so a shared writer can't
+ * pass access on. The creator's own row can't be revoked, and debt accounts
+ * are never shared.
  */
 
 const requireShareable = Effect.fnUntraced(function* (
@@ -42,6 +43,21 @@ const requireShareable = Effect.fnUntraced(function* (
   }
 
   return { createdBy: access.createdBy };
+});
+
+/** Who may change the members: the owner only */
+const requireShareOwner = Effect.fnUntraced(function* (
+  userId: string,
+  entity: ShareEntity,
+  id: string,
+) {
+  const { createdBy } = yield* requireShareable(userId, entity, id);
+
+  if (createdBy !== userId) {
+    return yield* forbidden();
+  }
+
+  return { createdBy };
 });
 
 const membersTable = (entity: ShareEntity) =>
@@ -92,7 +108,7 @@ export const addShare = Effect.fn("sharing.add")(function* (
     canWrite: boolean;
   },
 ) {
-  yield* requireShareable(userId, input.entity, input.id);
+  yield* requireShareOwner(userId, input.entity, input.id);
 
   const [target] = yield* query((db) =>
     db
@@ -168,7 +184,11 @@ export const revokeShare = Effect.fn("sharing.revoke")(function* (
   userId: string,
   input: { entity: ShareEntity; id: string; userId: string },
 ) {
-  const { createdBy } = yield* requireShareable(userId, input.entity, input.id);
+  const { createdBy } = yield* requireShareOwner(
+    userId,
+    input.entity,
+    input.id,
+  );
 
   if (input.userId === createdBy) {
     return yield* forbidden();

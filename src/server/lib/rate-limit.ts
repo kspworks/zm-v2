@@ -37,8 +37,12 @@ export const rateLimitKeys = {
  * store, so the worst case is twice the limit for that window.
  */
 
-/** Hashed, so emails and reset tokens never appear in Redis as plaintext */
+/**
+ * Hashed in both stores, so emails and reset tokens never sit in Redis or in
+ * the `rate_limits` table as plaintext
+ */
 export const redisRateLimitKey = (key: string) => `zm:rl:${sha256(key)}`;
+export const postgresRateLimitKey = (key: string) => sha256(key);
 
 /**
  * One atomic step: count the attempt, and start the window on the first one.
@@ -73,6 +77,7 @@ const hitPostgres = Effect.fnUntraced(function* (
   windowMs: number,
 ) {
   const at = yield* now;
+  const stored = postgresRateLimitKey(key);
   // raw sql parameters bypass Drizzle's column mapping, so pass ISO strings
   const nowParam = sql`${at.toISOString()}::timestamptz`;
   const cutoff = sql`${new Date(at.getTime() - windowMs).toISOString()}::timestamptz`;
@@ -80,7 +85,7 @@ const hitPostgres = Effect.fnUntraced(function* (
   const [row] = yield* query((db) =>
     db
       .insert(rateLimits)
-      .values({ key, count: 1, windowStart: at })
+      .values({ key: stored, count: 1, windowStart: at })
       .onConflictDoUpdate({
         target: rateLimits.key,
         set: {
@@ -139,7 +144,9 @@ export const resetRateLimit = Effect.fn("rateLimit.reset")(function* (
     );
   }
 
-  yield* query((db) => db.delete(rateLimits).where(eq(rateLimits.key, key)));
+  yield* query((db) =>
+    db.delete(rateLimits).where(eq(rateLimits.key, postgresRateLimitKey(key))),
+  );
 });
 
 /**

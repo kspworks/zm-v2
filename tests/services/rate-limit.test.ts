@@ -5,6 +5,7 @@ import { db } from "~/server/db";
 import { rateLimits } from "~/server/db/schema";
 import {
   hitRateLimit as hitEffect,
+  postgresRateLimitKey,
   resetRateLimit as resetEffect,
   sweepRateLimits as sweepEffect,
 } from "~/server/lib/rate-limit";
@@ -51,7 +52,7 @@ describe("hitRateLimit", () => {
     const [row] = await db
       .select()
       .from(rateLimits)
-      .where(eq(rateLimits.key, "k"));
+      .where(eq(rateLimits.key, postgresRateLimitKey("k")));
     expect(row?.windowStart.toISOString()).toBe("2026-01-01T10:01:00.000Z");
   });
 
@@ -73,6 +74,14 @@ describe("hitRateLimit", () => {
 
     expect(counts).toEqual(Array.from({ length: 25 }, (_, i) => i + 1));
     expect(results.filter((r) => r.allowed)).toHaveLength(10);
+  });
+
+  it("stores the key hashed, never as plaintext", async () => {
+    await hitRateLimit("reset:token:secret-token", rule);
+
+    const keys = (await db.select().from(rateLimits)).map((r) => r.key);
+    expect(keys).toEqual([postgresRateLimitKey("reset:token:secret-token")]);
+    expect(keys.join()).not.toContain("secret-token");
   });
 
   it("resets a key", async () => {
@@ -97,6 +106,6 @@ describe("sweepRateLimits", () => {
     expect(await sweepRateLimits()).toBe(1);
 
     const keys = (await db.select().from(rateLimits)).map((r) => r.key);
-    expect(keys).toEqual(["recent"]);
+    expect(keys).toEqual([postgresRateLimitKey("recent")]);
   });
 });

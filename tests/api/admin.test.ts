@@ -179,7 +179,7 @@ describe("users", () => {
         id: invite?.id ?? "",
         name: "Again",
         email: "person@example.com",
-        password: "secret123",
+        password: "secret-1234",
       }),
     ).resolves.toBeTruthy();
 
@@ -207,18 +207,51 @@ describe("users", () => {
     );
   });
 
-  it("re-opens the admin bootstrap when the last admin is deleted", async () => {
+  it("never bans or deletes the last active admin", async () => {
     const admin = await createAdmin();
+
+    await expectTRPCError(
+      callerFor(admin).admin.setBanned({ userId: admin.id, banned: true }),
+      "BAD_REQUEST",
+      "last_admin",
+    );
+    await expectTRPCError(
+      callerFor(admin).admin.deleteUser({ userId: admin.id }),
+      "BAD_REQUEST",
+      "last_admin",
+    );
+
+    // the admin bootstrap stays closed
     await expectTRPCError(
       anonymousCaller().invites.validate({ id: "admin" }),
       "FORBIDDEN",
     );
+    expect(
+      await db.query.users.findFirst({ where: eq(users.id, admin.id) }),
+    ).toMatchObject({ banned: false, deletedAt: null });
+  });
 
-    await callerFor(admin).admin.deleteUser({ userId: admin.id });
+  it("bans or deletes an admin while another active admin remains", async () => {
+    const admin = await createAdmin();
+    const second = await createAdmin();
+    const third = await createAdmin();
 
-    expect(await anonymousCaller().invites.validate({ id: "admin" })).toEqual({
-      isAdmin: true,
+    await callerFor(admin).admin.setBanned({ userId: second.id, banned: true });
+    await callerFor(admin).admin.deleteUser({ userId: third.id });
+
+    // the banned and the deleted admin don't count: `admin` is the last one
+    await expectTRPCError(
+      callerFor(admin).admin.setBanned({ userId: admin.id, banned: true }),
+      "BAD_REQUEST",
+      "last_admin",
+    );
+
+    // unbanning never needs the guard
+    await callerFor(admin).admin.setBanned({
+      userId: second.id,
+      banned: false,
     });
+    await callerFor(admin).admin.deleteUser({ userId: admin.id });
   });
 
   it("revokes all of a user's sessions", async () => {

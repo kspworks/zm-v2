@@ -1,6 +1,5 @@
 import { Secret, TOTP } from "otpauth";
 
-import { isDev } from "~/server/config";
 import { randomString } from "~/server/lib/ids";
 
 /*
@@ -66,17 +65,19 @@ export const generateTotp = (secret: string, timestamp = Date.now()): string =>
   totpFor(secret).generate({ timestamp });
 
 /**
- * Accepts the current step and one step either side of `timestamp`, which
- * server code takes from Effect's Clock (see `totpMatches`)
+ * Accepts the current step and one step either side of `timestamp`, and with
+ * `acceptDevCode` the literal DEV_OTP. Server code takes both from its
+ * services (Clock and AppConfig, see `totpMatches`).
  */
 export const verifyTotp = (
   secret: string,
   code: string,
   timestamp: number,
+  acceptDevCode = false,
 ): boolean => {
   const token = code.replace(/\s+/g, "");
 
-  if (isDev() && token === DEV_OTP) {
+  if (acceptDevCode && token === DEV_OTP) {
     return true;
   }
 

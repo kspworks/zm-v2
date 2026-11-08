@@ -19,6 +19,10 @@ import type { BetterAuthPlugin } from "better-auth/types";
 import { Schema } from "effect";
 
 import { env } from "~/env";
+import {
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+} from "~/lib/validators/auth";
 import { trimmedString } from "~/lib/validators/common";
 import {
   isLiveUser,
@@ -286,8 +290,8 @@ export const auth = betterAuth({
     },
     // invite-only: users are created by the invites.register procedure
     disableSignUp: true,
-    minPasswordLength: 6,
-    maxPasswordLength: 128,
+    minPasswordLength: MIN_PASSWORD_LENGTH,
+    maxPasswordLength: MAX_PASSWORD_LENGTH,
     revokeSessionsOnPasswordReset: true,
     resetPasswordTokenExpiresIn: 60 * 60,
     // without SMTP the "forgot password" link is hidden and this is a no-op;

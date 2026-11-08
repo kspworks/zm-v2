@@ -21,7 +21,7 @@ import { createAdmin, createUser } from "../helpers/fixtures";
 const details = {
   name: "New Person",
   email: "New.Person@Example.com",
-  password: "secret123",
+  password: "secret-1234",
 };
 
 const createInvite = async (id = "i".repeat(48), secret = "S".repeat(32)) => {
@@ -199,6 +199,14 @@ describe("invites.makeOtpQR", () => {
       "BAD_REQUEST",
     );
     await expectTRPCError(
+      anonymousCaller().invites.makeOtpQR({
+        id,
+        ...details,
+        password: "123456789",
+      }),
+      "BAD_REQUEST",
+    );
+    await expectTRPCError(
       anonymousCaller().invites.makeOtpQR({ id, ...details, email: "nope" }),
       "BAD_REQUEST",
     );
@@ -236,7 +244,7 @@ describe("invites.register", () => {
     });
     expect(credential?.providerId).toBe("credential");
     expect(credential?.password).toBeTruthy();
-    expect(credential?.password).not.toContain("secret123");
+    expect(credential?.password).not.toContain("secret-1234");
 
     const factor = await db.query.twoFactors.findFirst({
       where: eq(twoFactors.userId, userId),

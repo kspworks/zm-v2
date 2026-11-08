@@ -1,6 +1,6 @@
 import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import { Effect } from "effect";
-
+import { MIN_PASSWORD_LENGTH } from "~/lib/validators/auth";
 import {
   confirmPendingEnrolment,
   startPendingEnrolment,
@@ -9,6 +9,7 @@ import { issueSignInTicket } from "~/server/auth/sign-in-ticket";
 import { enrolTwoFactor } from "~/server/auth/two-factor";
 import { query, transaction } from "~/server/db/database";
 import { recoveryLinks, users } from "~/server/db/schema";
+import { AppConfig } from "~/server/effect/app-config";
 import { audit } from "~/server/lib/audit";
 import { now } from "~/server/lib/clock";
 import {
@@ -34,11 +35,12 @@ const TTL_MS = 24 * 60 * 60_000;
 /**
  * An admin-issued, single-use recovery link (stored hashed, 24 h). Creating
  * one revokes the user's previous unused link. The raw token is returned
- * once, inside the URL.
+ * once, inside the URL, which is built on the configured base URL and never
+ * on the request's Host or X-Forwarded-Host headers.
  */
 export const createRecoveryLink = Effect.fn("recovery.createLink")(function* (
   adminId: string,
-  input: { userId: string; scope: RecoveryScope; origin: string },
+  input: { userId: string; scope: RecoveryScope },
 ) {
   const [user] = yield* query((db) =>
     db
@@ -66,6 +68,7 @@ export const createRecoveryLink = Effect.fn("recovery.createLink")(function* (
       ),
   );
 
+  const { authBaseUrl } = yield* AppConfig;
   const token = randomString(48);
   const [link] = yield* query((db) =>
     db
@@ -95,7 +98,7 @@ export const createRecoveryLink = Effect.fn("recovery.createLink")(function* (
   return {
     id: link?.id ?? "",
     expiresAt: link?.expiresAt,
-    url: `${input.origin}/auth/recover?token=${token}`,
+    url: `${authBaseUrl.replace(/\/+$/, "")}/auth/recover?token=${token}`,
   };
 }, transaction);
 
@@ -210,7 +213,7 @@ const applyRecovery = Effect.fn("recovery.apply")(function* (
   const coversTwoFactor = link.scope !== "password";
 
   if (coversPassword) {
-    if (!input.newPassword || input.newPassword.length < 6) {
+    if (!input.newPassword || input.newPassword.length < MIN_PASSWORD_LENGTH) {
       return yield* badRequest("invalid_password");
     }
   } else {

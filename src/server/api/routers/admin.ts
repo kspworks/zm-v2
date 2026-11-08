@@ -95,10 +95,7 @@ export const adminRouter = createTRPCRouter({
       ),
     )
     .mutation(({ ctx, input, signal }) =>
-      runForTrpc(
-        createRecoveryLink(ctx.user.id, { ...input, origin: ctx.origin }),
-        signal,
-      ),
+      runForTrpc(createRecoveryLink(ctx.user.id, input), signal),
     ),
 
   revokeRecoveryLink: adminProcedure

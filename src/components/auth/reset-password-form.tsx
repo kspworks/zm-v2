@@ -20,6 +20,7 @@ import { Input } from "~/components/ui/input";
 import { Spinner } from "~/components/ui/spinner";
 import { authClient } from "~/lib/auth/client";
 import { type AuthErrorCode, authErrorFromStatus } from "~/lib/auth-routing";
+import { MIN_PASSWORD_LENGTH } from "~/lib/validators/auth";
 
 export function ResetPasswordForm({
   token,
@@ -204,7 +205,11 @@ export function ResetPasswordForm({
           <Button
             type="submit"
             form="reset-form"
-            disabled={pending || password.length < 6 || code.trim().length < 6}
+            disabled={
+              pending ||
+              password.length < MIN_PASSWORD_LENGTH ||
+              code.trim().length < 6
+            }
           >
             {pending ? <Spinner /> : null}
             {t("reset.submit")}

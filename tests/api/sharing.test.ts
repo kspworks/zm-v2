@@ -137,6 +137,50 @@ describe("sharing an account", () => {
     );
   });
 
+  it("lets only the owner add or revoke, never a shared writer", async () => {
+    const owner = await createUser();
+    const writer = await createUser();
+    const reader = await createUser();
+    const third = await createUser();
+    const account = await makeAccount(owner);
+    await grant("account", account.id, writer, { canWrite: true });
+    await grant("account", account.id, reader);
+
+    // a writer sees the members ...
+    await expect(
+      callerFor(writer).sharing.list({ entity: "account", id: account.id }),
+    ).resolves.toHaveLength(3);
+
+    // ... but can't pass access on or take it away
+    await expectTRPCError(
+      callerFor(writer).sharing.add({
+        entity: "account",
+        id: account.id,
+        email: third.email,
+        canWrite: true,
+      }),
+      "FORBIDDEN",
+    );
+    await expectTRPCError(
+      callerFor(writer).sharing.revoke({
+        entity: "account",
+        id: account.id,
+        userId: reader.id,
+      }),
+      "FORBIDDEN",
+    );
+    await expect(callerFor(third).accounts.list()).resolves.toEqual([]);
+    await expect(callerFor(reader).accounts.list()).resolves.toHaveLength(1);
+
+    // the owner still can
+    await callerFor(owner).sharing.revoke({
+      entity: "account",
+      id: account.id,
+      userId: reader.id,
+    });
+    await expect(callerFor(reader).accounts.list()).resolves.toEqual([]);
+  });
+
   it("rejects unknown emails, oneself and debt accounts", async () => {
     const owner = await createUser();
     const account = await makeAccount(owner);
@@ -226,5 +270,16 @@ describe("sharing a category", () => {
     await expect(
       callerFor(writer).categories.update({ id: category.id, name: "X" }),
     ).resolves.toBeTruthy();
+
+    // a shared writer still can't share it onward
+    await expectTRPCError(
+      callerFor(writer).sharing.add({
+        entity: "category",
+        id: category.id,
+        email: (await createUser()).email,
+        canWrite: false,
+      }),
+      "FORBIDDEN",
+    );
   });
 });

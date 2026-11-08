@@ -25,9 +25,17 @@ export const emailSchema = Schema.String.pipe(
   ),
 );
 
+/**
+ * Bounds for a new password (registration, reset, change, recovery). Sign-in
+ * never checks the minimum, so a shorter password set before it was raised
+ * keeps working.
+ */
+export const MIN_PASSWORD_LENGTH = 10;
+export const MAX_PASSWORD_LENGTH = 128;
+
 export const passwordSchema = Schema.String.check(
-  Schema.isMinLength(6, message("password_too_short")),
-  Schema.isMaxLength(128, message("too_long")),
+  Schema.isMinLength(MIN_PASSWORD_LENGTH, message("password_too_short")),
+  Schema.isMaxLength(MAX_PASSWORD_LENGTH, message("too_long")),
 );
 
 export const otpSchema = Schema.Trim.check(

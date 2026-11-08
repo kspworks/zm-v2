@@ -1,5 +1,6 @@
 import { getISODay, parseISO } from "date-fns";
 import { count, sql } from "drizzle-orm";
+import type { PgTable } from "drizzle-orm/pg-core";
 import { Effect } from "effect";
 import type postgres from "postgres";
 
@@ -612,34 +613,47 @@ export const migrateFromV1 = Effect.fn("migrateFromV1")(function* (
       );
 
       // --- verification
-      const newCount = Effect.fnUntraced(function* (table: string) {
+      const newCount = Effect.fnUntraced(function* (table: PgTable) {
         const [row] = yield* query((db) =>
-          db.execute<{ n: string }>(
-            sql.raw(`SELECT count(*) AS n FROM "${table}"`),
-          ),
+          db.select({ n: count() }).from(table),
         );
 
-        return Number(row?.n ?? 0);
+        return row?.n ?? 0;
       });
-      const pairs: [string, string, number][] = [
-        ["users", "users", oldUsers.length],
-        ["accounts", "accounts", oldAccounts.length],
-        ["accounts_users", "account_members", oldAccountUsers.length],
-        ["categories", "categories", oldCategories.length],
-        ["categories_users", "category_members", oldCategoryUsers.length],
-        ["transactions", "transactions", oldTransactions.length],
-        ["planned_transactions", "planned_transactions", oldPlanned.length],
-        ["imports", "imports", oldImports.length],
-        ["history_logs", "history_logs", oldHistory.length],
-        ["invites", "invites", oldInvites.length],
+      const pairs: [string, string, PgTable, number][] = [
+        ["users", "users", users, oldUsers.length],
+        ["accounts", "accounts", accounts, oldAccounts.length],
+        [
+          "accounts_users",
+          "account_members",
+          accountMembers,
+          oldAccountUsers.length,
+        ],
+        ["categories", "categories", categories, oldCategories.length],
+        [
+          "categories_users",
+          "category_members",
+          categoryMembers,
+          oldCategoryUsers.length,
+        ],
+        ["transactions", "transactions", transactions, oldTransactions.length],
+        [
+          "planned_transactions",
+          "planned_transactions",
+          plannedTransactions,
+          oldPlanned.length,
+        ],
+        ["imports", "imports", imports, oldImports.length],
+        ["history_logs", "history_logs", historyLogs, oldHistory.length],
+        ["invites", "invites", invites, oldInvites.length],
       ];
       const counts = [];
 
-      for (const [oldTable, newTable, oldCount] of pairs) {
+      for (const [oldTable, newTable, table, oldCount] of pairs) {
         counts.push({
           table: `${oldTable} → ${newTable}`,
           old: oldCount,
-          new: yield* newCount(newTable),
+          new: yield* newCount(table),
         });
       }
 

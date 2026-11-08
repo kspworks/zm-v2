@@ -204,7 +204,7 @@
     "adjust_balance_changed": "The balance has changed since you opened the form, check the amounts and try again",
     "not_recurring": "This transaction doesn't repeat",
     "name_too_short": "At least 3 characters",
-    "password_too_short": "At least 6 characters",
+    "password_too_short": "At least 10 characters",
     "too_long": "Too long",
     "invalid_email": "Enter a valid email",
     "invalid_date": "Enter a valid date",
@@ -287,6 +287,7 @@
   "sharing": {
     "title": "Share \"{name}\"",
     "description": "Share with another user of this ZM by email.",
+    "ownerOnly": "Only the owner can change who has access.",
     "email": "Email",
     "canWrite": "Can edit",
     "readOnly": "Read only",

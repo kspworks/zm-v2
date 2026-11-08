@@ -10,7 +10,12 @@ import {
 } from "~/server/db/schema";
 import { audit } from "~/server/lib/audit";
 import { now } from "~/server/lib/clock";
-import { badRequest, forbidden, notFound } from "~/server/lib/errors";
+import {
+  type BadRequest,
+  badRequest,
+  forbidden,
+  notFound,
+} from "~/server/lib/errors";
 import { newId } from "~/server/lib/ids";
 import {
   type AccountAccess,
@@ -47,6 +52,7 @@ export const prepareLegs = Effect.fn("transactions.prepareLegs")(function* (
   input: TransactionInput,
 ): Effect.fn.Return<
   { legs: Leg[]; access: Map<string, AccountAccess> },
+  | BadRequest
   | Effect.Error<ReturnType<typeof requireWritableAccounts>>
   | Effect.Error<ReturnType<typeof resolveCounterpartyRef>>
   | Effect.Error<ReturnType<typeof getOrCreateDebtAccount>>,

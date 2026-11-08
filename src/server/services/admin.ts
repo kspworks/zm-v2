@@ -144,6 +144,24 @@ export const revokeSessions = Effect.fn("admin.revokeSessions")(function* (
   );
 });
 
+/**
+ * Fails with `last_admin` when the (locked) user is the only active admin.
+ * Demoting, banning or deleting them would leave no admin, and with none the
+ * public admin bootstrap re-opens to anyone.
+ */
+const refuseLastAdmin = Effect.fnUntraced(function* (
+  user: typeof users.$inferSelect,
+) {
+  if (
+    user.role === "admin" &&
+    !user.deletedAt &&
+    !user.banned &&
+    (yield* activeAdminCount()) <= 1
+  ) {
+    return yield* badRequest("last_admin");
+  }
+});
+
 /** Promote or demote; the last active admin can't be demoted */
 export const setRole = Effect.fn("admin.setRole")(function* (
   adminId: string,
@@ -151,14 +169,8 @@ export const setRole = Effect.fn("admin.setRole")(function* (
 ) {
   const user = yield* lockUser(input.userId);
 
-  if (
-    user.role === "admin" &&
-    input.role === "user" &&
-    !user.deletedAt &&
-    !user.banned &&
-    (yield* activeAdminCount()) <= 1
-  ) {
-    return yield* badRequest("last_admin");
+  if (input.role === "user") {
+    yield* refuseLastAdmin(user);
   }
 
   yield* query((db) =>
@@ -173,12 +185,19 @@ export const setRole = Effect.fn("admin.setRole")(function* (
   });
 }, transaction);
 
-/** Ban or unban; banned users are signed out and can't sign in */
+/**
+ * Ban or unban; banned users are signed out and can't sign in. The last
+ * active admin can't be banned.
+ */
 export const setBanned = Effect.fn("admin.setBanned")(function* (
   adminId: string,
   input: { userId: string; banned: boolean },
 ) {
   const user = yield* lockUser(input.userId);
+
+  if (input.banned) {
+    yield* refuseLastAdmin(user);
+  }
 
   yield* query((db) =>
     db
@@ -202,7 +221,7 @@ export const setBanned = Effect.fn("admin.setBanned")(function* (
 
 /**
  * Soft delete: the address moves to deletedEmail so it can be invited again,
- * and every session ends. Deleting the last admin re-opens the bootstrap.
+ * and every session ends. The last active admin can't be deleted.
  */
 export const deleteUser = Effect.fn("admin.deleteUser")(function* (
   adminId: string,
@@ -213,6 +232,8 @@ export const deleteUser = Effect.fn("admin.deleteUser")(function* (
   if (user.deletedAt) {
     return;
   }
+
+  yield* refuseLastAdmin(user);
 
   const at = yield* now;
 

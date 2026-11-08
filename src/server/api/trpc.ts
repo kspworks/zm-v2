@@ -27,8 +27,6 @@ export type Context = {
   sessionId?: string | null;
   /** The UI locale of this request (cookie or Accept-Language) */
   locale: Locale;
-  /** The public origin, for links shown to the user */
-  origin: string;
 };
 
 const readCookie = (header: string | null, name: string) =>
@@ -43,8 +41,6 @@ export const createTRPCContext = async ({
   headers: Headers;
 }): Promise<Context> => {
   const session = await auth.api.getSession({ headers });
-  const host = headers.get("x-forwarded-host") ?? headers.get("host");
-  const proto = headers.get("x-forwarded-proto") ?? "http";
 
   return {
     userId: session?.user.id ?? null,
@@ -53,7 +49,6 @@ export const createTRPCContext = async ({
       cookie: readCookie(headers.get("cookie"), "NEXT_LOCALE"),
       acceptLanguage: headers.get("accept-language"),
     }),
-    origin: host ? `${proto}://${host}` : "",
   };
 };
 

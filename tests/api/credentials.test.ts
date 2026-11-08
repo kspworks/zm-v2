@@ -59,7 +59,6 @@ const withSession = (userId: string, sessionId: string) =>
     userId,
     sessionId,
     locale: "en",
-    origin: "http://localhost:3000",
   });
 
 const addSessions = (userId: string, ...ids: string[]) =>
@@ -81,7 +80,7 @@ describe("settings.changePassword", () => {
     await expectTRPCError(
       caller.settings.changePassword({
         currentPassword: "wrong!",
-        newPassword: "newsecret",
+        newPassword: "new-secret-1",
         code: generateTotp(secret),
       }),
       "BAD_REQUEST",
@@ -90,7 +89,7 @@ describe("settings.changePassword", () => {
     await expectTRPCError(
       caller.settings.changePassword({
         currentPassword: password,
-        newPassword: "newsecret",
+        newPassword: "new-secret-1",
         code: "000000",
       }),
       "BAD_REQUEST",
@@ -99,7 +98,7 @@ describe("settings.changePassword", () => {
 
     await caller.settings.changePassword({
       currentPassword: password,
-      newPassword: "newsecret",
+      newPassword: "new-secret-1",
       code: generateTotp(secret),
     });
 
@@ -109,9 +108,45 @@ describe("settings.changePassword", () => {
     expect(await signIn(user.email, password, generateTotp(secret))).toBe(
       false,
     );
-    expect(await signIn(user.email, "newsecret", generateTotp(secret))).toBe(
+    expect(await signIn(user.email, "new-secret-1", generateTotp(secret))).toBe(
       true,
     );
+  });
+});
+
+describe("password length", () => {
+  it("refuses a new password shorter than 10 characters", async () => {
+    const { user, password, secret } = await createUserWithCredentials();
+
+    await expectTRPCError(
+      withSession(user.id, "current").settings.changePassword({
+        currentPassword: password,
+        newPassword: "123456789",
+        code: generateTotp(secret),
+      }),
+      "BAD_REQUEST",
+    );
+
+    const admin = await createAdmin();
+    const { url } = await callerFor(admin).admin.createRecoveryLink({
+      userId: user.id,
+      scope: "password",
+    });
+    await expectTRPCError(
+      anonymousCaller().recovery.complete({
+        token: tokenOf(url),
+        newPassword: "123456789",
+      }),
+      "BAD_REQUEST",
+    );
+
+    expect(await signIn(user.email, password, generateTotp(secret))).toBe(true);
+  });
+
+  it("still signs in with a shorter password set before the minimum rose", async () => {
+    const { user, secret } = await createUserWithCredentials({}, "short6");
+
+    expect(await signIn(user.email, "short6", generateTotp(secret))).toBe(true);
   });
 });
 
@@ -199,7 +234,7 @@ describe("second-factor input", () => {
       (caller: ReturnType<typeof callerFor>, password: string) =>
         caller.settings.changePassword({
           currentPassword: password,
-          newPassword: "newsecret",
+          newPassword: "new-secret-1",
           code: "12345",
         }),
     ],
@@ -237,7 +272,7 @@ describe("second-factor input", () => {
     await expectTRPCError(
       callerFor(user).settings.changePassword({
         currentPassword: password,
-        newPassword: "newsecret",
+        newPassword: "new-secret-1",
         code,
       }),
       "BAD_REQUEST",
@@ -246,14 +281,14 @@ describe("second-factor input", () => {
       run(
         changePassword(
           { id: user.id, sessionId: null },
-          { currentPassword: password, newPassword: "newsecret", code },
+          { currentPassword: password, newPassword: "new-secret-1", code },
         ),
       ),
       "BAD_REQUEST",
       "invalid_code",
     );
 
-    expect(await signIn(user.email, "newsecret", code, true)).toBe(false);
+    expect(await signIn(user.email, "new-secret-1", code, true)).toBe(false);
     expect(await signIn(user.email, password, code, true)).toBe(true);
   });
 
@@ -314,12 +349,12 @@ describe("recovery links", () => {
 
     const result = await anonymousCaller().recovery.complete({
       token,
-      newPassword: "recovered",
+      newPassword: "recovered-pw",
     });
 
     expect(result).toEqual({ backupCodes: null, ticket: null });
     expect(await db.select().from(sessions)).toEqual([]);
-    expect(await signIn(user.email, "recovered", generateTotp(secret))).toBe(
+    expect(await signIn(user.email, "recovered-pw", generateTotp(secret))).toBe(
       true,
     );
   });
@@ -364,11 +399,11 @@ describe("recovery links", () => {
 
     await anonymousCaller().recovery.complete({
       token,
-      newPassword: "brandnew",
+      newPassword: "brand-new-pw",
       code: generateTotp(fresh),
     });
 
-    expect(await signIn(user.email, "brandnew", generateTotp(fresh))).toBe(
+    expect(await signIn(user.email, "brand-new-pw", generateTotp(fresh))).toBe(
       true,
     );
   });
@@ -377,11 +412,14 @@ describe("recovery links", () => {
     const { token } = await link("password");
     await anonymousCaller().recovery.complete({
       token,
-      newPassword: "recovered",
+      newPassword: "recovered-pw",
     });
 
     await expectTRPCError(
-      anonymousCaller().recovery.complete({ token, newPassword: "again!" }),
+      anonymousCaller().recovery.complete({
+        token,
+        newPassword: "again-again!",
+      }),
       "FORBIDDEN",
       "recovery_link_invalid",
     );
@@ -437,7 +475,7 @@ describe("recovery links", () => {
       await expectTRPCError(
         anonymousCaller().recovery.complete({
           token,
-          newPassword: "brandnew",
+          newPassword: "brand-new-pw",
           code: "000000",
         }),
         "BAD_REQUEST",
@@ -448,7 +486,7 @@ describe("recovery links", () => {
     await expectTRPCError(
       anonymousCaller().recovery.complete({
         token,
-        newPassword: "brandnew",
+        newPassword: "brand-new-pw",
         code: "000000",
       }),
       "TOO_MANY_REQUESTS",

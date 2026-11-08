@@ -19,6 +19,30 @@ const devOrigins = (): string[] => {
   }
 };
 
+// Sent on every response, whatever proxy sits in front. The CSP covers only
+// directives that need no nonce (framing, base URL, form targets, plugins): a
+// script policy would have to carry a nonce through Next's inline scripts.
+// Referrer-Policy keeps the reset and recovery tokens in /auth URLs from
+// leaving the origin.
+const SECURITY_HEADERS = [
+  { key: "X-Frame-Options", value: "DENY" },
+  {
+    key: "Content-Security-Policy",
+    value:
+      "frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+  },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "same-origin" },
+  {
+    key: "Strict-Transport-Security",
+    value: "max-age=31536000; includeSubDomains",
+  },
+  {
+    key: "Permissions-Policy",
+    value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+  },
+];
+
 const config: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
@@ -33,6 +57,7 @@ const config: NextConfig = {
   redirects: async () => [
     { source: "/reports", destination: "/reports/map", permanent: false },
   ],
+  headers: async () => [{ source: "/:path*", headers: SECURITY_HEADERS }],
 };
 
 export default withSentryConfig(withNextIntl(config), {
