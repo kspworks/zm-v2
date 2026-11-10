@@ -2,7 +2,7 @@
 
 import { format, parseISO } from "date-fns";
 import { CalendarIcon, XIcon } from "lucide-react";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 import { enGB, uk } from "react-day-picker/locale";
 
@@ -41,6 +41,7 @@ export function DatePicker({
   className?: string;
 }) {
   const locale = useLocale();
+  const t = useTranslations("common");
   const [open, setOpen] = useState(false);
   const selected = value ? parseISO(value) : undefined;
 
@@ -102,7 +103,7 @@ export function DatePicker({
           variant="ghost"
           size="icon-xs"
           className="absolute top-1/2 right-1.5 -translate-y-1/2"
-          aria-label="Clear"
+          aria-label={t("clear")}
           onClick={() => onChange(null)}
         >
           <XIcon />

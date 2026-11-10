@@ -38,7 +38,8 @@
     "createAccountLink": "Create an account",
     "share": "Share",
     "undo": "Undo",
-    "moreActions": "More actions"
+    "moreActions": "More actions",
+    "clear": "Clear"
   },
   "seed": {
     "cash": "Cash",
@@ -87,7 +88,8 @@
     "menu": "Menu",
     "budgets": "Budgets",
     "sections": "Sections",
-    "skip": "Skip to content"
+    "skip": "Skip to content",
+    "toggleSidebar": "Toggle Sidebar"
   },
   "auth": {
     "login": {
