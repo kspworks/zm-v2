@@ -4,12 +4,16 @@ import {
   parseAsArrayOf,
   parseAsIsoDate,
   parseAsString,
+  parseAsStringLiteral,
   useQueryStates,
 } from "nuqs";
 import { useMemo } from "react";
 
 import { amountFilterRange } from "~/lib/money";
-import type { TransactionFilter } from "~/lib/validators/transactions";
+import {
+  TRANSACTION_KINDS,
+  type TransactionFilter,
+} from "~/lib/validators/transactions";
 
 /**
  * The shared filter object, backed by URL search params so filters survive
@@ -19,6 +23,9 @@ const parsers = {
   accounts: parseAsArrayOf(parseAsString).withDefault([]),
   categories: parseAsArrayOf(parseAsString).withDefault([]),
   counterparties: parseAsArrayOf(parseAsString).withDefault([]),
+  kinds: parseAsArrayOf(parseAsStringLiteral(TRANSACTION_KINDS)).withDefault(
+    [],
+  ),
   startDate: parseAsString,
   endDate: parseAsString,
   amount: parseAsString,
@@ -46,6 +53,7 @@ export const useTransactionFilter = () => {
       accounts: state.accounts,
       categories: state.categories,
       counterparties: state.counterparties,
+      kinds: state.kinds,
       startDate: reversed ? null : startDate,
       endDate: reversed ? null : endDate,
       amount:
@@ -59,6 +67,7 @@ export const useTransactionFilter = () => {
       accounts: null,
       categories: null,
       counterparties: null,
+      kinds: null,
       startDate: null,
       endDate: null,
       amount: null,

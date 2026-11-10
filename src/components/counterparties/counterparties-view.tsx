@@ -130,7 +130,10 @@ export function CounterpartiesView() {
     <>
       <PageHeader title={t("title")} />
 
-      <div className="mx-auto w-full max-w-3xl p-4 sm:p-6">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4 sm:p-6">
+        {rows.length > 0 ? (
+          <p className="text-muted-foreground text-sm">{t("hint")}</p>
+        ) : null}
         {list.isPending ? (
           <div className="flex flex-col gap-2">
             {[0, 1, 2].map((index) => (

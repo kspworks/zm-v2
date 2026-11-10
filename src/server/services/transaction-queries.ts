@@ -12,6 +12,7 @@ import {
   lt,
   lte,
   ne,
+  notExists,
   or,
   param,
   type SQL,
@@ -63,6 +64,8 @@ const cat = alias(categories, "cat");
 const parent = alias(categories, "parent");
 const cp = alias(counterparties, "cp");
 const pt = alias(plannedTransactions, "pt");
+/** An earlier occurrence of the same series, for `nextOnly` */
+const earlier = alias(transactions, "earlier");
 
 const escapeLike = (value: string) => value.replace(/[\\%_]/g, (c) => `\\${c}`);
 
@@ -102,6 +105,11 @@ const filterConditions = (filter: Partial<TransactionFilter>) => {
         inArray(l.counterpartyId, filter.counterparties),
       ),
     );
+  }
+
+  if (filter.kinds?.length) {
+    // both legs of a pair carry the same kind
+    conditions.push(inArray(p.kind, filter.kinds));
   }
 
   if (filter.startDate) {
@@ -527,12 +535,19 @@ export const listTransactions = Effect.fn("transactionQueries.list")(function* (
     planned,
     limit,
     extra = [],
+    nextOnly = false,
   }: {
     filter: Partial<TransactionFilter>;
     cursor?: ListCursor | null;
     planned: Planned;
     limit: number;
     extra?: (SQL | undefined)[];
+    /**
+     * Keeps the first planned occurrence of each series: no live planned row
+     * of the same schedule is due earlier. Every occurrence, and both legs of
+     * a pair, carry the primary schedule's id; a one-off is its own series.
+     */
+    nextOnly?: boolean;
   },
 ): Effect.fn.Return<
   { items: TransactionRow[]; nextCursor: ListCursor | null },
@@ -546,6 +561,21 @@ export const listTransactions = Effect.fn("transactionQueries.list")(function* (
   const raw = yield* query((db) =>
     listQuery(db, userId, planned, filter, [
       ...extra,
+      nextOnly
+        ? notExists(
+            db
+              .select({ one: sql`1` })
+              .from(earlier)
+              .where(
+                and(
+                  eq(earlier.plannedTransactionId, p.plannedTransactionId),
+                  eq(earlier.isPlanned, true),
+                  isNull(earlier.deletedAt),
+                  lt(earlier.date, p.date),
+                ),
+              ),
+          )
+        : undefined,
       cursorCondition(cursor, newestFirst),
     ])
       .orderBy(direction(p.date), direction(p.createdAt), direction(p.id))
@@ -952,10 +982,14 @@ export const nearestPlannedDates = Effect.fn(
 export const listTransactionsPage = Effect.fn("transactionQueries.listPage")(
   function* (
     userId: string,
-    input: {
+    {
+      nextOnly,
+      ...input
+    }: {
       filter: Partial<TransactionFilter>;
       cursor?: ListCursor | null;
       planned: Planned;
+      nextOnly?: boolean | null;
     },
   ) {
     const { paginationLimit } = yield* AppConfig;
@@ -963,6 +997,7 @@ export const listTransactionsPage = Effect.fn("transactionQueries.listPage")(
     return yield* listTransactions(userId, {
       ...input,
       limit: paginationLimit,
+      nextOnly: !!nextOnly && input.planned === "planned",
     });
   },
 );

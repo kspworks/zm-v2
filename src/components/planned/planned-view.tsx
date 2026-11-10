@@ -1,6 +1,7 @@
 "use client";
 
 import { useInfiniteQuery } from "@tanstack/react-query";
+import { Schema } from "effect";
 import { CalendarClockIcon, PlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
@@ -35,8 +36,12 @@ import {
 } from "~/components/ui/empty";
 import { Skeleton } from "~/components/ui/skeleton";
 import { Spinner } from "~/components/ui/spinner";
+import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { useLocalStorage } from "~/hooks/use-local-storage";
 import { isFilterActive } from "~/lib/validators/transactions";
 import { useTRPC } from "~/trpc/react";
+
+const viewSchema = Schema.Literals(["next", "all"]);
 
 export function PlannedView() {
   const t = useTranslations("planned");
@@ -49,10 +54,20 @@ export function PlannedView() {
   const [dialog, setDialog] = useState<PlannedDialogState>(null);
   const [deleting, setDeleting] = useState<TransactionRowData | null>(null);
 
+  // a repeating payment is one row until the reader asks for every date; a
+  // date filter asks for exactly that
+  const [view, setView, ready] = useLocalStorage(
+    "zm.planned.view",
+    viewSchema,
+    "next",
+  );
+  const dated = !!filter.startDate || !!filter.endDate;
+  const nextOnly = view === "next" && !dated;
+
   const list = useInfiniteQuery(
     trpc.transactions.planned.infiniteQueryOptions(
-      { filter },
-      { getNextPageParam: (page) => page.nextCursor },
+      { filter, nextOnly },
+      { getNextPageParam: (page) => page.nextCursor, enabled: ready },
     ),
   );
   const rows = list.data?.pages.flatMap((page) => page.items) ?? [];
@@ -82,6 +97,19 @@ export function PlannedView() {
     >
       <FilterSummary state={state} setState={setState} reset={reset} />
       {filtering ? <TotalsBar filter={filter} planned /> : null}
+      {dated ? null : (
+        <Tabs
+          value={view}
+          onValueChange={(value) =>
+            setView(Schema.decodeUnknownSync(viewSchema)(value))
+          }
+        >
+          <TabsList aria-label={t("view")}>
+            <TabsTrigger value="next">{t("viewNext")}</TabsTrigger>
+            <TabsTrigger value="all">{t("viewAll")}</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      )}
 
       {list.isPending ? (
         <div className="flex flex-col gap-2">

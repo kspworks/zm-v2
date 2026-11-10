@@ -93,10 +93,21 @@ const idList = Schema.Array(idSchema)
   .check(maxLength(200))
   .pipe(withDefault([]));
 
+export const TRANSACTION_KINDS = [
+  "expense",
+  "income",
+  "transfer",
+  "debt",
+] as const satisfies readonly TransactionKind[];
+
 const transactionFilterFields = {
   accounts: idList,
   categories: idList,
   counterparties: idList,
+  /** Empty means every kind */
+  kinds: Schema.Array(Schema.Literals(TRANSACTION_KINDS))
+    .check(maxLength(TRANSACTION_KINDS.length))
+    .pipe(withDefault([])),
   startDate: nullish(calendarDateSchema),
   endDate: nullish(calendarDateSchema),
   amount: nullish(
@@ -155,12 +166,18 @@ export const listInputSchema = Schema.Struct({
     withDefault({ accounts: [], categories: [], counterparties: [] }),
   ),
   cursor: nullish(cursorSchema),
+  /**
+   * Planned list only: just the next occurrence of each series, so a monthly
+   * payment is one row instead of twelve
+   */
+  nextOnly: nullish(Schema.Boolean),
 });
 
 export const isFilterActive = (filter: Partial<TransactionFilter>): boolean =>
   (filter.accounts?.length ?? 0) > 0 ||
   (filter.categories?.length ?? 0) > 0 ||
   (filter.counterparties?.length ?? 0) > 0 ||
+  (filter.kinds?.length ?? 0) > 0 ||
   !!filter.startDate ||
   !!filter.endDate ||
   !!filter.amount ||

@@ -36,6 +36,50 @@ const idsOf = (result: { items: { id: string }[] }) =>
   result.items.map((item) => item.id);
 
 describe("transactions.list", () => {
+  it("filters by kind, a pair counting once", async () => {
+    const user = await createUser();
+    const a = await makeAccount(user);
+    const b = await makeAccount(user);
+    const c = callerFor(user);
+
+    await c.transactions.create(expense(a.id, 5));
+    await c.transactions.create({
+      kind: "income",
+      date: "2026-03-10",
+      amount: 7,
+      accountId: a.id,
+    });
+    await c.transactions.create({
+      kind: "transfer",
+      date: "2026-03-10",
+      amount: 9,
+      accountId: a.id,
+      linkedAccountId: b.id,
+      linkedAmount: 9,
+    });
+    await c.transactions.create({
+      kind: "debt",
+      date: "2026-03-10",
+      amount: 11,
+      accountId: a.id,
+      direction: "gave",
+      counterparty: { name: "Alex" },
+    });
+
+    const kindsOf = async (kinds: string[]) =>
+      (await list(user, { kinds })).items.map((item) => item.kind).sort();
+
+    // the page limit here is 3, so each check stays under it
+    expect(await kindsOf(["expense"])).toEqual(["expense"]);
+    expect(await kindsOf(["transfer"])).toEqual(["transfer"]);
+    expect(await kindsOf(["debt", "income"])).toEqual(["debt", "income"]);
+    expect(await kindsOf(["expense", "income", "debt"])).toEqual([
+      "debt",
+      "expense",
+      "income",
+    ]);
+  });
+
   it("returns submitted rows newest first, created order breaking ties", async () => {
     const user = await createUser();
     const account = await makeAccount(user);

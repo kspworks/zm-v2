@@ -106,6 +106,7 @@
       "useTotp": "Use the authenticator app instead",
       "startOver": "Use another account",
       "forgotPassword": "Forgot password?",
+      "askAdmin": "Lost your password? Ask your administrator for a recovery link.",
       "setUpAdmin": "No account yet? Set up the administrator",
       "reenrolPrompt": "You signed in with a backup code. Set up your authenticator again in Settings."
     },
@@ -269,6 +270,7 @@
     "title": "Counterparties",
     "empty": "No counterparties yet",
     "emptyHint": "They appear when you name a counterparty on a transaction or record a debt.",
+    "hint": "The people and places you pay, get paid by, lend to or borrow from. A new one is added when you name it on a transaction or a debt.",
     "rename": "Rename",
     "renameTitle": "Rename counterparty",
     "name": "Name",
@@ -372,6 +374,7 @@
     "accounts": "Accounts",
     "categories": "Categories",
     "counterparties": "Counterparties",
+    "kinds": "Type",
     "dates": "Dates",
     "from": "From",
     "to": "To",
@@ -476,7 +479,10 @@
     "add": "Plan a transaction",
     "createTitle": "New planned transaction",
     "empty": "Nothing planned",
-    "emptyHint": "Plan a one-off payment, or a repeating one like rent or salary."
+    "emptyHint": "Plan a one-off payment, or a repeating one like rent or salary.",
+    "view": "Show",
+    "viewNext": "Next of each",
+    "viewAll": "Every occurrence"
   },
   "adjust": {
     "comment": "Balance adjustment",

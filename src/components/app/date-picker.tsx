@@ -27,6 +27,7 @@ export function DatePicker({
   placeholder,
   clearable = false,
   invalid = false,
+  shortcuts,
   className,
 }: {
   id?: string;
@@ -35,6 +36,8 @@ export function DatePicker({
   placeholder?: string;
   clearable?: boolean;
   invalid?: boolean;
+  /** One-tap dates under the calendar, such as today and yesterday */
+  shortcuts?: { label: string; value: string }[];
   className?: string;
 }) {
   const locale = useLocale();
@@ -72,6 +75,25 @@ export function DatePicker({
               setOpen(false);
             }}
           />
+          {shortcuts?.length ? (
+            <div className="flex flex-wrap gap-1 border-t p-2">
+              {shortcuts.map((shortcut) => (
+                <Button
+                  key={shortcut.value}
+                  type="button"
+                  size="sm"
+                  variant={shortcut.value === value ? "secondary" : "ghost"}
+                  className="flex-1 first-letter:uppercase"
+                  onClick={() => {
+                    onChange(shortcut.value);
+                    setOpen(false);
+                  }}
+                >
+                  {shortcut.label}
+                </Button>
+              ))}
+            </div>
+          ) : null}
         </PopoverContent>
       </Popover>
       {clearable && value ? (

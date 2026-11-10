@@ -570,3 +570,86 @@ describe("planned.updateSchedule", () => {
     });
   });
 });
+
+describe("transactions.planned nextOnly", () => {
+  const noFilter = { accounts: [], categories: [], counterparties: [] };
+
+  it("keeps the next occurrence of each series, pairs and one-offs included", async () => {
+    const user = await createUser();
+    const a = await makeAccount(user);
+    const b = await makeAccount(user);
+    const c = callerFor(user);
+    const until = { repeatInterval: 1, endDate: "2026-06-30" };
+
+    await c.planned.create({
+      data: {
+        kind: "expense",
+        date: "2026-03-20",
+        amount: 10,
+        accountId: a.id,
+      },
+      schedule: { repeatType: "monthly", ...until },
+    });
+    await c.planned.create({
+      data: {
+        kind: "transfer",
+        date: "2026-03-18",
+        amount: 100,
+        accountId: a.id,
+        linkedAccountId: b.id,
+        linkedAmount: 100,
+      },
+      schedule: { repeatType: "monthly", ...until },
+    });
+    await c.planned.create({
+      data: { kind: "income", date: "2026-05-01", amount: 5, accountId: a.id },
+      schedule: none,
+    });
+
+    // every date: more than one page (the limit here is 3)
+    const all = await c.transactions.planned({ filter: noFilter });
+    const next = await c.transactions.planned({
+      filter: noFilter,
+      nextOnly: true,
+    });
+
+    expect(all.nextCursor).not.toBeNull();
+    expect(next.nextCursor).toBeNull();
+    expect(next.items.map((item) => [item.kind, item.date])).toEqual([
+      ["transfer", "2026-03-18"],
+      ["expense", "2026-03-20"],
+      ["income", "2026-05-01"],
+    ]);
+  });
+
+  it("moves on to the following date once the next one is paid", async () => {
+    const user = await createUser();
+    const account = await makeAccount(user);
+    const c = callerFor(user);
+
+    await c.planned.create({
+      data: {
+        kind: "expense",
+        date: "2026-03-20",
+        amount: 10,
+        accountId: account.id,
+      },
+      schedule: {
+        repeatType: "monthly",
+        repeatInterval: 1,
+        endDate: "2026-06-30",
+      },
+    });
+
+    const [first] = (
+      await c.transactions.planned({ filter: noFilter, nextOnly: true })
+    ).items;
+    await c.transactions.submit({ id: first?.id ?? "" });
+
+    const next = await c.transactions.planned({
+      filter: noFilter,
+      nextOnly: true,
+    });
+    expect(next.items.map((item) => item.date)).toEqual(["2026-04-20"]);
+  });
+});

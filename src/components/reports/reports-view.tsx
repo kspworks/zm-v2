@@ -211,6 +211,7 @@ export function ReportsView() {
                 accounts: null,
                 categories: null,
                 counterparties: null,
+                kinds: null,
                 amount: null,
                 comment: null,
               })

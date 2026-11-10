@@ -195,6 +195,12 @@ export function LoginForm({
                   </Field>
                 )}
               />
+              {canResetPassword ? null : (
+                // no mail server: the only way back in is an admin's link
+                <p className="text-muted-foreground text-xs">
+                  {t("login.askAdmin")}
+                </p>
+              )}
               <Button type="submit" className="w-full" disabled={submitting}>
                 {submitting ? <Spinner /> : null}
                 {t("login.submit")}

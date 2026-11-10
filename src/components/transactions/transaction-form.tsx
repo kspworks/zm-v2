@@ -2,6 +2,7 @@
 
 import { effectTsResolver } from "@hookform/resolvers/effect-ts";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { format, parseISO, subDays } from "date-fns";
 import { Schema } from "effect";
 import { MinusIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
@@ -9,7 +10,6 @@ import { useLocale, useTranslations } from "next-intl";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
-
 import { DatePicker } from "~/components/app/date-picker";
 import { FormError } from "~/components/app/form-error";
 import { Money } from "~/components/app/money";
@@ -237,6 +237,15 @@ export function TransactionForm({
   const locale = useLocale();
   const trpc = useTRPC();
   const today = useToday();
+  const tr = useTranslations("transactions.relative");
+  // most entries are made on the day or the morning after
+  const dateShortcuts = [
+    { label: tr("today"), value: today },
+    {
+      label: tr("yesterday"),
+      value: format(subDays(parseISO(today), 1), "yyyy-MM-dd"),
+    },
+  ];
   const toastError = useToastError();
   const labelText = useDebtLabelText();
   const amountRef = useRef<HTMLInputElement>(null);
@@ -532,6 +541,7 @@ export function TransactionForm({
                   id={`${formId}-date`}
                   value={field.value}
                   onChange={(value) => field.onChange(value ?? "")}
+                  shortcuts={dateShortcuts}
                 />
               </Field>
             )}

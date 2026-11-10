@@ -33,10 +33,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "~/components/ui/popover";
+import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { useIsMobile } from "~/hooks/use-mobile";
 import { categoryOptions } from "~/lib/category-options";
 import { amountFilterRange } from "~/lib/money";
-import { NO_CATEGORY } from "~/lib/validators/transactions";
+import { NO_CATEGORY, TRANSACTION_KINDS } from "~/lib/validators/transactions";
 import { useTRPC } from "~/trpc/react";
 
 /** Applies a text value after 500 ms of quiet, and only while it's valid */
@@ -74,6 +75,7 @@ export const activeFilterCount = (state: FilterState, withDates = true) =>
   (state.accounts.length ? 1 : 0) +
   (state.categories.length ? 1 : 0) +
   (state.counterparties.length ? 1 : 0) +
+  (state.kinds.length ? 1 : 0) +
   (withDates && (state.startDate || state.endDate) ? 1 : 0) +
   (state.amount ? 1 : 0) +
   (state.comment ? 1 : 0);
@@ -88,6 +90,7 @@ function FilterFields({
   withDates: boolean;
 }) {
   const t = useTranslations("filters");
+  const tk = useTranslations("form.kinds");
   const te = useTranslations("errors");
   const locale = useLocale();
   const trpc = useTRPC();
@@ -137,6 +140,28 @@ function FilterFields({
 
   return (
     <FieldGroup className="gap-4">
+      <Field>
+        <FieldLabel id="filter-kinds">{t("kinds")}</FieldLabel>
+        <ToggleGroup
+          type="multiple"
+          variant="outline"
+          size="sm"
+          aria-labelledby="filter-kinds"
+          className="w-full"
+          value={state.kinds}
+          onValueChange={(value) =>
+            void setState({
+              kinds: TRANSACTION_KINDS.filter((kind) => value.includes(kind)),
+            })
+          }
+        >
+          {TRANSACTION_KINDS.map((kind) => (
+            <ToggleGroupItem key={kind} value={kind} className="flex-1">
+              {tk(kind)}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </Field>
       <Field>
         <FieldLabel htmlFor="filter-accounts">{t("accounts")}</FieldLabel>
         <MultiSelect

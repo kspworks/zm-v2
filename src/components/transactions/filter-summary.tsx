@@ -23,6 +23,7 @@ type Chip = { key: string; label: string; clear: () => void };
 /** One chip per value, so each can go without reopening the filters */
 const useChips = (state: FilterState, setState: SetFilterState): Chip[] => {
   const t = useTranslations("filters");
+  const tk = useTranslations("form.kinds");
   const locale = useLocale();
   const trpc = useTRPC();
   const accounts = useQuery({
@@ -69,6 +70,15 @@ const useChips = (state: FilterState, setState: SetFilterState): Chip[] => {
     "counterparties",
     (id) => counterparties.data?.find((c) => c.id === id)?.name,
   );
+
+  for (const kind of state.kinds) {
+    chips.push({
+      key: `kind:${kind}`,
+      label: tk(kind),
+      clear: () =>
+        void setState({ kinds: state.kinds.filter((x) => x !== kind) }),
+    });
+  }
 
   if (state.startDate || state.endDate) {
     const from = state.startDate ? formatDisplayDate(state.startDate) : "";

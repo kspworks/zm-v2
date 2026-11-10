@@ -62,6 +62,7 @@ export const transactionsRouter = createTRPCRouter({
           filter: input.filter,
           cursor: input.cursor,
           planned: "planned",
+          nextOnly: input.nextOnly,
         }),
         signal,
       ),

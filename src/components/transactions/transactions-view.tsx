@@ -42,6 +42,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "~/components/ui/empty";
+import { Kbd } from "~/components/ui/kbd";
 import { Skeleton } from "~/components/ui/skeleton";
 import { Spinner } from "~/components/ui/spinner";
 import { isFilterActive } from "~/lib/validators/transactions";
@@ -95,6 +96,13 @@ export function TransactionsView({
           >
             <PlusIcon />
             {t("add")}
+            {/* the one shortcut worth learning first; "?" lists the rest */}
+            <Kbd
+              aria-hidden
+              className="bg-primary-foreground/20 text-primary-foreground max-lg:hidden"
+            >
+              N
+            </Kbd>
           </Button>
         </>
       }
