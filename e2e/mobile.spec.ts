@@ -199,8 +199,15 @@ test("adds a subcategory and the indented row still fits", async ({
   expect(parentBox).not.toBeNull();
   expect(childBox).not.toBeNull();
 
+  // the rows share one card, so the indent is in where the name starts
+  const parentName = await parent
+    .getByText("Clothing, shoes, accessories")
+    .boundingBox();
+  const childName = await child.getByText("Sneakers").boundingBox();
+
+  expect(childName?.x ?? 0).toBeGreaterThan(parentName?.x ?? Infinity);
+
   if (parentBox && childBox) {
-    expect(childBox.x).toBeGreaterThan(parentBox.x);
     expect(childBox.x + childBox.width).toBeLessThanOrEqual(
       parentBox.x + parentBox.width + 0.5,
     );

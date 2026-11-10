@@ -175,7 +175,12 @@ Per entity, through the member tables, with `canRead` / `canWrite`:
   non-debt accounts, and count a debt pair by its **real-account** leg.
 - **Report colors** follow a category's creation order, or a hash of the key
   for other tiles (`colorSlots` in `~/lib/report`), never its size, so a
-  category keeps its color everywhere.
+  category keeps its color everywhere, the categories list included. Debts
+  have a color of their own (`seriesColor`).
+- The totals also say how much of each side is **debts** (`debtIncomes`,
+  `debtExpenses`), so a screen can show that lending is not spending.
+- A **count of transactions** shown to the user counts a pair once (its
+  primary leg), like the list it links to.
 - **Period comparison**: while a period is running, both default to the days of
   it that have passed (`sameDays` in `~/lib/period`), so a part of a month is
   never set against a whole one.
@@ -203,6 +208,8 @@ Per entity, through the member tables, with `canRead` / `canWrite`:
   double-inserting.
 - Weekly emits, for each step, every selected weekday within the Monday-started
   week of that step, bounded by both `startDate` and the horizon.
+- The planned list's `nextOnly` keeps the first live planned occurrence of
+  each schedule (a one-off is its own series); it is what the page opens on.
 - Editing a schedule soft-deletes un-submitted **future** occurrences and
   regenerates in one transaction, **clearing their hashes** so those dates come
   back under the new rules. Occurrences the user deleted one by one keep their
