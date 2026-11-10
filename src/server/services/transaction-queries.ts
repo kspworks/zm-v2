@@ -586,6 +586,10 @@ export type CurrencyTotal = {
   expenses: number;
   incomes: number;
   total: number;
+  /** The part of `expenses` that is money lent or repaid, not spent */
+  debtExpenses: number;
+  /** The part of `incomes` that is money borrowed or paid back, not earned */
+  debtIncomes: number;
 };
 
 /**
@@ -612,6 +616,7 @@ export const filteredTotals = Effect.fn("transactionQueries.filteredTotals")(
             sql<string>`case when ${primaryIsDebtLeg} then ${la.currencyId} else ${pa.currencyId} end`.as(
               "currency_id",
             ),
+          isDebt: sql<boolean>`${p.kind} = 'debt'`.as("is_debt"),
         },
         userId,
         planned,
@@ -630,6 +635,12 @@ export const filteredTotals = Effect.fn("transactionQueries.filteredTotals")(
           incomes: sql<
             string | null
           >`sum(${x.amount}) filter (where ${x.amount} > 0)`,
+          debtExpenses: sql<
+            string | null
+          >`sum(${x.amount}) filter (where ${x.amount} < 0 and ${x.isDebt})`,
+          debtIncomes: sql<
+            string | null
+          >`sum(${x.amount}) filter (where ${x.amount} > 0 and ${x.isDebt})`,
         })
         .from(x)
         .innerJoin(currencies, eq(currencies.id, x.currencyId))
@@ -649,6 +660,8 @@ export const filteredTotals = Effect.fn("transactionQueries.filteredTotals")(
           expenses,
           incomes,
           total: expenses + incomes,
+          debtExpenses: Number(row.debtExpenses ?? 0),
+          debtIncomes: Number(row.debtIncomes ?? 0),
         };
       })
       .filter((row) => row.expenses !== 0 || row.incomes !== 0);

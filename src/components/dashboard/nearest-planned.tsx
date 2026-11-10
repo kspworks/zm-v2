@@ -41,8 +41,9 @@ const useRelativeLabel = (today: string) => {
   };
 };
 
-function ItemLine({ item }: { item: Item }) {
+function ItemLine({ item, today }: { item: Item; today: string }) {
   const t = useTranslations("dashboard.balance");
+  const locale = useLocale() as Locale;
   const label = useEntryLabel();
 
   return (
@@ -72,7 +73,12 @@ function ItemLine({ item }: { item: Item }) {
           <span className="truncate">{label(item)}</span>
         )}
         {item.overdue ? (
-          <span className="text-destructive text-xs">{t("overdue")}</span>
+          // it sits under today, so say which day it was planned for
+          <span className="text-destructive text-xs">
+            {t("overdueSince", {
+              date: formatListDate(item.dueDate, today, locale),
+            })}
+          </span>
         ) : null}
       </span>
       <Money
@@ -149,7 +155,7 @@ export function NearestPlanned({
                       {item ? (
                         // per-column dividers, so the gaps between columns show
                         <div className="border-b py-2">
-                          <ItemLine item={item} />
+                          <ItemLine item={item} today={today} />
                         </div>
                       ) : null}
                     </TableCell>
@@ -161,9 +167,9 @@ export function NearestPlanned({
         </table>
       </div>
 
-      <div className="flex flex-col gap-8 md:hidden">
+      <div className="flex flex-col gap-4 md:hidden">
         {days.map((day) => (
-          <section key={day.date} className="flex flex-col gap-1.5">
+          <section key={day.date} className="flex flex-col">
             <div className="flex items-baseline gap-2">
               <span className="text-sm font-semibold">
                 {formatListDate(day.date, today, locale)}
@@ -173,7 +179,7 @@ export function NearestPlanned({
               </span>
             </div>
             {day.items.map((item) => (
-              <ItemLine key={item.id} item={item} />
+              <ItemLine key={item.id} item={item} today={today} />
             ))}
           </section>
         ))}

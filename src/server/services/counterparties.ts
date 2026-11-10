@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, sql, sum } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, lt, or, sql, sum } from "drizzle-orm";
 import { Effect } from "effect";
 
 import { catchUniqueViolation, query, transaction } from "~/server/db/database";
@@ -174,6 +174,9 @@ export const listCounterparties = Effect.fn("counterparties.list")(function* (
           and(
             eq(transactions.counterpartyId, counterparties.id),
             isNull(transactions.deletedAt),
+            // a debt is two legs with the same counterparty: count the
+            // primary one, so the number matches the rows in the list
+            or(isNull(transactions.batchId), lt(transactions.amount, 0)),
           ),
         ),
       })

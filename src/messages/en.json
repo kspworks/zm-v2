@@ -536,7 +536,8 @@
       "rangeHint": "From {min} to {max} days",
       "more": "+{count} more",
       "noChanges": "No transactions",
-      "overdue": "overdue"
+      "overdue": "overdue",
+      "overdueSince": "overdue since {date}"
     },
     "forecast": {
       "title": "Forecast",
@@ -574,6 +575,7 @@
       "expenses": "Expenses",
       "net": "Net",
       "vsLast": "{change} vs last month",
+      "inclDebts": "incl. {amount} of debts",
       "allBudgets": "All budgets",
       "setBudget": "Set a budget"
     }

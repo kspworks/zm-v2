@@ -536,7 +536,8 @@
       "rangeHint": "Від {min} до {max} днів",
       "more": "Ще +{count}",
       "noChanges": "Транзакції відсутні",
-      "overdue": "прострочено"
+      "overdue": "прострочено",
+      "overdueSince": "прострочено з {date}"
     },
     "forecast": {
       "title": "Прогноз",
@@ -574,6 +575,7 @@
       "expenses": "Витрати",
       "net": "Різниця",
       "vsLast": "{change} до минулого місяця",
+      "inclDebts": "з них борги: {amount}",
       "allBudgets": "Усі бюджети",
       "setBudget": "Встановити бюджет"
     }

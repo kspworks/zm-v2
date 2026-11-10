@@ -1,7 +1,6 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { format, subMonths } from "date-fns";
 import { Schema } from "effect";
 import { AlertTriangleIcon, ChartPieIcon } from "lucide-react";
 import Link from "next/link";
@@ -50,7 +49,7 @@ import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { useLocalStorage } from "~/hooks/use-local-storage";
 import { formatDisplayDate } from "~/lib/dates";
 import { formatMoney } from "~/lib/money";
-import type { Period } from "~/lib/period";
+import { monthOf, type Period } from "~/lib/period";
 import {
   buildReport,
   colorSlots,
@@ -104,19 +103,13 @@ export function ReportsView() {
     "category",
   );
 
-  // the range is required: without a valid one in the URL, one month ago
-  // .. today
+  // the range is required: without a valid one in the URL, this calendar
+  // month, the same one the dashboard and the comparison open on
   const period = useMemo(
     (): Period =>
       filter.startDate && filter.endDate
         ? { startDate: filter.startDate, endDate: filter.endDate }
-        : {
-            startDate: format(
-              subMonths(new Date(`${today}T12:00:00`), 1),
-              "yyyy-MM-dd",
-            ),
-            endDate: today,
-          },
+        : monthOf(today),
     [filter.startDate, filter.endDate, today],
   );
 

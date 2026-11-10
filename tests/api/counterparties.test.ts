@@ -198,6 +198,26 @@ describe("counterparties.list", () => {
       ["Olena", 0],
     ]);
   });
+
+  it("counts a debt once, not once per leg", async () => {
+    const user = await createUser();
+    const account = await makeAccount(user);
+    const c = callerFor(user);
+
+    for (const direction of ["gave", "took"] as const) {
+      await c.transactions.create({
+        kind: "debt",
+        date: "2026-03-10",
+        amount: 100,
+        accountId: account.id,
+        direction,
+        counterparty: { name: "Olena" },
+      });
+    }
+
+    const rows = await c.counterparties.list();
+    expect(rows.map((row) => [row.name, row.usage])).toEqual([["Olena", 2]]);
+  });
 });
 
 describe("counterparties.delete", () => {

@@ -212,6 +212,8 @@ export const forecast = Effect.fn("dashboard.forecast")(function* (
 
 export type NearestItem = DashboardEntry & {
   overdue: boolean;
+  /** The day the row was planned for; `date` is today for an overdue one */
+  dueDate: string;
   currencySign: string;
   /** Same-amount transfer between accounts of one currency: no +/- sign */
   unsigned: boolean;
@@ -250,6 +252,7 @@ export const nearestPlanned = Effect.fn("dashboard.nearestPlanned")(function* (
       ...toEntry(row, amount),
       date,
       overdue: date !== row.date,
+      dueDate: row.date,
       currencySign:
         (primaryOnDebt ? row.linkedCurrencySign : row.currencySign) ?? "",
       unsigned:

@@ -15,6 +15,7 @@ import {
   CardTitle,
 } from "~/components/ui/card";
 import { Skeleton } from "~/components/ui/skeleton";
+import { formatMoney } from "~/lib/money";
 import { cn } from "~/lib/utils";
 import { useTRPC } from "~/trpc/react";
 
@@ -66,6 +67,7 @@ export function MonthSummary({ currencyId }: { currencyId: string }) {
     before: number,
     goodWhen: "up" | "down",
     className?: string,
+    debts = 0,
   ) => (
     <div className="flex min-w-0 flex-col gap-0.5">
       <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
@@ -77,6 +79,12 @@ export function MonthSummary({ currencyId }: { currencyId: string }) {
         className={cn("text-lg font-semibold", className)}
       />
       <Delta current={value} previous={before} goodWhen={goodWhen} />
+      {/* lending and repayments move money without being earned or spent */}
+      {debts ? (
+        <span className="text-muted-foreground text-xs">
+          {t("inclDebts", { amount: formatMoney(debts, sign) })}
+        </span>
+      ) : null}
     </div>
   );
 
@@ -109,12 +117,15 @@ export function MonthSummary({ currencyId }: { currencyId: string }) {
               previous?.incomes ?? 0,
               "up",
               "text-positive",
+              current?.debtIncomes,
             )}
             {stat(
               t("expenses"),
               -(current?.expenses ?? 0),
               -(previous?.expenses ?? 0),
               "down",
+              undefined,
+              -(current?.debtExpenses ?? 0),
             )}
             {stat(
               t("net"),

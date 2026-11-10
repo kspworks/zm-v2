@@ -492,6 +492,8 @@ describe("filtered totals", () => {
         expenses: -500,
         incomes: 1000,
         total: 500,
+        debtExpenses: 0,
+        debtIncomes: 0,
       },
       {
         currencyId: CURRENCY.USD,
@@ -500,6 +502,8 @@ describe("filtered totals", () => {
         expenses: -7,
         incomes: 0,
         total: -7,
+        debtExpenses: 0,
+        debtIncomes: 0,
       },
     ]);
   });
@@ -540,6 +544,8 @@ describe("filtered totals", () => {
     const [totals] = await c.transactions.totals({ filter: noFilter });
 
     expect(totals).toMatchObject({ expenses: -300, incomes: 200, total: -100 });
+    // and the totals say how much of each side is debts
+    expect(totals).toMatchObject({ debtExpenses: -300, debtIncomes: 200 });
   });
 
   it("applies the filters and hides zero lines", async () => {
