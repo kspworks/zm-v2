@@ -9,6 +9,7 @@ import {
 } from "~/components/transactions/transaction-item";
 import type { Locale } from "~/i18n/config";
 import { calendarDateIn, formatListDate, relativeDay } from "~/lib/dates";
+import { cn } from "~/lib/utils";
 
 /** Today in the app time zone, as "yyyy-MM-dd" */
 export const useToday = () => {
@@ -43,7 +44,15 @@ export function DayHeading({
       <span className="text-sm font-semibold">
         {formatListDate(date, today, locale)}
       </span>
-      <span className="text-muted-foreground text-xs first-letter:uppercase">
+      <span
+        className={cn(
+          "text-xs first-letter:uppercase",
+          // a planned day that has passed is overdue
+          planned && date < today
+            ? "text-amber-700 dark:text-amber-400"
+            : "text-muted-foreground",
+        )}
+      >
         {label}
       </span>
     </div>

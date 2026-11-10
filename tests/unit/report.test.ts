@@ -4,12 +4,14 @@ import {
   buildComparison,
   buildReport,
   type ComparisonInput,
+  categoryColorOrder,
   colorSlots,
   DEBTS_KEY,
   deltaOf,
   NONE_KEY,
   type ReportChart,
   type ReportInput,
+  seriesColor,
 } from "~/lib/report";
 
 let n = 0;
@@ -415,5 +417,26 @@ describe("deltaOf", () => {
     expect(deltaOf({ a: 0, b: 0 })).toEqual({ diff: 0, percent: 0 });
     // a negative remainder that grows is an increase
     expect(deltaOf({ a: -100, b: 50 })).toEqual({ diff: 150, percent: 1.5 });
+  });
+});
+
+describe("category colors", () => {
+  const at = (iso: string) => new Date(iso);
+
+  it("deals colors to top-level categories, oldest first", () => {
+    expect(
+      categoryColorOrder([
+        { id: "b", parentId: null, createdAt: at("2026-02-01") },
+        { id: "child", parentId: "a", createdAt: at("2025-01-01") },
+        { id: "a", parentId: null, createdAt: at("2026-01-01") },
+        { id: "c", parentId: null, createdAt: at("2026-02-01") },
+      ]),
+    ).toEqual(["a", "b", "c"]);
+  });
+
+  it("keeps debts and slotless keys off the series colors", () => {
+    expect(seriesColor("food", 3)).toBe("var(--series-3)");
+    expect(seriesColor(DEBTS_KEY, 3)).toBe("var(--series-debts)");
+    expect(seriesColor(NONE_KEY, undefined)).toBe("var(--series-other)");
   });
 });

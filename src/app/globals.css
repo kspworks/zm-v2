@@ -65,6 +65,11 @@
   --series-10: #8a8a1e;
   --series-11: #a4623a;
   --series-12: #6478b4;
+  --series-13: #4fb0d9;
+  --series-14: #a2409a;
+  --series-15: #b0915a;
+  --series-16: #8a2f52;
+  --series-debts: #55606e;
   --series-other: #9a9a94;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -114,6 +119,11 @@
   --series-10: #a3a32e;
   --series-11: #bd7a50;
   --series-12: #7f93cf;
+  --series-13: #6cc4e8;
+  --series-14: #c56bbd;
+  --series-15: #cdb27f;
+  --series-16: #a8456a;
+  --series-debts: #97a3b3;
   --series-other: #6b6b66;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);

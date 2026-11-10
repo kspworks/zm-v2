@@ -178,6 +178,40 @@ const hashOf = (key: string) => {
   return hash >>> 0;
 };
 
+/** Series colors in the palette (`--series-1` .. `--series-16`) */
+export const SERIES_SLOTS = 16;
+
+/**
+ * Top-level category ids, oldest first: the order their colors are dealt in.
+ * A new category goes to the end, so the ones before it keep their color.
+ */
+export const categoryColorOrder = (
+  categories: readonly {
+    id: string;
+    parentId: string | null;
+    createdAt: Date;
+  }[],
+): string[] =>
+  categories
+    .filter((category) => category.parentId === null)
+    .sort(
+      (a, b) =>
+        a.createdAt.getTime() - b.createdAt.getTime() ||
+        a.id.localeCompare(b.id),
+    )
+    .map((category) => category.id);
+
+/**
+ * The CSS color of a tile: debts have one of their own, so they never share
+ * a category's, and a key without a slot is gray.
+ */
+export const seriesColor = (key: string, slot: number | undefined): string =>
+  key === DEBTS_KEY
+    ? "var(--series-debts)"
+    : slot
+      ? `var(--series-${slot})`
+      : "var(--series-other)";
+
 /**
  * Color slot (1..slots) per tile key, never from its size, so a category keeps
  * its color from one report, period or currency to the next. Keys in `order`

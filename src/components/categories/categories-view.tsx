@@ -46,6 +46,7 @@ import {
 } from "~/components/ui/item";
 import { Skeleton } from "~/components/ui/skeleton";
 import { useToastError } from "~/hooks/use-toast-error";
+import { categoryColorOrder, SERIES_SLOTS, seriesColor } from "~/lib/report";
 import { cn } from "~/lib/utils";
 import { useTRPC } from "~/trpc/react";
 import type { RouterOutputs } from "~/trpc/types";
@@ -84,6 +85,13 @@ export function CategoriesView() {
   };
 
   const rows = categories.data ?? [];
+  // the color each top-level category has in the reports
+  const colorOrder = categoryColorOrder(rows);
+  const colorOf = (id: string) => {
+    const index = colorOrder.indexOf(id);
+
+    return seriesColor(id, index < 0 ? undefined : (index % SERIES_SLOTS) + 1);
+  };
 
   return (
     <>
@@ -136,7 +144,13 @@ export function CategoriesView() {
                     <span className="flex min-w-0 items-center gap-2">
                       {category.parentId ? (
                         <CornerDownRightIcon className="text-muted-foreground size-3.5" />
-                      ) : null}
+                      ) : (
+                        <span
+                          aria-hidden
+                          className="size-2.5 shrink-0 rounded-sm"
+                          style={{ background: colorOf(category.id) }}
+                        />
+                      )}
                       <span className="truncate">{category.name}</span>
                     </span>
                     {category.isShared ? (

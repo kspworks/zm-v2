@@ -13,6 +13,8 @@ const HEIGHT = 360;
 const BAND = 26;
 /** Rows listed in the tooltip of a merged leaf. */
 const GROUP_ROWS = 8;
+/** A leaf this wide has room for its name before the amount */
+const NAMED_LEAF = 150;
 
 type Hover = { leaf: LeafRect; x: number; y: number };
 
@@ -102,6 +104,10 @@ export function ReportTreemap({
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   const [hover, setHover] = useState<Hover | null>(null);
+  // a finger has no hover: the first tap on a leaf shows its details, the
+  // second one follows the link
+  const touch = useRef(false);
+  const tapped = useRef<string | null>(null);
 
   useEffect(() => {
     const element = ref.current;
@@ -150,10 +156,14 @@ export function ReportTreemap({
           className="block"
         >
           {leaves.map((leaf) => {
+            const amount = formatMoney(leaf.value, sign);
+            const name = leaf.leaves[0]?.name;
             const label =
               leaf.leaves.length > 1
                 ? t("more", { count: leaf.leaves.length })
-                : formatMoney(leaf.value, sign);
+                : name && leaf.width > NAMED_LEAF
+                  ? `${name} · ${amount}`
+                  : amount;
             const inBand = leaf.height <= BAND;
             const showLabel = leaf.width > 58 && leaf.height >= BAND - 2;
             const href = hrefOf(leaf.tileKey);
@@ -168,7 +178,20 @@ export function ReportTreemap({
                 className={
                   href ? "cursor-pointer outline-none" : "outline-none"
                 }
-                onClick={() => href && router.push(href)}
+                onPointerDown={(event) => {
+                  touch.current = event.pointerType !== "mouse";
+                }}
+                onClick={() => {
+                  if (touch.current && tapped.current !== leaf.key) {
+                    tapped.current = leaf.key;
+
+                    return;
+                  }
+
+                  if (href) {
+                    router.push(href);
+                  }
+                }}
                 onKeyDown={(event) => {
                   if (href && event.key === "Enter") {
                     router.push(href);
@@ -176,7 +199,13 @@ export function ReportTreemap({
                 }}
                 onPointerEnter={(event) => pointAt(leaf, event)}
                 onPointerMove={(event) => pointAt(leaf, event)}
-                onPointerLeave={() => setHover(null)}
+                onPointerLeave={(event) => {
+                  // a touch pointer leaves as the finger lifts; its tooltip
+                  // stays until the leaf loses focus
+                  if (event.pointerType === "mouse") {
+                    setHover(null);
+                  }
+                }}
                 onFocus={() =>
                   setHover({
                     leaf,
@@ -184,7 +213,10 @@ export function ReportTreemap({
                     y: leaf.y + leaf.height / 2,
                   })
                 }
-                onBlur={() => setHover(null)}
+                onBlur={() => {
+                  tapped.current = null;
+                  setHover(null);
+                }}
               >
                 <rect
                   x={leaf.x}

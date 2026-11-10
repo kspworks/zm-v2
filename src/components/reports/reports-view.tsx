@@ -52,18 +52,19 @@ import { formatMoney } from "~/lib/money";
 import { monthOf, type Period } from "~/lib/period";
 import {
   buildReport,
+  categoryColorOrder,
   colorSlots,
   DEBTS_KEY,
   NONE_KEY,
   type ReportGroupBy,
   type ReportInput,
   reportGroupBySchema,
+  SERIES_SLOTS,
+  seriesColor,
 } from "~/lib/report";
 import { filteredHref } from "~/lib/transaction-links";
 import { NO_CATEGORY } from "~/lib/validators/transactions";
 import { useTRPC } from "~/trpc/react";
-
-const SLOTS = 12;
 
 const viewSchema = Schema.Literals(["expense", "income"]);
 
@@ -147,23 +148,10 @@ export function ReportsView() {
   // takes the next color; "no category" is gray
   const colorOf = useMemo(() => {
     const order =
-      groupBy === "category"
-        ? (categories.data ?? [])
-            .filter((category) => category.parentId === null)
-            .sort(
-              (a, b) =>
-                a.createdAt.getTime() - b.createdAt.getTime() ||
-                a.id.localeCompare(b.id),
-            )
-            .map((category) => category.id)
-        : [];
-    const slots = colorSlots(charts, SLOTS, order);
+      groupBy === "category" ? categoryColorOrder(categories.data ?? []) : [];
+    const slots = colorSlots(charts, SERIES_SLOTS, order);
 
-    return (key: string) => {
-      const slot = slots.get(key);
-
-      return slot ? `var(--series-${slot})` : "var(--series-other)";
-    };
+    return (key: string) => seriesColor(key, slots.get(key));
   }, [charts, categories.data, groupBy]);
 
   // the rows behind a tile, in this report's period and filters

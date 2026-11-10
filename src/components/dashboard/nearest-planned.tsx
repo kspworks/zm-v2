@@ -74,7 +74,7 @@ function ItemLine({ item, today }: { item: Item; today: string }) {
         )}
         {item.overdue ? (
           // it sits under today, so say which day it was planned for
-          <span className="text-destructive text-xs">
+          <span className="text-xs text-amber-700 dark:text-amber-400">
             {t("overdueSince", {
               date: formatListDate(item.dueDate, today, locale),
             })}

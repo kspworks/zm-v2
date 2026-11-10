@@ -113,7 +113,7 @@ function PointTooltip({
               <span className="flex min-w-0 items-baseline gap-1">
                 <span className="min-w-0 truncate">{label(item)}</span>
                 {item.overdue ? (
-                  <span className="text-destructive shrink-0">
+                  <span className="shrink-0 text-amber-700 dark:text-amber-400">
                     · {t("overdue")}
                   </span>
                 ) : null}
@@ -143,6 +143,7 @@ export function BalanceChart({
   sign: string;
 }) {
   const t = useTranslations("dashboard.balance");
+  const tr = useTranslations("transactions.relative");
   const locale = useLocale() as Locale;
   const config = {
     actual: { label: t("actual"), color: "var(--series-1)" },
@@ -158,87 +159,117 @@ export function BalanceChart({
   const belowZero = lowest < 0;
 
   return (
-    <ChartContainer config={config} className="aspect-auto h-56 w-full sm:h-80">
-      <LineChart
-        data={points}
-        margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+    <div className="flex flex-col gap-2">
+      {/* the two lines differ by dash as well as color */}
+      <ul className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-xs">
+        {(["actual", "planned"] as const).map((key) => (
+          <li key={key} className="flex items-center gap-1.5">
+            <svg width="18" height="6" aria-hidden>
+              <line
+                x1="0"
+                y1="3"
+                x2="18"
+                y2="3"
+                stroke={config[key].color}
+                strokeWidth="2"
+                strokeDasharray={key === "planned" ? "5 4" : undefined}
+              />
+            </svg>
+            {config[key].label}
+          </li>
+        ))}
+      </ul>
+      <ChartContainer
+        config={config}
+        className="aspect-auto h-56 w-full sm:h-80"
       >
-        <CartesianGrid vertical={false} />
-        <XAxis
-          dataKey="date"
-          tickLine={false}
-          axisLine={false}
-          minTickGap={24}
-          tickFormatter={(date: string) =>
-            format(parseISO(date), "d MMM", { locale: dateFnsLocale(locale) })
-          }
-        />
-        <YAxis
-          width={72}
-          tickLine={false}
-          axisLine={false}
-          tick={<MoneyTick highlightZero={belowZero} />}
-          domain={["auto", "auto"]}
-        />
-        <ReferenceLine
-          x={today}
-          stroke="var(--muted-foreground)"
-          strokeDasharray="3 3"
-          strokeOpacity={0.6}
-        />
-        {/* zero is marked only once the balance goes below it */}
-        {belowZero ? (
-          <>
-            <ReferenceArea
-              y1={lowest * 2}
-              y2={0}
-              fill="var(--destructive)"
-              fillOpacity={0.06}
-              strokeOpacity={0}
-              ifOverflow="hidden"
-            />
-            <ReferenceLine
-              y={0}
-              stroke="var(--destructive)"
-              strokeWidth={1.5}
-              strokeOpacity={0.8}
-              ifOverflow="discard"
-            />
-          </>
-        ) : null}
-        <Tooltip
-          cursor={{ stroke: "var(--border)" }}
-          content={({ active, payload }) => (
-            <PointTooltip
-              active={active}
-              payload={payload}
-              today={today}
-              sign={sign}
-            />
-          )}
-        />
-        <Line
-          dataKey="actual"
-          type="linear"
-          stroke="var(--color-actual)"
-          strokeWidth={2}
-          dot={{ r, strokeWidth: 0, fill: "var(--color-actual)" }}
-          activeDot={{ r: 5 }}
-          connectNulls={false}
-          isAnimationActive={false}
-        />
-        <Line
-          dataKey="planned"
-          type="linear"
-          stroke="var(--color-planned)"
-          strokeWidth={2}
-          strokeDasharray="5 4"
-          dot={{ r, strokeWidth: 0, fill: "var(--color-planned)" }}
-          activeDot={{ r: 5 }}
-          connectNulls={false}
-          isAnimationActive={false}
-        />
-      </LineChart>
-    </ChartContainer>
+        <LineChart
+          data={points}
+          margin={{ top: 16, right: 8, bottom: 0, left: 0 }}
+        >
+          <CartesianGrid vertical={false} />
+          <XAxis
+            dataKey="date"
+            tickLine={false}
+            axisLine={false}
+            minTickGap={24}
+            tickFormatter={(date: string) =>
+              format(parseISO(date), "d MMM", { locale: dateFnsLocale(locale) })
+            }
+          />
+          <YAxis
+            width={72}
+            tickLine={false}
+            axisLine={false}
+            tick={<MoneyTick highlightZero={belowZero} />}
+            domain={["auto", "auto"]}
+          />
+          <ReferenceLine
+            x={today}
+            stroke="var(--muted-foreground)"
+            strokeDasharray="3 3"
+            strokeOpacity={0.6}
+            label={{
+              value: tr("today"),
+              position: "top",
+              className: "fill-muted-foreground",
+              fontSize: 11,
+            }}
+          />
+          {/* zero is marked only once the balance goes below it */}
+          {belowZero ? (
+            <>
+              <ReferenceArea
+                y1={lowest * 2}
+                y2={0}
+                fill="var(--destructive)"
+                fillOpacity={0.06}
+                strokeOpacity={0}
+                ifOverflow="hidden"
+              />
+              <ReferenceLine
+                y={0}
+                stroke="var(--destructive)"
+                strokeWidth={1.5}
+                strokeOpacity={0.8}
+                ifOverflow="discard"
+              />
+            </>
+          ) : null}
+          <Tooltip
+            cursor={{ stroke: "var(--border)" }}
+            content={({ active, payload }) => (
+              <PointTooltip
+                active={active}
+                payload={payload}
+                today={today}
+                sign={sign}
+              />
+            )}
+          />
+          <Line
+            dataKey="actual"
+            type="linear"
+            stroke="var(--color-actual)"
+            strokeWidth={2}
+            dot={{ r, strokeWidth: 0, fill: "var(--color-actual)" }}
+            activeDot={{ r: 5 }}
+            connectNulls={false}
+            isAnimationActive={false}
+          />
+          <Line
+            dataKey="planned"
+            type="linear"
+            stroke="var(--color-planned)"
+            strokeWidth={2}
+            strokeDasharray="5 4"
+            dot={{ r, strokeWidth: 0, fill: "var(--color-planned)" }}
+            activeDot={{ r: 5 }}
+            connectNulls={false}
+            isAnimationActive={false}
+          />
+        </LineChart>
+      </ChartContainer>
+    </div>
   );
 }
