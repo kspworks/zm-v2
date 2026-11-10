@@ -1,5 +1,15 @@
 # How to deploy a self-hosted ZM instance
 
+| Setup                                                            | Good for                                              | Database                 |
+| ---------------------------------------------------------------- | ----------------------------------------------------- | ------------------------ |
+| [Vercel](#vercel)                                                | no server to look after; the free tier is enough      | Neon, attached by Vercel |
+| [Docker Compose](#docker-compose)                                | one machine with Docker, up in one command            | a container in the stack |
+| [VPS with GitLab deploy](#self-hosted-with-docker-gitlab-deploy) | a hardened install next to other apps, deployed by CI | the host's own Postgres  |
+
+Whichever you pick, read the [security notes](#security-notes) and check
+that the [cron jobs](#cron-jobs) run. The environment variables are listed
+in the [README](README.md#configuration).
+
 ## Vercel
 
 1. [Create a Vercel account](https://vercel.com/signup) or [log in](https://vercel.com/login).
@@ -41,14 +51,43 @@
 
 ### Cron on Vercel runs in UTC
 
-`vercel.json` schedules `/api/cron/daily-0000` at `0 0 * * *` and
-`/api/cron/daily-0900` at `0 9 * * *`, and Vercel reads those in **UTC**.
+`vercel.json` schedules the two [cron jobs](#cron-jobs),
+`/api/cron/daily-0000` at `0 0 * * *` and `/api/cron/daily-0900` at
+`0 9 * * *`, and Vercel reads those in **UTC**.
 The jobs compute "today" and "tomorrow" in `APP_TIMEZONE`, so they are
 correct at any hour, but the email arrives at 09:00 UTC. To get it at 09:00
 local time, shift the schedule by your offset, e.g. for `Europe/Kyiv`
 (UTC+2 in winter, UTC+3 in summer) use `0 7 * * *` or `0 6 * * *`. For the
 midnight job, running shortly _after_ local midnight is what matters
 (`0 22 * * *` is 00:00 in Kyiv in winter).
+
+## Docker Compose
+
+`docker-compose.yml` is the whole stack on one machine: the app, its own
+Postgres, the migrations and the cron caller.
+
+1. `cp .env.docker.example .env.docker` and fill in `BETTER_AUTH_SECRET`,
+   `BETTER_AUTH_URL` and `CRON_SECRET`. The app refuses to start without
+   them.
+2. **Change the Postgres password**, in `docker-compose.yml` and in
+   `DATABASE_URL`. The example one is public: it is in this repository.
+3. Build and start:
+
+   ```shell
+   BUILD_ENV_REVISION=$(sha256sum .env.docker | cut -c1-64) docker compose up --wait --build
+   ```
+4. Open [http://localhost:3333](http://localhost:3333); the sign-in page
+   links to the admin setup.
+
+A `migrator` service applies the migrations and must exit successfully before
+`next-app` starts, so the schema is never behind the code. A `cron` service
+calls the [cron routes](#cron-jobs) at their local time.
+
+`.env.docker` reaches the image build as a BuildKit secret, not a copied
+file: the build reads its `NEXT_PUBLIC_*` and Sentry values, and none of it is
+left in the image. Docker's build cache can't see a secret's contents, so
+`BUILD_ENV_REVISION` (a hash of the file) is what makes a changed
+`.env.docker` rebuild.
 
 ## Self-hosted with Docker (GitLab deploy)
 
@@ -196,6 +235,40 @@ compose pulls it from the registry again.
   `server.js`. The next boot applies the migrations under a Postgres advisory
   lock (the same one `migrate.mjs` takes, so nothing races) and removes the
   file only after a successful run.
+
+## Cron jobs
+
+| Route                  | When                    | What                                                                           |
+| ---------------------- | ----------------------- | ------------------------------------------------------------------------------ |
+| `/api/cron/daily-0000` | 00:00 in `APP_TIMEZONE` | rolls the one-year planned window forward, sweeps Postgres rate-limit rows     |
+| `/api/cron/daily-0900` | 09:00 in `APP_TIMEZONE` | emails readers of accounts that tomorrow's planned transactions would overdraw |
+
+Both answer only `Authorization: Bearer <CRON_SECRET>` and return plain-text
+logs. Who calls them depends on the setup:
+
+- **Docker** (both setups): a `cron` container (`scripts/cron.ts`) calls
+  them at those times in `APP_TIMEZONE` and holds nothing but `CRON_SECRET`.
+- **Vercel**: `vercel.json`, [in UTC](#cron-on-vercel-runs-in-utc).
+- **Anything else**: system cron, e.g. `0 0 * * *` and `0 9 * * *` in a
+  crontab running in the app's time zone:
+
+  ```shell
+  curl -fsS -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/daily-0000
+  ```
+
+## Migrating from v1
+
+On an empty, migrated database:
+
+```shell
+OLD_DATABASE_URL=postgres://… DATABASE_URL=postgres://… \
+BETTER_AUTH_SECRET=<the production secret> pnpm run migrate:v1
+```
+
+It runs in one transaction, refuses a target that already has users, keeps
+v1 passwords (bcrypt, rehashed on the next sign-in) and authenticators, turns
+payees into counterparties (merging case variants, reported), and prints
+row counts, balance mismatches and transactions per kind.
 
 ## Security notes
 

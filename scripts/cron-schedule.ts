@@ -9,7 +9,7 @@ export type CronJob = {
   at: string;
 };
 
-/** The cron routes and when they run - see README "Cron jobs" */
+/** The cron routes and when they run - see SELF-HOSTING.md "Cron jobs" */
 export const CRON_JOBS: readonly CronJob[] = [
   { path: "/api/cron/daily-0000", at: "00:00" },
   { path: "/api/cron/daily-0900", at: "09:00" },

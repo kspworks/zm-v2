@@ -42,7 +42,7 @@ services:
       secrets:
         - dotenv
       # ties the build cache to the contents of .env.docker - see the
-      # Dockerfile and README
+      # Dockerfile and SELF-HOSTING.md
       args:
         BUILD_ENV_REVISION: ${BUILD_ENV_REVISION:-}
     depends_on:
