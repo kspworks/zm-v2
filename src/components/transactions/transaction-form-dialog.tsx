@@ -76,7 +76,7 @@ export function TransactionFormDialog({
             return result;
           }}
           footer={({ pending }) => (
-            <div className="mt-6 flex justify-end gap-2">
+            <div className="mt-6 flex justify-end gap-2 max-md:*:flex-1">
               <Button type="button" variant="outline" onClick={onClose}>
                 {dirty ? tc("cancel") : tc("close")}
               </Button>

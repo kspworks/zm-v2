@@ -3,10 +3,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   EllipsisVerticalIcon,
+  HandshakeIcon,
   MergeIcon,
   PencilIcon,
   Trash2Icon,
-  UsersRoundIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -141,7 +141,7 @@ export function CounterpartiesView() {
           <Empty className="border">
             <EmptyHeader>
               <EmptyMedia variant="icon">
-                <UsersRoundIcon />
+                <HandshakeIcon />
               </EmptyMedia>
               <EmptyTitle>{t("empty")}</EmptyTitle>
               <EmptyDescription>{t("emptyHint")}</EmptyDescription>

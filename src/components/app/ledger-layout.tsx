@@ -1,6 +1,6 @@
 "use client";
 
-import { WalletIcon } from "lucide-react";
+import { CoinsIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { type ReactNode, useState } from "react";
 
@@ -51,7 +51,7 @@ export function LedgerLayout({
                 aria-label={t("title")}
                 onClick={() => setSheetOpen(true)}
               >
-                <WalletIcon />
+                <CoinsIcon />
               </Button>
             )}
             {actions}

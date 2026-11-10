@@ -3,12 +3,12 @@ import {
   CalendarClockIcon,
   ChartPieIcon,
   FolderTreeIcon,
+  HandshakeIcon,
   LayoutDashboardIcon,
   type LucideIcon,
   SettingsIcon,
   TargetIcon,
   UsersIcon,
-  UsersRoundIcon,
   WalletIcon,
 } from "lucide-react";
 
@@ -73,7 +73,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: FolderTreeIcon,
     quickAdd: true,
   },
-  { key: "counterparties", href: "/counterparties", icon: UsersRoundIcon },
+  { key: "counterparties", href: "/counterparties", icon: HandshakeIcon },
   { key: "users", href: "/users", icon: UsersIcon, adminOnly: true },
   { key: "settings", href: "/settings", icon: SettingsIcon },
 ];

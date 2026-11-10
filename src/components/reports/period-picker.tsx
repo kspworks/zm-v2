@@ -52,17 +52,20 @@ const periodLabel = (
 /**
  * A period as ‹ label ›: the arrows step to the neighbouring period, the
  * label opens a month grid and a custom range. In a narrow table (the
- * `@container` is below 4xl) only the label shows, and a range wraps.
+ * `@container` is below 4xl) only the label shows, and a range wraps;
+ * `arrows="always"` keeps them for a picker with a row to itself.
  */
 export function PeriodPicker({
   value,
   onChange,
   label,
+  arrows = "wide",
   className,
 }: {
   value: Period;
   onChange: (value: Period) => void;
   label: string;
+  arrows?: "wide" | "always";
   className?: string;
 }) {
   const t = useTranslations("reports");
@@ -102,7 +105,7 @@ export function PeriodPicker({
       <Button
         variant="outline"
         size="icon"
-        className="@max-4xl:hidden"
+        className={cn(arrows === "wide" && "@max-4xl:hidden")}
         aria-label={t("previousPeriod")}
         onClick={() => onChange(shiftPeriod(value, -1))}
       >
@@ -218,7 +221,7 @@ export function PeriodPicker({
       <Button
         variant="outline"
         size="icon"
-        className="@max-4xl:hidden"
+        className={cn(arrows === "wide" && "@max-4xl:hidden")}
         aria-label={t("nextPeriod")}
         onClick={() => onChange(shiftPeriod(value, 1))}
       >

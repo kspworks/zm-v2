@@ -95,7 +95,9 @@ export function AppSidebar({
 
   return (
     <>
-      <Sidebar collapsible="icon">
+      {/* on a phone Menu is the bottom bar's right-most tab, so the sheet
+          comes from that edge */}
+      <Sidebar collapsible="icon" mobileSide="right">
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>

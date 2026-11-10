@@ -241,7 +241,8 @@ export function ReportsView() {
                 endDate: next.endDate,
               })
             }
-            className="w-auto @4xl:w-64"
+            arrows="always"
+            className="w-auto max-sm:order-last max-sm:w-full @4xl:w-64"
           />
           <Select
             value={groupBy}
@@ -250,7 +251,9 @@ export function ReportsView() {
             }
           >
             <SelectTrigger aria-label={t("groupBy")}>
-              <span className="text-muted-foreground">{t("groupBy")}:</span>
+              <span className="text-muted-foreground max-sm:hidden">
+                {t("groupBy")}:
+              </span>
               <SelectValue />
             </SelectTrigger>
             <SelectContent align="end">
