@@ -164,6 +164,26 @@ export function TransactionItem({
       ? row.counterparty?.name
       : null;
   const comment = row.comment ?? "";
+  // "Parent → Child": when the row is too narrow the parent gives way first,
+  // since the child is what tells two rows apart
+  const nested =
+    row.kind !== "debt" &&
+    !row.batchId &&
+    row.category &&
+    !row.category.deleted &&
+    row.category.parentName
+      ? { parent: row.category.parentName, name: row.category.name }
+      : null;
+  const title = nested ? (
+    <>
+      <span className="min-w-0 truncate">{nested.parent}</span>
+      <span className="shrink-0 whitespace-pre"> → </span>
+      <span className="max-w-[70%] shrink-0 truncate">{nested.name}</span>
+    </>
+  ) : (
+    description
+  );
+  const titleLayout = nested ? "flex min-w-0" : "truncate";
 
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: a wider mouse and touch target for the title button, which is the keyboard and screen-reader path
@@ -186,25 +206,27 @@ export function TransactionItem({
     >
       {/* stacked on phones, one line from md up */}
       <div className="min-w-0 flex-1 md:flex md:items-center md:gap-3">
-        <div className="flex min-w-0 items-center gap-1.5 md:max-w-[55%] md:shrink-0">
+        <div className="flex min-w-0 items-center gap-1.5 md:max-w-[65%] md:shrink-0">
           {onOpen ? (
             <button
               type="button"
               className={cn(
-                "focus-visible:ring-ring truncate rounded-sm text-left text-sm font-medium outline-none focus-visible:ring-2",
+                "focus-visible:ring-ring rounded-sm text-left text-sm font-medium outline-none focus-visible:ring-2",
+                titleLayout,
                 row.category?.deleted && "text-muted-foreground italic",
               )}
             >
-              {description}
+              {title}
             </button>
           ) : (
             <span
               className={cn(
-                "truncate text-sm font-medium",
+                "text-sm font-medium",
+                titleLayout,
                 row.category?.deleted && "text-muted-foreground italic",
               )}
             >
-              {description}
+              {title}
             </span>
           )}
           {counterpartyNote ? (
@@ -234,37 +256,45 @@ export function TransactionItem({
             </Tooltip>
           ) : null}
         </div>
-        {comment ? (
-          comment.length > 50 ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <p className="text-muted-foreground line-clamp-1 text-sm md:min-w-0 md:flex-1">
+        {/* phones: the comment and the account share the second line when they fit */}
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 md:contents">
+          {comment ? (
+            comment.length > 50 ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <p className="text-muted-foreground line-clamp-1 max-w-full min-w-0 text-sm md:flex-1">
+                    {comment}
+                  </p>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-sm whitespace-pre-wrap">
                   {comment}
-                </p>
-              </TooltipTrigger>
-              <TooltipContent className="max-w-sm whitespace-pre-wrap">
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <p className="text-muted-foreground line-clamp-1 max-w-full min-w-0 text-sm md:flex-1">
                 {comment}
-              </TooltipContent>
-            </Tooltip>
-          ) : (
-            <p className="text-muted-foreground line-clamp-1 text-sm md:min-w-0 md:flex-1">
-              {comment}
-            </p>
-          )
-        ) : null}
-        <p className="text-muted-foreground flex min-w-0 items-center gap-1 text-xs md:ml-auto md:max-w-48 md:shrink-0 md:justify-end">
-          <span className="truncate">{accountName(row.account)}</span>
-          {row.linked ? (
-            <>
-              <ArrowRightIcon className="size-3 shrink-0" />
-              <span className="truncate">
-                {accountName(row.linked.account)}
-              </span>
-            </>
+              </p>
+            )
           ) : null}
-        </p>
+          <p
+            className={cn(
+              "text-muted-foreground flex min-w-0 items-center gap-1 text-xs max-md:max-w-full md:ml-auto md:max-w-48 md:shrink-0 md:justify-end",
+              comment && "max-md:before:content-['·']",
+            )}
+          >
+            <span className="truncate">{accountName(row.account)}</span>
+            {row.linked ? (
+              <>
+                <ArrowRightIcon className="size-3 shrink-0" />
+                <span className="truncate">
+                  {accountName(row.linked.account)}
+                </span>
+              </>
+            ) : null}
+          </p>
+        </div>
       </div>
-      <div className="flex shrink-0 flex-col items-end">
+      <div className="flex shrink-0 flex-col items-end md:min-w-28">
         <Money
           amount={amount}
           sign={sign}

@@ -38,7 +38,8 @@ export function DayHeading({
         : t(relative.kind);
 
   return (
-    <div className="flex items-baseline gap-2 px-3 pt-4 pb-1.5 sm:px-4 md:pt-2.5 md:pb-1">
+    // above the rows in a narrow list, a column beside them in a wide one
+    <div className="flex items-baseline gap-2 @max-2xl:px-3 @max-2xl:pt-4 @max-2xl:pb-1.5 @max-2xl:sm:px-4 @max-2xl:md:pt-2.5 @max-2xl:md:pb-1 @2xl:flex-col @2xl:gap-0 @2xl:pt-1.5 @2xl:pl-1">
       <span className="text-sm font-semibold">
         {formatListDate(date, today, locale)}
       </span>
@@ -49,7 +50,11 @@ export function DayHeading({
   );
 }
 
-/** Rows grouped by day, the date shown once per group */
+/**
+ * Rows grouped by day, the date shown once per group. In a wide list the
+ * date sits in a column on the left, so a day with one row takes one line
+ * instead of two.
+ */
 export function TransactionGroups({
   rows,
   planned,
@@ -74,9 +79,12 @@ export function TransactionGroups({
   }
 
   return (
-    <div className="flex flex-col">
+    <div className="@container flex flex-col @2xl:gap-1.5">
       {groups.map((group) => (
-        <section key={group.date}>
+        <section
+          key={group.date}
+          className="@2xl:grid @2xl:grid-cols-[8.5rem_minmax(0,1fr)] @2xl:items-start @2xl:gap-x-3"
+        >
           <DayHeading date={group.date} planned={planned} />
           <div className="bg-card divide-y overflow-hidden rounded-lg border">
             {group.rows.map((row) => (

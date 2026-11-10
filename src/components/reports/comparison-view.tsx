@@ -343,7 +343,7 @@ export function ComparisonView() {
           />
         }
       />
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4 sm:p-6">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-4 sm:p-6">
         {running ? (
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
             <p className="text-muted-foreground min-w-0 flex-1 basis-64 text-sm">

@@ -282,7 +282,7 @@ export function UsersView({ currentUserId }: { currentUserId: string }) {
           </Button>
         }
       />
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 p-4 sm:p-6">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 p-4 sm:p-6">
         <section className="flex flex-col gap-3">
           <h2 className="text-sm font-semibold">{t("people")}</h2>
           <ItemGroup className="gap-2">

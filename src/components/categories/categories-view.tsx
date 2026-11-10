@@ -121,13 +121,15 @@ export function CategoriesView() {
             </EmptyContent>
           </Empty>
         ) : (
-          <ItemGroup className="gap-1.5">
+          <ItemGroup className="bg-card gap-0 divide-y overflow-hidden rounded-lg border has-data-[size=sm]:gap-0">
             {rows.map((category) => (
               <Item
                 key={category.id}
-                variant="outline"
                 size="sm"
-                className={cn(category.parentId && "ml-6 w-auto sm:ml-8")}
+                className={cn(
+                  "rounded-none border-x-0 border-t-0 py-1.5",
+                  category.parentId && "pl-9 sm:pl-11",
+                )}
               >
                 <ItemContent className="min-w-40">
                   <ItemTitle className="w-full flex-wrap">
