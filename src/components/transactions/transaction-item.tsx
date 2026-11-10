@@ -256,8 +256,12 @@ export function TransactionItem({
             </Tooltip>
           ) : null}
         </div>
-        {/* phones: the comment and the account share the second line when they fit */}
-        <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 md:contents">
+        {/*
+          phones: the comment and the account share the second line when they
+          fit. The dot between them hangs in the gap, so when the account wraps
+          to a line of its own the clip hides it
+        */}
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 max-md:overflow-x-clip md:contents">
           {comment ? (
             comment.length > 50 ? (
               <Tooltip>
@@ -278,8 +282,9 @@ export function TransactionItem({
           ) : null}
           <p
             className={cn(
-              "text-muted-foreground flex min-w-0 items-center gap-1 text-xs max-md:max-w-full md:ml-auto md:max-w-48 md:shrink-0 md:justify-end",
-              comment && "max-md:before:content-['·']",
+              "text-muted-foreground relative flex min-w-0 items-center gap-1 text-xs max-md:max-w-full md:ml-auto md:max-w-48 md:shrink-0 md:justify-end",
+              comment &&
+                "max-md:before:absolute max-md:before:-left-2 max-md:before:content-['·']",
             )}
           >
             <span className="truncate">{accountName(row.account)}</span>
