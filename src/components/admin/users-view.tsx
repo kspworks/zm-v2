@@ -12,10 +12,9 @@ import {
   ShieldOffIcon,
   Trash2Icon,
 } from "lucide-react";
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { toast } from "sonner";
-
 import { ConfirmDialog } from "~/components/app/confirm-dialog";
 import { PageHeader } from "~/components/app/page-header";
 import { ResponsiveDialog } from "~/components/app/responsive-dialog";
@@ -44,6 +43,7 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { Spinner } from "~/components/ui/spinner";
+import { useDateTime } from "~/hooks/use-date-time";
 import { useToastError } from "~/hooks/use-toast-error";
 import { cn } from "~/lib/utils";
 import { useTRPC } from "~/trpc/react";
@@ -67,7 +67,7 @@ function RecoveryDialog({
 }) {
   const t = useTranslations("users");
   const tc = useTranslations("common");
-  const format = useFormatter();
+  const dateTime = useDateTime();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const toastError = useToastError();
@@ -161,10 +161,7 @@ function RecoveryDialog({
                   <ItemTitle>{t(`scopes.${link.scope}`)}</ItemTitle>
                   <ItemDescription>
                     {t("expires", {
-                      date: format.dateTime(link.expiresAt, {
-                        dateStyle: "short",
-                        timeStyle: "short",
-                      }),
+                      date: dateTime(link.expiresAt),
                     })}
                   </ItemDescription>
                 </ItemContent>
@@ -190,7 +187,7 @@ function RecoveryDialog({
 export function UsersView({ currentUserId }: { currentUserId: string }) {
   const t = useTranslations("users");
   const tc = useTranslations("common");
-  const format = useFormatter();
+  const dateTime = useDateTime();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const toastError = useToastError();
@@ -274,9 +271,6 @@ export function UsersView({ currentUserId }: { currentUserId: string }) {
     }),
   );
 
-  const dateTime = (date: Date) =>
-    format.dateTime(date, { dateStyle: "short", timeStyle: "short" });
-
   return (
     <>
       <PageHeader
@@ -300,7 +294,10 @@ export function UsersView({ currentUserId }: { currentUserId: string }) {
               >
                 <ItemContent className="min-w-0">
                   <ItemTitle className="w-full flex-wrap">
-                    <span className="truncate">{user.name}</span>
+                    {/* the id is for matching logs, not for reading */}
+                    <span className="truncate" title={user.id}>
+                      {user.name}
+                    </span>
                     {user.id === currentUserId ? (
                       <span className="text-muted-foreground">
                         ({t("you")})
@@ -321,9 +318,6 @@ export function UsersView({ currentUserId }: { currentUserId: string }) {
                   <ItemDescription className="truncate">
                     {user.email} · {t("created")} {dateTime(user.createdAt)} ·{" "}
                     {t("updated")} {dateTime(user.updatedAt)}
-                  </ItemDescription>
-                  <ItemDescription className="font-mono text-xs">
-                    {user.id}
                   </ItemDescription>
                 </ItemContent>
                 <ItemActions>

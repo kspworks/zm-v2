@@ -9,10 +9,9 @@ import {
   Undo2Icon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useFormatter, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-
 import { ConfirmDialog } from "~/components/app/confirm-dialog";
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
 import { Button } from "~/components/ui/button";
@@ -46,6 +45,7 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
+import { useDateTime } from "~/hooks/use-date-time";
 import { useToastError } from "~/hooks/use-toast-error";
 import { isErrorKey } from "~/lib/error-keys";
 import { MAX_IMPORT_BYTES } from "~/lib/import-limits";
@@ -90,7 +90,7 @@ const rowErrorsOf = (error: unknown): RowError[] | null => {
 export function ImportCard() {
   const t = useTranslations("import");
   const te = useTranslations("errors");
-  const format = useFormatter();
+  const dateTime = useDateTime();
   const trpc = useTRPC();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -227,11 +227,7 @@ export function ImportCard() {
                   <ItemContent className="min-w-0">
                     <ItemTitle className="truncate">{item.fileName}</ItemTitle>
                     <ItemDescription>
-                      {format.dateTime(item.createdAt, {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      })}{" "}
-                      · {t("counts", item)}
+                      {dateTime(item.createdAt)} · {t("counts", item)}
                     </ItemDescription>
                   </ItemContent>
                   <ItemActions>

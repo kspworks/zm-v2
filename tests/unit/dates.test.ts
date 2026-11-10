@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   calendarDateIn,
+  formatDateTime,
   formatDisplayDate,
   formatListDate,
   relativeDay,
@@ -10,6 +11,23 @@ import {
 describe("formatDisplayDate", () => {
   it("renders dd.MM.yyyy", () => {
     expect(formatDisplayDate("2026-03-05")).toBe("05.03.2026");
+  });
+});
+
+describe("formatDateTime", () => {
+  const instant = new Date("2026-11-09T21:37:00Z");
+
+  it("puts the day first on a 24-hour clock, in the given time zone", () => {
+    expect(formatDateTime(instant, "en", "Europe/Kyiv")).toBe(
+      "9 Nov 2026, 23:37",
+    );
+    expect(formatDateTime(instant, "en", "UTC")).toBe("9 Nov 2026, 21:37");
+  });
+
+  it("uses the locale's month name", () => {
+    expect(formatDateTime(instant, "uk", "Europe/Kyiv")).toMatch(
+      /^9 лис\S* 2026, 23:37$/,
+    );
   });
 });
 

@@ -252,7 +252,7 @@
     "title": "Categories",
     "add": "Add category",
     "empty": "No categories yet",
-    "emptyHint": "Categories group your expenses and incomes.",
+    "emptyHint": "Categories group your income and expenses.",
     "createTitle": "New category",
     "editTitle": "Edit category",
     "name": "Name",
@@ -268,7 +268,7 @@
   "counterparties": {
     "title": "Counterparties",
     "empty": "No counterparties yet",
-    "emptyHint": "They appear when you add a payee or record a debt.",
+    "emptyHint": "They appear when you name a counterparty on a transaction or record a debt.",
     "rename": "Rename",
     "renameTitle": "Rename counterparty",
     "name": "Name",
@@ -352,8 +352,8 @@
     },
     "totals": {
       "expenses": "Expenses",
-      "incomes": "Incomes",
-      "total": "Total",
+      "incomes": "Income",
+      "total": "Net",
       "hint": "These results do not include transfers between your own accounts"
     },
     "toast": {
@@ -419,7 +419,7 @@
     "account": "Account",
     "fromAccount": "From account",
     "toAccount": "To account",
-    "counterparty": "Payee",
+    "counterparty": "Counterparty",
     "debtCounterparty": "Who",
     "comment": "Comment",
     "direction": {
@@ -507,7 +507,7 @@
   },
   "import": {
     "upload": "Import a ZenMoney export",
-    "description": "A CSV exported from ZenMoney, up to 4 MB. Accounts, categories and payees are created as needed.",
+    "description": "A CSV exported from ZenMoney, up to 4 MB. Accounts, categories and counterparties are created as needed.",
     "choose": "Choose a CSV file",
     "importing": "Importing…",
     "done": "{count, plural, one {# transaction imported} other {# transactions imported}}",
@@ -542,7 +542,7 @@
     "forecast": {
       "title": "Forecast",
       "income": "Income",
-      "expense": "Expense",
+      "expense": "Expenses",
       "balance": "Balance"
     },
     "options": {
@@ -583,7 +583,7 @@
   "reports": {
     "title": "Reports",
     "expense": "Expenses",
-    "income": "Incomes",
+    "income": "Income",
     "total": "Total: {amount}",
     "empty": "Nothing to show for this period",
     "truncated": "Showing the first {limit} transactions of this period; narrow the range to see all of them.",
@@ -604,7 +604,7 @@
     "map": "Map",
     "comparison": "Period comparison",
     "difference": "Difference",
-    "remainder": "Remainder",
+    "remainder": "Net",
     "newValue": "new",
     "period1": "First period",
     "period2": "Second period",

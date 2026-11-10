@@ -2,8 +2,7 @@
 
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { HistoryIcon } from "lucide-react";
-import { useFormatter, useTranslations } from "next-intl";
-
+import { useTranslations } from "next-intl";
 import { Money } from "~/components/app/money";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -22,12 +21,13 @@ import {
 } from "~/components/ui/empty";
 import { Skeleton } from "~/components/ui/skeleton";
 import { Spinner } from "~/components/ui/spinner";
+import { useDateTime } from "~/hooks/use-date-time";
 import { useTRPC } from "~/trpc/react";
 
 /** What this user changed, newest first, read from the audit log */
 export function HistoryCard() {
   const t = useTranslations("history");
-  const format = useFormatter();
+  const dateTime = useDateTime();
   const trpc = useTRPC();
   const list = useInfiniteQuery(
     trpc.history.list.infiniteQueryOptions(
@@ -96,12 +96,7 @@ export function HistoryCard() {
                     dateTime={item.at.toISOString()}
                     className="text-muted-foreground text-xs"
                   >
-                    {format.dateTime(item.at, {
-                      day: "numeric",
-                      month: "short",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {dateTime(item.at)}
                   </time>
                 </div>
               </li>

@@ -20,6 +20,20 @@ export const formatDisplayDate = (date: string): string =>
 export const calendarDateIn = (instant: Date, timeZone: string): string =>
   format(new TZDate(instant, timeZone), "yyyy-MM-dd");
 
+/**
+ * A moment as "9 Nov 2026, 23:37" in a time zone: day first and a 24-hour
+ * clock in both locales, like every calendar date in the app. Intl's "en"
+ * would put the month first, which next to "09.11.2026" reads as September.
+ */
+export const formatDateTime = (
+  instant: Date,
+  locale: Locale,
+  timeZone: string,
+): string =>
+  format(new TZDate(instant, timeZone), "d MMM yyyy, HH:mm", {
+    locale: dateFnsLocale(locale),
+  });
+
 /** List heading: "d MMMM", plus "yyyy" when not the current year */
 export const formatListDate = (
   date: string,
