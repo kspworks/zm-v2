@@ -31,6 +31,7 @@ import { ConfirmDialog } from "~/components/app/confirm-dialog";
 import { Money } from "~/components/app/money";
 import { PageHeader } from "~/components/app/page-header";
 import { ShareDialog } from "~/components/app/share-dialog";
+import { ItemListSkeleton, LoadingRegion } from "~/components/app/skeletons";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
@@ -57,7 +58,6 @@ import {
   ItemMedia,
   ItemTitle,
 } from "~/components/ui/item";
-import { Skeleton } from "~/components/ui/skeleton";
 import { useToastError } from "~/hooks/use-toast-error";
 import { filteredHref } from "~/lib/transaction-links";
 import { cn } from "~/lib/utils";
@@ -127,11 +127,9 @@ export function AccountsView() {
 
       <div className="mx-auto w-full max-w-3xl p-4 sm:p-6">
         {accounts.isPending ? (
-          <div className="flex flex-col gap-2">
-            {[0, 1, 2].map((index) => (
-              <Skeleton key={index} className="h-16 w-full" />
-            ))}
-          </div>
+          <LoadingRegion>
+            <ItemListSkeleton icon />
+          </LoadingRegion>
         ) : accounts.data?.length === 0 ? (
           <Empty className="border">
             <EmptyHeader>

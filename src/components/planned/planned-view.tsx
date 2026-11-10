@@ -8,6 +8,10 @@ import { useState } from "react";
 import { BalancesSidebar } from "~/components/app/balances-sidebar";
 import { LedgerLayout } from "~/components/app/ledger-layout";
 import {
+  LoadingRegion,
+  TransactionListSkeleton,
+} from "~/components/app/skeletons";
+import {
   type PlannedDialogState,
   PlannedFormDialog,
 } from "~/components/planned/planned-form-dialog";
@@ -34,7 +38,6 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "~/components/ui/empty";
-import { Skeleton } from "~/components/ui/skeleton";
 import { Spinner } from "~/components/ui/spinner";
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { useLocalStorage } from "~/hooks/use-local-storage";
@@ -112,11 +115,9 @@ export function PlannedView() {
       )}
 
       {list.isPending ? (
-        <div className="flex flex-col gap-2">
-          {[0, 1, 2].map((index) => (
-            <Skeleton key={index} className="h-16 w-full" />
-          ))}
-        </div>
+        <LoadingRegion>
+          <TransactionListSkeleton />
+        </LoadingRegion>
       ) : rows.length === 0 ? (
         <Empty className="border">
           <EmptyHeader>

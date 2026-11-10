@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { ConfirmDialog } from "~/components/app/confirm-dialog";
 import { PageHeader } from "~/components/app/page-header";
 import { ResponsiveDialog } from "~/components/app/responsive-dialog";
+import { ItemListSkeleton, LoadingRegion } from "~/components/app/skeletons";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
@@ -49,7 +50,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { Skeleton } from "~/components/ui/skeleton";
 import { Spinner } from "~/components/ui/spinner";
 import { useToastError } from "~/hooks/use-toast-error";
 import { formatMoney } from "~/lib/money";
@@ -131,15 +131,14 @@ export function CounterpartiesView() {
       <PageHeader title={t("title")} />
 
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4 sm:p-6">
-        {rows.length > 0 ? (
+        {/* shown while loading too, so the list does not move when it lands */}
+        {list.isPending || rows.length > 0 ? (
           <p className="text-muted-foreground text-sm">{t("hint")}</p>
         ) : null}
         {list.isPending ? (
-          <div className="flex flex-col gap-2">
-            {[0, 1, 2].map((index) => (
-              <Skeleton key={index} className="h-14 w-full" />
-            ))}
-          </div>
+          <LoadingRegion>
+            <ItemListSkeleton />
+          </LoadingRegion>
         ) : rows.length === 0 ? (
           <Empty className="border">
             <EmptyHeader>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 
 import { Money } from "~/components/app/money";
+import { LoadingRegion, StatsSkeleton } from "~/components/app/skeletons";
 import { BudgetProgress } from "~/components/budgets/budget-progress";
 import {
   Card,
@@ -14,7 +15,6 @@ import {
   CardHeader,
   CardTitle,
 } from "~/components/ui/card";
-import { Skeleton } from "~/components/ui/skeleton";
 import { formatMoney } from "~/lib/money";
 import { cn } from "~/lib/utils";
 import { useTRPC } from "~/trpc/react";
@@ -108,7 +108,9 @@ export function MonthSummary({ currencyId }: { currencyId: string }) {
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
         {month.isPending ? (
-          <Skeleton className="h-16 w-full" />
+          <LoadingRegion>
+            <StatsSkeleton />
+          </LoadingRegion>
         ) : (
           <div className="grid grid-cols-3 gap-3">
             {stat(

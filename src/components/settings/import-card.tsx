@@ -13,6 +13,7 @@ import { useTranslations } from "next-intl";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "~/components/app/confirm-dialog";
+import { ItemListSkeleton, LoadingRegion } from "~/components/app/skeletons";
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
 import { Button } from "~/components/ui/button";
 import {
@@ -211,7 +212,11 @@ export function ImportCard() {
           ) : null}
 
           <h3 className="text-sm font-semibold">{t("history")}</h3>
-          {history.data?.length === 0 ? (
+          {history.isPending ? (
+            <LoadingRegion>
+              <ItemListSkeleton rows={2} value={false} fade={false} />
+            </LoadingRegion>
+          ) : history.data?.length === 0 ? (
             <Empty className="border">
               <EmptyHeader>
                 <EmptyMedia variant="icon">

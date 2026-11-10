@@ -4,6 +4,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { HistoryIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Money } from "~/components/app/money";
+import { HistoryListSkeleton, LoadingRegion } from "~/components/app/skeletons";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
@@ -19,7 +20,6 @@ import {
   EmptyHeader,
   EmptyMedia,
 } from "~/components/ui/empty";
-import { Skeleton } from "~/components/ui/skeleton";
 import { Spinner } from "~/components/ui/spinner";
 import { useDateTime } from "~/hooks/use-date-time";
 import { useTRPC } from "~/trpc/react";
@@ -45,7 +45,9 @@ export function HistoryCard() {
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {list.isPending ? (
-          <Skeleton className="h-32 w-full" />
+          <LoadingRegion>
+            <HistoryListSkeleton />
+          </LoadingRegion>
         ) : items.length === 0 ? (
           <Empty className="border border-dashed">
             <EmptyHeader>

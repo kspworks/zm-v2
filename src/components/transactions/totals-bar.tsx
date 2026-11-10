@@ -5,6 +5,7 @@ import { InfoIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Money } from "~/components/app/money";
+import { LoadingRegion, TotalsSkeleton } from "~/components/app/skeletons";
 import {
   Tooltip,
   TooltipContent,
@@ -26,6 +27,14 @@ export function TotalsBar({
   const totals = useQuery(
     trpc.transactions.totals.queryOptions({ filter, planned }),
   );
+
+  if (totals.isPending) {
+    return (
+      <LoadingRegion>
+        <TotalsSkeleton />
+      </LoadingRegion>
+    );
+  }
 
   if (!totals.data?.length) {
     return null;

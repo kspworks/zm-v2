@@ -7,6 +7,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { ResponsiveDialog } from "~/components/app/responsive-dialog";
+import { ItemListSkeleton, LoadingRegion } from "~/components/app/skeletons";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "~/components/ui/field";
@@ -19,7 +20,6 @@ import {
   ItemGroup,
   ItemTitle,
 } from "~/components/ui/item";
-import { Skeleton } from "~/components/ui/skeleton";
 import { Spinner } from "~/components/ui/spinner";
 import { Switch } from "~/components/ui/switch";
 import { useToastError } from "~/hooks/use-toast-error";
@@ -136,7 +136,9 @@ export function ShareDialog({
           {t("members")}
         </h3>
         {members.isPending ? (
-          <Skeleton className="h-14 w-full" />
+          <LoadingRegion>
+            <ItemListSkeleton rows={2} menu={false} fade={false} />
+          </LoadingRegion>
         ) : (
           <ItemGroup className="gap-2">
             {members.data?.map((member) => (

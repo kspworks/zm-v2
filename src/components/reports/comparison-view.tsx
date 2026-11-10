@@ -9,6 +9,7 @@ import { Fragment, type ReactNode, useId, useMemo, useState } from "react";
 
 import { Money } from "~/components/app/money";
 import { PageHeader } from "~/components/app/page-header";
+import { LoadingRegion, TableSkeleton } from "~/components/app/skeletons";
 import { DeltaCell } from "~/components/reports/delta-cell";
 import { PeriodPicker } from "~/components/reports/period-picker";
 import { FilterButton } from "~/components/transactions/filter-bar";
@@ -26,7 +27,6 @@ import {
   EmptyMedia,
 } from "~/components/ui/empty";
 import { Field, FieldLabel } from "~/components/ui/field";
-import { Skeleton } from "~/components/ui/skeleton";
 import { Switch } from "~/components/ui/switch";
 import {
   Table,
@@ -463,7 +463,9 @@ export function ComparisonView() {
               })}
             </Table>
             {data.isPending ? (
-              <Skeleton className="my-2 h-72 w-full" />
+              <LoadingRegion>
+                <TableSkeleton rows={10} columns={3} />
+              </LoadingRegion>
             ) : tables.length === 0 ? (
               <Empty className="border-0">
                 <EmptyHeader>

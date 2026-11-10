@@ -9,6 +9,7 @@ import { useMemo } from "react";
 
 import { Money } from "~/components/app/money";
 import { PageHeader } from "~/components/app/page-header";
+import { LoadingRegion, ReportCardSkeleton } from "~/components/app/skeletons";
 import { PeriodPicker } from "~/components/reports/period-picker";
 import { ReportTreemap } from "~/components/reports/report-treemap";
 import { FilterButton } from "~/components/transactions/filter-bar";
@@ -36,7 +37,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { Skeleton } from "~/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -277,7 +277,9 @@ export function ReportsView() {
         ) : null}
 
         {data.isPending ? (
-          <Skeleton className="h-96 w-full" />
+          <LoadingRegion>
+            <ReportCardSkeleton />
+          </LoadingRegion>
         ) : charts.length === 0 ? (
           <Empty className="border">
             <EmptyHeader>

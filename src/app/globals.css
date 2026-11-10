@@ -182,3 +182,38 @@
     cursor: pointer;
   }
 }
+
+/*
+ * Loading placeholders. The gradient is attached to the viewport, so every
+ * block on a page shows its piece of one band of light crossing the screen,
+ * instead of each pulsing on its own. Both stops are tints of the text
+ * colour, so a block reads the same on the page, a card and a muted surface.
+ */
+@utility skeleton {
+  --skeleton-base: color-mix(in oklab, var(--foreground) 8%, transparent);
+  --skeleton-glint: color-mix(in oklab, var(--foreground) 3.5%, transparent);
+  background-image: linear-gradient(
+    100deg,
+    var(--skeleton-base) 0 40%,
+    var(--skeleton-glint) 50%,
+    var(--skeleton-base) 60% 100%
+  );
+  background-size: 200vw 100vh;
+  background-attachment: fixed;
+  animation: skeleton-sweep 2.4s linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    background: var(--skeleton-base);
+    animation: none;
+  }
+}
+
+/* one whole tile of the repeating gradient, so the loop has no seam */
+@keyframes skeleton-sweep {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 200vw 0;
+  }
+}

@@ -13,6 +13,10 @@ import { type ReactNode, useState } from "react";
 import { BalancesSidebar } from "~/components/app/balances-sidebar";
 import { LedgerLayout } from "~/components/app/ledger-layout";
 import {
+  LoadingRegion,
+  TransactionListSkeleton,
+} from "~/components/app/skeletons";
+import {
   type PlannedDialogState,
   PlannedFormDialog,
 } from "~/components/planned/planned-form-dialog";
@@ -43,7 +47,6 @@ import {
   EmptyTitle,
 } from "~/components/ui/empty";
 import { Kbd } from "~/components/ui/kbd";
-import { Skeleton } from "~/components/ui/skeleton";
 import { Spinner } from "~/components/ui/spinner";
 import { isFilterActive } from "~/lib/validators/transactions";
 import { useTRPC } from "~/trpc/react";
@@ -124,11 +127,9 @@ export function TransactionsView({
       />
 
       {list.isPending ? (
-        <div className="flex flex-col gap-2">
-          {[0, 1, 2, 3].map((index) => (
-            <Skeleton key={index} className="h-16 w-full" />
-          ))}
-        </div>
+        <LoadingRegion>
+          <TransactionListSkeleton />
+        </LoadingRegion>
       ) : rows.length === 0 ? (
         <Empty className="border">
           <EmptyHeader>

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
+import { FormSkeleton, LoadingRegion } from "~/components/app/skeletons";
 import { BackupCodes } from "~/components/auth/backup-codes";
 import { TotpEnrolment } from "~/components/auth/totp-enrolment";
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
@@ -21,7 +22,6 @@ import {
 } from "~/components/ui/card";
 import { Field, FieldGroup, FieldLabel } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
-import { Skeleton } from "~/components/ui/skeleton";
 import { Spinner } from "~/components/ui/spinner";
 import { useErrorMessage } from "~/hooks/use-error-message";
 import { signInWithTicket } from "~/lib/auth/client";
@@ -51,7 +51,11 @@ export function RecoverForm({ token }: { token: string }) {
   const complete = useMutation(trpc.recovery.complete.mutationOptions());
 
   if (link.isPending) {
-    return <Skeleton className="h-80 w-full" />;
+    return (
+      <LoadingRegion>
+        <FormSkeleton fields={4} />
+      </LoadingRegion>
+    );
   }
 
   if (link.isError || !link.data) {

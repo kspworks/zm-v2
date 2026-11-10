@@ -18,6 +18,10 @@ import { toast } from "sonner";
 import { ConfirmDialog } from "~/components/app/confirm-dialog";
 import { PageHeader } from "~/components/app/page-header";
 import { ShareDialog } from "~/components/app/share-dialog";
+import {
+  CategoryListSkeleton,
+  LoadingRegion,
+} from "~/components/app/skeletons";
 import { CategoryFormDialog } from "~/components/categories/category-form-dialog";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -44,7 +48,6 @@ import {
   ItemGroup,
   ItemTitle,
 } from "~/components/ui/item";
-import { Skeleton } from "~/components/ui/skeleton";
 import { useToastError } from "~/hooks/use-toast-error";
 import { categoryColorOrder, SERIES_SLOTS, seriesColor } from "~/lib/report";
 import { cn } from "~/lib/utils";
@@ -107,11 +110,9 @@ export function CategoriesView() {
 
       <div className="mx-auto w-full max-w-3xl p-4 sm:p-6">
         {categories.isPending ? (
-          <div className="flex flex-col gap-2">
-            {[0, 1, 2, 3].map((index) => (
-              <Skeleton key={index} className="h-12 w-full" />
-            ))}
-          </div>
+          <LoadingRegion>
+            <CategoryListSkeleton />
+          </LoadingRegion>
         ) : rows.length === 0 ? (
           <Empty className="border">
             <EmptyHeader>

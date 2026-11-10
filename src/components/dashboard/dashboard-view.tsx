@@ -14,6 +14,13 @@ import { type ReactNode, useId, useMemo, useState } from "react";
 
 import { BalancesSidebar } from "~/components/app/balances-sidebar";
 import { LedgerLayout } from "~/components/app/ledger-layout";
+import {
+  ChartSkeleton,
+  DashboardSkeleton,
+  LoadingRegion,
+  NearestSkeleton,
+  TableSkeleton,
+} from "~/components/app/skeletons";
 import { BalanceChart } from "~/components/dashboard/balance-chart";
 import { BalanceSummary } from "~/components/dashboard/balance-summary";
 import { ForecastTable } from "~/components/dashboard/forecast-table";
@@ -51,7 +58,6 @@ import {
   PopoverTrigger,
 } from "~/components/ui/popover";
 import { Separator } from "~/components/ui/separator";
-import { Skeleton } from "~/components/ui/skeleton";
 import { Switch } from "~/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { useLocalStorage } from "~/hooks/use-local-storage";
@@ -343,7 +349,12 @@ export function DashboardView() {
       }
     >
       {firstRun ? null : currencyTabs("sm:hidden", "w-full")}
-      {noAccounts ? (
+      {accounts.isPending ? (
+        // which currency to chart is not known yet; the cards hold their place
+        <LoadingRegion className="contents">
+          <DashboardSkeleton />
+        </LoadingRegion>
+      ) : noAccounts ? (
         <Empty className="border">
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -387,7 +398,9 @@ export function DashboardView() {
                   sign={currency.sign}
                 />
               ) : (
-                <Skeleton className="h-56 w-full sm:h-80" />
+                <LoadingRegion>
+                  <ChartSkeleton />
+                </LoadingRegion>
               )}
             </CardContent>
           </Card>
@@ -407,7 +420,9 @@ export function DashboardView() {
               {forecast.data ? (
                 <ForecastTable months={forecast.data} today={today} />
               ) : (
-                <Skeleton className="h-32 w-full" />
+                <LoadingRegion>
+                  <TableSkeleton rows={4} columns={4} />
+                </LoadingRegion>
               )}
             </CardContent>
           </Card>
@@ -418,7 +433,9 @@ export function DashboardView() {
             </CardHeader>
             <CardContent>
               {nearest.isPending ? (
-                <Skeleton className="h-32 w-full" />
+                <LoadingRegion>
+                  <NearestSkeleton />
+                </LoadingRegion>
               ) : nearest.data && nearest.data.length > 0 ? (
                 <NearestPlanned days={nearest.data} today={today} />
               ) : (

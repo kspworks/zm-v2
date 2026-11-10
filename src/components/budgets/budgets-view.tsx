@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { ConfirmDialog } from "~/components/app/confirm-dialog";
 import { PageHeader } from "~/components/app/page-header";
+import { BudgetListSkeleton, LoadingRegion } from "~/components/app/skeletons";
 import { BudgetFormDialog } from "~/components/budgets/budget-form-dialog";
 import {
   type Budget,
@@ -28,7 +29,6 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "~/components/ui/empty";
-import { Skeleton } from "~/components/ui/skeleton";
 import { useToastError } from "~/hooks/use-toast-error";
 import { useTRPC } from "~/trpc/react";
 
@@ -74,7 +74,9 @@ export function BudgetsView() {
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4 sm:p-6">
         <p className="text-muted-foreground text-sm">{t("hint")}</p>
         {list.isPending ? (
-          <Skeleton className="h-40 w-full" />
+          <LoadingRegion>
+            <BudgetListSkeleton />
+          </LoadingRegion>
         ) : list.data?.length ? (
           <ul className="bg-card divide-y rounded-lg border">
             {list.data.map((budget) => (

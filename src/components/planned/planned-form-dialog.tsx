@@ -4,6 +4,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { ResponsiveDialog } from "~/components/app/responsive-dialog";
+import { FormSkeleton, LoadingRegion } from "~/components/app/skeletons";
 import {
   defaultRepeat,
   RepeatFields,
@@ -18,7 +19,6 @@ import {
 import { useToday } from "~/components/transactions/transaction-groups";
 import type { TransactionRowData } from "~/components/transactions/transaction-item";
 import { Button } from "~/components/ui/button";
-import { Skeleton } from "~/components/ui/skeleton";
 import { Spinner } from "~/components/ui/spinner";
 import { formatDisplayDate } from "~/lib/dates";
 import { useTRPC } from "~/trpc/react";
@@ -84,7 +84,11 @@ function PlannedForm({
   const update = useMutation(trpc.planned.updateSchedule.mutationOptions());
 
   if (row && !schedule.data) {
-    return <Skeleton className="h-96 w-full" />;
+    return (
+      <LoadingRegion>
+        <FormSkeleton fields={6} />
+      </LoadingRegion>
+    );
   }
 
   return (

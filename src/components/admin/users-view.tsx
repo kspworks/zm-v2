@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { ConfirmDialog } from "~/components/app/confirm-dialog";
 import { PageHeader } from "~/components/app/page-header";
 import { ResponsiveDialog } from "~/components/app/responsive-dialog";
+import { ItemListSkeleton, LoadingRegion } from "~/components/app/skeletons";
 import { RowMenu } from "~/components/transactions/row-menu";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -285,6 +286,11 @@ export function UsersView({ currentUserId }: { currentUserId: string }) {
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 p-4 sm:p-6">
         <section className="flex flex-col gap-3">
           <h2 className="text-sm font-semibold">{t("people")}</h2>
+          {users.isPending ? (
+            <LoadingRegion>
+              <ItemListSkeleton rows={3} value={false} />
+            </LoadingRegion>
+          ) : null}
           <ItemGroup className="gap-2">
             {users.data?.map((user) => (
               <Item
@@ -394,6 +400,11 @@ export function UsersView({ currentUserId }: { currentUserId: string }) {
 
         <section className="flex flex-col gap-3">
           <h2 className="text-sm font-semibold">{t("invites")}</h2>
+          {invites.isPending ? (
+            <LoadingRegion>
+              <ItemListSkeleton rows={2} value={false} fade={false} />
+            </LoadingRegion>
+          ) : null}
           <ItemGroup className="gap-2">
             {invites.data?.map((invite) => (
               <Item key={invite.id} variant="outline" size="sm">

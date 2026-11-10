@@ -7,8 +7,8 @@ import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 
 import { Money } from "~/components/app/money";
+import { BalancesSkeleton, LoadingRegion } from "~/components/app/skeletons";
 import { Separator } from "~/components/ui/separator";
-import { Skeleton } from "~/components/ui/skeleton";
 import { usePrimaryCurrency } from "~/hooks/use-primary-currency";
 import { filteredHref } from "~/lib/transaction-links";
 import { cn } from "~/lib/utils";
@@ -136,10 +136,9 @@ export function BalancesSidebar({
 
   if (accounts.isPending || debts.isPending) {
     return (
-      <div className="flex flex-col gap-3">
-        <Skeleton className="h-16" />
-        <Skeleton className="h-40" />
-      </div>
+      <LoadingRegion>
+        <BalancesSkeleton />
+      </LoadingRegion>
     );
   }
 
