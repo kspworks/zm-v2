@@ -39,8 +39,11 @@ export function DayHeading({
         : t(relative.kind);
 
   return (
-    // above the rows in a narrow list, a column beside them in a wide one
-    <div className="flex items-baseline gap-2 @max-2xl:px-3 @max-2xl:pt-4 @max-2xl:pb-1.5 @max-2xl:sm:px-4 @max-2xl:md:pt-2.5 @max-2xl:md:pb-1 @2xl:flex-col @2xl:gap-0 @2xl:pt-1.5 @2xl:pl-1">
+    // Above the rows in a narrow list, a column beside them in a wide one.
+    // There it takes no height (`h-0`, the text overflows), so the card alone
+    // sizes the group: the date is taller than a one-row card, and would
+    // otherwise leave a wider gap after single-row days.
+    <div className="flex items-baseline gap-2 @max-2xl:px-3 @max-2xl:pt-4 @max-2xl:pb-1.5 @max-2xl:sm:px-4 @max-2xl:md:pt-2.5 @max-2xl:md:pb-1 @2xl:h-0 @2xl:flex-col @2xl:gap-0 @2xl:pt-1.5 @2xl:pl-1">
       <span className="text-sm font-semibold">
         {formatListDate(date, today, locale)}
       </span>
@@ -88,25 +91,29 @@ export function TransactionGroups({
   }
 
   return (
-    <div className="@container flex flex-col @2xl:gap-1.5">
-      {groups.map((group) => (
-        <section
-          key={group.date}
-          className="@2xl:grid @2xl:grid-cols-[8.5rem_minmax(0,1fr)] @2xl:items-start @2xl:gap-x-3"
-        >
-          <DayHeading date={group.date} planned={planned} />
-          <div className="bg-card divide-y overflow-hidden rounded-lg border">
-            {group.rows.map((row) => (
-              <TransactionItem
-                key={row.id}
-                row={row}
-                actions={actions(row)}
-                onOpen={() => onOpen(row)}
-              />
-            ))}
-          </div>
-        </section>
-      ))}
+    // a container query never matches its own container, so the gap sits
+    // on an inner element
+    <div className="@container">
+      <div className="flex flex-col @2xl:gap-1.5">
+        {groups.map((group) => (
+          <section
+            key={group.date}
+            className="@2xl:grid @2xl:grid-cols-[8.5rem_minmax(0,1fr)] @2xl:items-start @2xl:gap-x-3"
+          >
+            <DayHeading date={group.date} planned={planned} />
+            <div className="bg-card divide-y overflow-hidden rounded-lg border">
+              {group.rows.map((row) => (
+                <TransactionItem
+                  key={row.id}
+                  row={row}
+                  actions={actions(row)}
+                  onOpen={() => onOpen(row)}
+                />
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
     </div>
   );
 }
