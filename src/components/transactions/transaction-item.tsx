@@ -4,6 +4,7 @@ import { ArrowRightIcon, CheckCheckIcon, RepeatIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { type ReactNode, useCallback } from "react";
 
+import { ClippedText } from "~/components/app/clipped-text";
 import { Money } from "~/components/app/money";
 import {
   Tooltip,
@@ -263,22 +264,9 @@ export function TransactionItem({
         */}
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 max-md:overflow-x-clip md:contents">
           {comment ? (
-            comment.length > 50 ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <p className="text-muted-foreground line-clamp-1 max-w-full min-w-0 text-sm md:flex-1">
-                    {comment}
-                  </p>
-                </TooltipTrigger>
-                <TooltipContent className="max-w-sm whitespace-pre-wrap">
-                  {comment}
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-              <p className="text-muted-foreground line-clamp-1 max-w-full min-w-0 text-sm md:flex-1">
-                {comment}
-              </p>
-            )
+            <ClippedText className="text-muted-foreground line-clamp-1 max-w-full min-w-0 text-sm md:flex-1">
+              {comment}
+            </ClippedText>
           ) : null}
           <p
             className={cn(
