@@ -7,8 +7,10 @@ import { useTranslations } from "next-intl";
 import { parseAsBoolean, parseAsString, useQueryStates } from "nuqs";
 import { Fragment, type ReactNode, useId, useMemo, useState } from "react";
 
+import { AfterHydration } from "~/components/app/after-hydration";
 import { Money } from "~/components/app/money";
 import { PageHeader } from "~/components/app/page-header";
+import { ReportsComparePageSkeleton } from "~/components/app/route-skeletons";
 import { LoadingRegion, TableSkeleton } from "~/components/app/skeletons";
 import { DeltaCell } from "~/components/reports/delta-cell";
 import { PeriodPicker } from "~/components/reports/period-picker";
@@ -254,6 +256,14 @@ function Section({
 }
 
 export function ComparisonView() {
+  return (
+    <AfterHydration fallback={<ReportsComparePageSkeleton />}>
+      <Comparison />
+    </AfterHydration>
+  );
+}
+
+function Comparison() {
   const t = useTranslations("reports");
   const tt = useTranslations("transactions");
   const trpc = useTRPC();

@@ -4,6 +4,8 @@ import { EllipsisIcon, ListPlusIcon, ScaleIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
+import { AfterHydration } from "~/components/app/after-hydration";
+import { TransactionsPageSkeleton } from "~/components/app/route-skeletons";
 import { AdjustBalanceDialog } from "~/components/transactions/adjust-balance-dialog";
 import { BulkEntryDialog } from "~/components/transactions/bulk-entry-dialog";
 import { TransactionsView } from "~/components/transactions/transactions-view";
@@ -17,6 +19,14 @@ import {
 
 /** The Transactions page with its secondary entry points */
 export function TransactionsPage() {
+  return (
+    <AfterHydration fallback={<TransactionsPageSkeleton />}>
+      <Transactions />
+    </AfterHydration>
+  );
+}
+
+function Transactions() {
   const t = useTranslations("transactions");
   const tc = useTranslations("common");
   const [bulkOpen, setBulkOpen] = useState(false);

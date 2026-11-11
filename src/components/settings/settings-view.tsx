@@ -8,8 +8,10 @@ import { parseAsStringLiteral, useQueryState } from "nuqs";
 import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
 
+import { AfterHydration } from "~/components/app/after-hydration";
 import { useSwitchLocale } from "~/components/app/language-switcher";
 import { PageHeader } from "~/components/app/page-header";
+import { SettingsPageSkeleton } from "~/components/app/route-skeletons";
 import { BackupCodes } from "~/components/auth/backup-codes";
 import { TotpEnrolment } from "~/components/auth/totp-enrolment";
 import { ExportCard } from "~/components/settings/export-card";
@@ -391,7 +393,15 @@ function AppearanceCard() {
 
 const TABS = ["general", "security", "data"] as const;
 
-export function SettingsView({ reenrolPrompt }: { reenrolPrompt: boolean }) {
+export function SettingsView(props: { reenrolPrompt: boolean }) {
+  return (
+    <AfterHydration fallback={<SettingsPageSkeleton />}>
+      <Settings {...props} />
+    </AfterHydration>
+  );
+}
+
+function Settings({ reenrolPrompt }: { reenrolPrompt: boolean }) {
   const t = useTranslations("settings");
   const [tab, setTab] = useQueryState(
     "tab",

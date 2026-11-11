@@ -15,8 +15,11 @@ import {
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { toast } from "sonner";
+
+import { AfterHydration } from "~/components/app/after-hydration";
 import { ConfirmDialog } from "~/components/app/confirm-dialog";
 import { PageHeader } from "~/components/app/page-header";
+import { CategoriesPageSkeleton } from "~/components/app/route-skeletons";
 import { ShareDialog } from "~/components/app/share-dialog";
 import {
   CategoryListSkeleton,
@@ -57,6 +60,14 @@ import type { RouterOutputs } from "~/trpc/types";
 type Category = RouterOutputs["categories"]["list"][number];
 
 export function CategoriesView() {
+  return (
+    <AfterHydration fallback={<CategoriesPageSkeleton />}>
+      <Categories />
+    </AfterHydration>
+  );
+}
+
+function Categories() {
   const t = useTranslations("categories");
   const tc = useTranslations("common");
   const trpc = useTRPC();

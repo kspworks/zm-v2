@@ -7,8 +7,10 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useMemo } from "react";
 
+import { AfterHydration } from "~/components/app/after-hydration";
 import { Money } from "~/components/app/money";
 import { PageHeader } from "~/components/app/page-header";
+import { ReportsMapPageSkeleton } from "~/components/app/route-skeletons";
 import { LoadingRegion, ReportCardSkeleton } from "~/components/app/skeletons";
 import { PeriodPicker } from "~/components/reports/period-picker";
 import { ReportTreemap } from "~/components/reports/report-treemap";
@@ -85,6 +87,14 @@ function TileName({ name, href }: { name: string; href: string | null }) {
 }
 
 export function ReportsView() {
+  return (
+    <AfterHydration fallback={<ReportsMapPageSkeleton />}>
+      <Reports />
+    </AfterHydration>
+  );
+}
+
+function Reports() {
   const t = useTranslations("reports");
   const tt = useTranslations("transactions");
   const tf = useTranslations("filters");

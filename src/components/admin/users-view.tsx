@@ -15,9 +15,12 @@ import {
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { toast } from "sonner";
+
+import { AfterHydration } from "~/components/app/after-hydration";
 import { ConfirmDialog } from "~/components/app/confirm-dialog";
 import { PageHeader } from "~/components/app/page-header";
 import { ResponsiveDialog } from "~/components/app/responsive-dialog";
+import { UsersPageSkeleton } from "~/components/app/route-skeletons";
 import { ItemListSkeleton, LoadingRegion } from "~/components/app/skeletons";
 import { RowMenu } from "~/components/transactions/row-menu";
 import { Badge } from "~/components/ui/badge";
@@ -185,7 +188,15 @@ function RecoveryDialog({
   );
 }
 
-export function UsersView({ currentUserId }: { currentUserId: string }) {
+export function UsersView(props: { currentUserId: string }) {
+  return (
+    <AfterHydration fallback={<UsersPageSkeleton />}>
+      <Users {...props} />
+    </AfterHydration>
+  );
+}
+
+function Users({ currentUserId }: { currentUserId: string }) {
   const t = useTranslations("users");
   const tc = useTranslations("common");
   const dateTime = useDateTime();

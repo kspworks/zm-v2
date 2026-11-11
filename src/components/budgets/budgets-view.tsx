@@ -6,8 +6,10 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { AfterHydration } from "~/components/app/after-hydration";
 import { ConfirmDialog } from "~/components/app/confirm-dialog";
 import { PageHeader } from "~/components/app/page-header";
+import { BudgetsPageSkeleton } from "~/components/app/route-skeletons";
 import { BudgetListSkeleton, LoadingRegion } from "~/components/app/skeletons";
 import { BudgetFormDialog } from "~/components/budgets/budget-form-dialog";
 import {
@@ -33,6 +35,14 @@ import { useToastError } from "~/hooks/use-toast-error";
 import { useTRPC } from "~/trpc/react";
 
 export function BudgetsView() {
+  return (
+    <AfterHydration fallback={<BudgetsPageSkeleton />}>
+      <Budgets />
+    </AfterHydration>
+  );
+}
+
+function Budgets() {
   const t = useTranslations("budgets");
   const tc = useTranslations("common");
   const trpc = useTRPC();

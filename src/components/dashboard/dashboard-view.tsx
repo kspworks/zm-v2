@@ -12,8 +12,10 @@ import { useTranslations } from "next-intl";
 import { parseAsString, useQueryStates } from "nuqs";
 import { type ReactNode, useId, useMemo, useState } from "react";
 
+import { AfterHydration } from "~/components/app/after-hydration";
 import { BalancesSidebar } from "~/components/app/balances-sidebar";
 import { LedgerLayout } from "~/components/app/ledger-layout";
+import { DashboardPageSkeleton } from "~/components/app/route-skeletons";
 import {
   ChartSkeleton,
   DashboardSkeleton,
@@ -227,6 +229,14 @@ function ScopeOptions({
 }
 
 export function DashboardView() {
+  return (
+    <AfterHydration fallback={<DashboardPageSkeleton />}>
+      <Dashboard />
+    </AfterHydration>
+  );
+}
+
+function Dashboard() {
   const t = useTranslations("dashboard");
   const trpc = useTRPC();
   const today = useToday();

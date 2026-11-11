@@ -13,9 +13,11 @@ import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { AfterHydration } from "~/components/app/after-hydration";
 import { ConfirmDialog } from "~/components/app/confirm-dialog";
 import { PageHeader } from "~/components/app/page-header";
 import { ResponsiveDialog } from "~/components/app/responsive-dialog";
+import { CounterpartiesPageSkeleton } from "~/components/app/route-skeletons";
 import { ItemListSkeleton, LoadingRegion } from "~/components/app/skeletons";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -75,6 +77,14 @@ export function DebtBalance({ sum, sign }: { sum: number; sign: string }) {
 }
 
 export function CounterpartiesView() {
+  return (
+    <AfterHydration fallback={<CounterpartiesPageSkeleton />}>
+      <Counterparties />
+    </AfterHydration>
+  );
+}
+
+function Counterparties() {
   const t = useTranslations("counterparties");
   const tc = useTranslations("common");
   const trpc = useTRPC();

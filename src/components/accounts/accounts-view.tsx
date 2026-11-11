@@ -27,9 +27,11 @@ import {
   AccountFormDialog,
   type EditableAccount,
 } from "~/components/accounts/account-form-dialog";
+import { AfterHydration } from "~/components/app/after-hydration";
 import { ConfirmDialog } from "~/components/app/confirm-dialog";
 import { Money } from "~/components/app/money";
 import { PageHeader } from "~/components/app/page-header";
+import { AccountsPageSkeleton } from "~/components/app/route-skeletons";
 import { ShareDialog } from "~/components/app/share-dialog";
 import { ItemListSkeleton, LoadingRegion } from "~/components/app/skeletons";
 import { Badge } from "~/components/ui/badge";
@@ -76,6 +78,14 @@ const TYPE_ICONS: Record<Account["type"], LucideIcon> = {
 };
 
 export function AccountsView() {
+  return (
+    <AfterHydration fallback={<AccountsPageSkeleton />}>
+      <Accounts />
+    </AfterHydration>
+  );
+}
+
+function Accounts() {
   const t = useTranslations("accounts");
   const tc = useTranslations("common");
   const trpc = useTRPC();

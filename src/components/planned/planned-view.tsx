@@ -5,8 +5,11 @@ import { Schema } from "effect";
 import { CalendarClockIcon, PlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
+
+import { AfterHydration } from "~/components/app/after-hydration";
 import { BalancesSidebar } from "~/components/app/balances-sidebar";
 import { LedgerLayout } from "~/components/app/ledger-layout";
+import { PlannedPageSkeleton } from "~/components/app/route-skeletons";
 import {
   LoadingRegion,
   TransactionListSkeleton,
@@ -47,6 +50,14 @@ import { useTRPC } from "~/trpc/react";
 const viewSchema = Schema.Literals(["next", "all"]);
 
 export function PlannedView() {
+  return (
+    <AfterHydration fallback={<PlannedPageSkeleton />}>
+      <Planned />
+    </AfterHydration>
+  );
+}
+
+function Planned() {
   const t = useTranslations("planned");
   const tt = useTranslations("transactions");
   const trpc = useTRPC();
