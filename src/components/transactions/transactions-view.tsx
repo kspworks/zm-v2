@@ -48,6 +48,7 @@ import {
 } from "~/components/ui/empty";
 import { Kbd } from "~/components/ui/kbd";
 import { Spinner } from "~/components/ui/spinner";
+import { useLoadOnScroll } from "~/hooks/use-load-on-scroll";
 import { isFilterActive } from "~/lib/validators/transactions";
 import { useTRPC } from "~/trpc/react";
 
@@ -73,6 +74,16 @@ export function TransactionsView({
       { getNextPageParam: (page) => page.nextCursor },
     ),
   );
+
+  // the Load more button doubles as the sentinel, and stays as the fallback
+  // when auto-loading can't run or the last page fetch failed
+  const loadMoreRef = useLoadOnScroll({
+    enabled:
+      list.hasNextPage &&
+      !list.isFetchingNextPage &&
+      !list.isFetchNextPageError,
+    onLoad: () => void list.fetchNextPage(),
+  });
 
   const rows = list.data?.pages.flatMap((page) => page.items) ?? [];
   const hasAccounts = (accounts.data?.length ?? 0) > 0;
@@ -190,6 +201,7 @@ export function TransactionsView({
           />
           {list.hasNextPage ? (
             <Button
+              ref={loadMoreRef}
               variant="outline"
               className="self-center"
               disabled={list.isFetchingNextPage}
