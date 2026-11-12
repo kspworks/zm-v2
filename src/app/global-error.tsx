@@ -32,7 +32,7 @@ export default function GlobalError({
         <div style={{ textAlign: "center" }}>
           <h1>Щось пішло не так · Something went wrong</h1>
           <button type="button" onClick={reset}>
-            Спробувати ще · Try again
+            Спробувати ще раз · Try again
           </button>
         </div>
       </body>
