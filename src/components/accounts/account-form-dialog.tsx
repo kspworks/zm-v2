@@ -8,6 +8,7 @@ import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
+import { AmountInput } from "~/components/app/amount-input";
 import { FormError } from "~/components/app/form-error";
 import { ResponsiveDialog } from "~/components/app/responsive-dialog";
 import { Button } from "~/components/ui/button";
@@ -29,9 +30,9 @@ import {
 import { Spinner } from "~/components/ui/spinner";
 import { Switch } from "~/components/ui/switch";
 import { useToastError } from "~/hooks/use-toast-error";
-import { minorToInput, parseAmountInput } from "~/lib/money";
+import { evaluateAmount, minorToInput } from "~/lib/money";
 import { USER_ACCOUNT_TYPES } from "~/lib/validators/accounts";
-import { message, nonEmpty, trimmedString } from "~/lib/validators/common";
+import { amountIssue, nonEmpty, trimmedString } from "~/lib/validators/common";
 import { useTRPC } from "~/trpc/react";
 
 const formSchema = Schema.Struct({
@@ -39,11 +40,8 @@ const formSchema = Schema.Struct({
   currencyId: Schema.String.check(nonEmpty),
   type: Schema.Literals(USER_ACCOUNT_TYPES),
   initialBalance: Schema.String.check(
-    Schema.makeFilter(
-      (value: string) =>
-        value.trim() === "" ||
-        parseAmountInput(value, { allowSign: true }) !== null,
-      message("is_minor_units"),
+    Schema.makeFilter((value: string) =>
+      value.trim() === "" ? undefined : amountIssue(value, { allowSign: true }),
     ),
   ),
   isActive: Schema.Boolean,
@@ -130,7 +128,7 @@ export function AccountFormDialog({
     const payload = {
       ...values,
       initialBalance:
-        parseAmountInput(values.initialBalance, { allowSign: true }) ?? 0,
+        evaluateAmount(values.initialBalance, { allowSign: true }) ?? 0,
     };
 
     if (account) {
@@ -235,12 +233,10 @@ export function AccountFormDialog({
                 <FieldLabel htmlFor="account-balance">
                   {t("initialBalance")}
                 </FieldLabel>
-                <Input
+                <AmountInput
                   {...field}
                   id="account-balance"
-                  inputMode="decimal"
-                  autoComplete="off"
-                  className="tabular-nums"
+                  allowSign
                   aria-invalid={fieldState.invalid}
                 />
                 <FormError error={fieldState.error} />

@@ -10,6 +10,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
+import { AmountInput } from "~/components/app/amount-input";
 import { DatePicker } from "~/components/app/date-picker";
 import { FormError } from "~/components/app/form-error";
 import { Money } from "~/components/app/money";
@@ -22,12 +23,7 @@ import {
 } from "~/components/transactions/transaction-item";
 import { Button } from "~/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "~/components/ui/field";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-  InputGroupText,
-} from "~/components/ui/input-group";
+import { InputGroupAddon, InputGroupText } from "~/components/ui/input-group";
 import {
   Select,
   SelectContent,
@@ -44,9 +40,19 @@ import { categoryOptions } from "~/lib/category-options";
 import { formatDisplayDate } from "~/lib/dates";
 import { debtLabel } from "~/lib/debt-label";
 import type { ErrorKey } from "~/lib/error-keys";
-import { formatMoney, minorToInput, parseAmountInput } from "~/lib/money";
+import {
+  evaluateAmount,
+  formatMoney,
+  isAmountExpression,
+  minorToInput,
+} from "~/lib/money";
 import { cn } from "~/lib/utils";
-import { maxLength, message, nonEmpty } from "~/lib/validators/common";
+import {
+  amountIssue,
+  maxLength,
+  message,
+  nonEmpty,
+} from "~/lib/validators/common";
 import type {
   TransactionInputData,
   TransactionKind,
@@ -60,10 +66,8 @@ const amountField = Schema.String.check(
     (value: string) => value.trim() !== "",
     message("is_nonempty"),
   ),
-  Schema.makeFilter(
-    (value: string) =>
-      value.trim() === "" || (parseAmountInput(value) ?? 0) > 0,
-    message("is_minor_units"),
+  Schema.makeFilter((value: string) =>
+    value.trim() === "" ? undefined : amountIssue(value),
   ),
 );
 
@@ -96,8 +100,10 @@ const kindRules = (value: typeof formFields.Type) => {
       });
     }
 
-    if (!((parseAmountInput(value.linkedAmount) ?? 0) > 0)) {
-      issues.push({ path: ["linkedAmount"], issue: "is_minor_units" });
+    const linkedIssue = amountIssue(value.linkedAmount);
+
+    if (linkedIssue) {
+      issues.push({ path: ["linkedAmount"], issue: linkedIssue });
     }
   }
 
@@ -120,7 +126,7 @@ export const toTransactionInput = (
 ): TransactionInputData => {
   const base = {
     date: values.date,
-    amount: parseAmountInput(values.amount) ?? 0,
+    amount: evaluateAmount(values.amount) ?? 0,
     accountId: values.accountId,
     comment: values.comment.trim() || null,
   };
@@ -136,7 +142,7 @@ export const toTransactionInput = (
         kind: "transfer",
         ...base,
         linkedAccountId: values.linkedAccountId,
-        linkedAmount: parseAmountInput(values.linkedAmount) ?? 0,
+        linkedAmount: evaluateAmount(values.linkedAmount) ?? 0,
       };
     case "debt":
       return {
@@ -323,10 +329,22 @@ export function TransactionForm({
     }
   }, [kind, accountId, linkedAccountId, linkedOptions, form]);
 
-  // the linked amount mirrors the amount until it's edited by hand
+  // the linked amount mirrors the amount until it's edited by hand; while
+  // the amount is arithmetic, it mirrors the result
   useEffect(() => {
-    if (!linkedTouched) {
+    if (linkedTouched) {
+      return;
+    }
+
+    if (!isAmountExpression(amount)) {
       form.setValue("linkedAmount", amount);
+      return;
+    }
+
+    const result = evaluateAmount(amount);
+
+    if (result !== null) {
+      form.setValue("linkedAmount", minorToInput(result));
     }
   }, [amount, linkedTouched, form]);
 
@@ -353,7 +371,7 @@ export function TransactionForm({
   const withThem = counterparty?.id
     ? (balances.data ?? []).filter((b) => b.counterpartyId === counterparty.id)
     : [];
-  const minor = parseAmountInput(amount) ?? 0;
+  const minor = evaluateAmount(amount) ?? 0;
   const balanceHere =
     withThem.find((b) => b.currencyId === account?.currencyId)?.sum ?? 0;
   const preview =
@@ -554,33 +572,33 @@ export function TransactionForm({
                 <FieldLabel htmlFor={`${formId}-amount`}>
                   {t("amount")}
                 </FieldLabel>
-                <InputGroup>
-                  <InputGroupAddon>
-                    {negativeSign ? (
-                      <MinusIcon className="text-destructive" />
-                    ) : (
-                      <PlusIcon className="text-positive" />
-                    )}
-                  </InputGroupAddon>
-                  <InputGroupInput
-                    {...field}
-                    ref={(element) => {
-                      field.ref(element);
-                      amountRef.current = element;
-                    }}
-                    id={`${formId}-amount`}
-                    inputMode="decimal"
-                    autoComplete="off"
-                    autoFocus={mode === "create"}
-                    className="tabular-nums"
-                    aria-invalid={fieldState.invalid}
-                  />
-                  {account ? (
-                    <InputGroupAddon align="inline-end">
-                      <InputGroupText>{account.currencySign}</InputGroupText>
+                <AmountInput
+                  {...field}
+                  ref={(element) => {
+                    field.ref(element);
+                    amountRef.current = element;
+                  }}
+                  id={`${formId}-amount`}
+                  autoFocus={mode === "create"}
+                  placeholder={t("amountHint")}
+                  aria-invalid={fieldState.invalid}
+                  start={
+                    <InputGroupAddon>
+                      {negativeSign ? (
+                        <MinusIcon className="text-destructive" />
+                      ) : (
+                        <PlusIcon className="text-positive" />
+                      )}
                     </InputGroupAddon>
-                  ) : null}
-                </InputGroup>
+                  }
+                  end={
+                    account ? (
+                      <InputGroupAddon align="inline-end">
+                        <InputGroupText>{account.currencySign}</InputGroupText>
+                      </InputGroupAddon>
+                    ) : null
+                  }
+                />
                 <FormError error={fieldState.error} />
               </Field>
             )}
@@ -625,27 +643,24 @@ export function TransactionForm({
                   <FieldLabel htmlFor={`${formId}-linked-amount`}>
                     {t("linkedAmount")}
                   </FieldLabel>
-                  <InputGroup>
-                    <InputGroupInput
-                      {...field}
-                      onChange={(event) => {
-                        setLinkedTouched(true);
-                        field.onChange(event);
-                      }}
-                      id={`${formId}-linked-amount`}
-                      inputMode="decimal"
-                      autoComplete="off"
-                      className="tabular-nums"
-                      aria-invalid={fieldState.invalid}
-                    />
-                    {linkedAccount ? (
-                      <InputGroupAddon align="inline-end">
-                        <InputGroupText>
-                          {linkedAccount.currencySign}
-                        </InputGroupText>
-                      </InputGroupAddon>
-                    ) : null}
-                  </InputGroup>
+                  <AmountInput
+                    {...field}
+                    onChange={(value) => {
+                      setLinkedTouched(true);
+                      field.onChange(value);
+                    }}
+                    id={`${formId}-linked-amount`}
+                    aria-invalid={fieldState.invalid}
+                    end={
+                      linkedAccount ? (
+                        <InputGroupAddon align="inline-end">
+                          <InputGroupText>
+                            {linkedAccount.currencySign}
+                          </InputGroupText>
+                        </InputGroupAddon>
+                      ) : null
+                    }
+                  />
                   <FormError error={fieldState.error} />
                 </Field>
               )}

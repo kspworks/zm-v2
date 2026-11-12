@@ -5,7 +5,7 @@ import { PlusIcon, Trash2Icon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-
+import { AmountInput } from "~/components/app/amount-input";
 import { Money } from "~/components/app/money";
 import { ResponsiveDialog } from "~/components/app/responsive-dialog";
 import { CategorySelect } from "~/components/transactions/category-select";
@@ -28,7 +28,8 @@ import {
 import { Spinner } from "~/components/ui/spinner";
 import { useToastError } from "~/hooks/use-toast-error";
 import { type CategoryOption, categoryOptions } from "~/lib/category-options";
-import { minorToInput, parseAmountInput } from "~/lib/money";
+import { evaluateAmount, minorToInput } from "~/lib/money";
+import { amountIssue } from "~/lib/validators/common";
 import { useTRPC } from "~/trpc/react";
 
 type Kind = "income" | "expense";
@@ -78,8 +79,10 @@ export function AdjustBalanceDialog({
 
   const selectedId = accountId || options[0]?.id || "";
   const account = options.find((a) => a.id === selectedId);
-  const actualMinor = parseAmountInput(actual, { allowSign: true });
-  const invalid = actual.trim() !== "" && actualMinor === null;
+  const actualMinor = evaluateAmount(actual, { allowSign: true });
+  const actualIssue =
+    actual.trim() === "" ? undefined : amountIssue(actual, { allowSign: true });
+  const invalid = actualIssue !== undefined;
   const difference =
     account && actualMinor !== null ? actualMinor - account.balance : null;
 
@@ -100,7 +103,7 @@ export function AdjustBalanceDialog({
   const topCategoryOf = (kind: Kind) =>
     topCategory[kind] === undefined ? adjustmentOf(kind) : topCategory[kind];
 
-  const amountOf = (row: Row) => parseAmountInput(row.amount) ?? 0;
+  const amountOf = (row: Row) => evaluateAmount(row.amount) ?? 0;
   const invalidKeys = new Set(
     rows
       .filter((row) => row.amount.trim() !== "" && !(amountOf(row) > 0))
@@ -218,18 +221,16 @@ export function AdjustBalanceDialog({
               </Field>
               <Field className="min-w-0" data-invalid={invalid}>
                 <FieldLabel htmlFor="adjust-actual">{t("actual")}</FieldLabel>
-                <Input
+                <AmountInput
                   id="adjust-actual"
-                  inputMode="decimal"
-                  autoComplete="off"
-                  className="tabular-nums"
+                  allowSign
                   value={actual}
                   aria-invalid={invalid}
-                  onChange={(event) => setActual(event.target.value)}
+                  onChange={setActual}
                 />
               </Field>
             </div>
-            {invalid ? <FieldError>{te("is_minor_units")}</FieldError> : null}
+            {actualIssue ? <FieldError>{te(actualIssue)}</FieldError> : null}
             {account ? (
               <p className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{t("current")}</span>
@@ -318,7 +319,7 @@ function AdjustGroup({
   const tf = useTranslations("form");
   const total =
     Math.max(topAmount, 0) +
-    rows.reduce((sum, row) => sum + (parseAmountInput(row.amount) ?? 0), 0);
+    rows.reduce((sum, row) => sum + (evaluateAmount(row.amount) ?? 0), 0);
   const title = t(kind === "income" ? "income" : "expenses");
 
   return (
@@ -396,16 +397,13 @@ function AdjustRow({
         value={row.categoryId}
         onChange={(categoryId) => onChange({ categoryId })}
       />
-      <Input
+      <AmountInput
         aria-label={tf("amount")}
         placeholder={tf("amount")}
-        inputMode="decimal"
-        autoComplete="off"
         autoFocus
-        className="tabular-nums"
         aria-invalid={invalid}
         value={row.amount}
-        onChange={(event) => onChange({ amount: event.target.value })}
+        onChange={(amount) => onChange({ amount })}
       />
       <Button
         type="button"

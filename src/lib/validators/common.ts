@@ -1,7 +1,11 @@
 import { Effect, Schema, SchemaTransformation } from "effect";
 
 import type { ErrorKey } from "~/lib/error-keys";
-import { MAX_INTEGER_DIGITS } from "~/lib/money";
+import {
+  evaluateAmount,
+  isAmountExpression,
+  MAX_INTEGER_DIGITS,
+} from "~/lib/money";
 
 /*
  * Shared Effect Schema building blocks. Every check carries an app error key
@@ -11,6 +15,26 @@ import { MAX_INTEGER_DIGITS } from "~/lib/money";
 
 /** Annotations for a check that fails with `key` */
 export const message = (key: ErrorKey) => ({ message: key });
+
+/**
+ * What is wrong with an amount field's text, if anything: arithmetic that
+ * can't be calculated, or not an amount. A magnitude (no `allowSign`) must
+ * also be above zero. Returns the key, so a Schema filter can return it.
+ */
+export const amountIssue = (
+  value: string,
+  { allowSign = false }: { allowSign?: boolean } = {},
+): ErrorKey | undefined => {
+  const minor = evaluateAmount(value, { allowSign });
+
+  if (minor === null) {
+    return isAmountExpression(value, { allowSign })
+      ? "amount_expression_invalid"
+      : "is_minor_units";
+  }
+
+  return !allowSign && minor <= 0 ? "is_minor_units" : undefined;
+};
 
 export const nonEmpty = Schema.isMinLength(1, message("is_nonempty"));
 

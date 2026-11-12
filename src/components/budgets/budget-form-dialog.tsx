@@ -3,13 +3,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
-
+import { AmountInput } from "~/components/app/amount-input";
 import { ResponsiveDialog } from "~/components/app/responsive-dialog";
 import type { Budget } from "~/components/budgets/budget-progress";
 import { CategorySelect } from "~/components/transactions/category-select";
 import { Button } from "~/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "~/components/ui/field";
-import { Input } from "~/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -21,7 +20,7 @@ import { Spinner } from "~/components/ui/spinner";
 import { usePrimaryCurrency } from "~/hooks/use-primary-currency";
 import { useToastError } from "~/hooks/use-toast-error";
 import { categoryOptions } from "~/lib/category-options";
-import { formatMoney, parseAmountInput } from "~/lib/money";
+import { evaluateAmount, formatMoney } from "~/lib/money";
 import { useTRPC } from "~/trpc/react";
 
 /** A new monthly limit, or a new amount for an existing one */
@@ -66,7 +65,7 @@ export function BudgetFormDialog({
     }),
   );
 
-  const minor = parseAmountInput(amount);
+  const minor = evaluateAmount(amount);
   const valid = !!categoryId && !!currencyId && (minor ?? 0) > 0;
 
   return (
@@ -123,12 +122,10 @@ export function BudgetFormDialog({
           <div className="grid grid-cols-[minmax(0,1fr)_8rem] gap-3">
             <Field>
               <FieldLabel htmlFor="budget-amount">{t("amount")}</FieldLabel>
-              <Input
+              <AmountInput
                 id="budget-amount"
-                inputMode="decimal"
-                autoComplete="off"
                 value={amount}
-                onChange={(event) => setAmount(event.target.value)}
+                onChange={setAmount}
               />
             </Field>
             <Field>

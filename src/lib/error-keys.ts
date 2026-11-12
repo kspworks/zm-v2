@@ -35,6 +35,7 @@ export const ERROR_KEYS = [
   "category_parent_has_children",
   "category_replace_self",
   "category_replace_kind_mismatch",
+  "amount_expression_invalid",
   "counterparty_name_not_unique",
   "counterparty_in_use",
   "counterparty_merge_self",

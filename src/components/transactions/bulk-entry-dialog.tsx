@@ -5,7 +5,7 @@ import { MinusIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-
+import { AmountInput } from "~/components/app/amount-input";
 import { DatePicker } from "~/components/app/date-picker";
 import { ResponsiveDialog } from "~/components/app/responsive-dialog";
 import { CategorySelect } from "~/components/transactions/category-select";
@@ -23,8 +23,7 @@ import {
 import { Spinner } from "~/components/ui/spinner";
 import { useToastError } from "~/hooks/use-toast-error";
 import { categoryOptions } from "~/lib/category-options";
-import { parseAmountInput } from "~/lib/money";
-import { cn } from "~/lib/utils";
+import { evaluateAmount } from "~/lib/money";
 import { useTRPC } from "~/trpc/react";
 
 type Row = {
@@ -121,7 +120,7 @@ export function BulkEntryDialog({
   const filled = rows.filter((row) => row.amount.trim() !== "");
   const invalidKeys = new Set(
     filled
-      .filter((row) => !((parseAmountInput(row.amount) ?? 0) > 0))
+      .filter((row) => !((evaluateAmount(row.amount) ?? 0) > 0))
       .map((row) => row.key),
   );
 
@@ -160,7 +159,7 @@ export function BulkEntryDialog({
       items: filled.map((row) => ({
         kind: row.kind,
         date: row.date ?? today,
-        amount: parseAmountInput(row.amount) ?? 0,
+        amount: evaluateAmount(row.amount) ?? 0,
         accountId: accountOf(row),
         categoryId: row.categoryId,
         comment: row.comment.trim() || null,
@@ -234,13 +233,10 @@ export function BulkEntryDialog({
                   <PlusIcon className="text-positive" />
                 )}
               </Button>
-              <Input
+              <AmountInput
                 aria-label={tf("amount")}
                 placeholder={tf("amount")}
-                inputMode="decimal"
-                autoComplete="off"
                 data-bulk-amount
-                className={cn("tabular-nums")}
                 onKeyDown={(event) => {
                   if (
                     event.key === "Enter" &&
@@ -253,9 +249,7 @@ export function BulkEntryDialog({
                 }}
                 aria-invalid={showErrors && invalidKeys.has(row.key)}
                 value={row.amount}
-                onChange={(event) =>
-                  update(row.key, { amount: event.target.value })
-                }
+                onChange={(amount) => update(row.key, { amount })}
               />
               <div className="col-span-3 max-sm:order-1 sm:col-span-1">
                 <CategorySelect
