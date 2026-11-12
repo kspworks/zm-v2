@@ -187,6 +187,8 @@
     "category_has_children": "Delete or move the child categories first",
     "category_kind_required": "Pick expense, income or both",
     "category_parent_has_children": "A category with children can't have a parent",
+    "category_replace_self": "Pick a different category to replace it with",
+    "category_replace_kind_mismatch": "The category you picked can't hold some of these transactions: check its Expense and Income flags",
     "counterparty_name_not_unique": "A counterparty with this name already exists",
     "counterparty_in_use": "This counterparty is used by transactions",
     "counterparty_merge_self": "Pick a different counterparty to merge into",
@@ -266,7 +268,17 @@
     "parentHidden": "This category has subcategories, so it stays top-level.",
     "deleteTitle": "Delete category \"{name}\"?",
     "deleteDescription": "Transactions in this category will show it as deleted.",
-    "addChild": "Add subcategory"
+    "addChild": "Add subcategory",
+    "hide": "Hide from lists",
+    "show": "Show in lists",
+    "hidden": "Hidden",
+    "hiddenHint": "Hidden categories stay out of pickers. Type a name to find one.",
+    "replace": "Replace with…",
+    "replaceTitle": "Replace \"{name}\"",
+    "replaceDescription": "All transactions, schedules and your budgets of \"{name}\" move to the category you pick, and \"{name}\" is deleted.",
+    "replaceTarget": "Replace with",
+    "replaceSubmit": "Replace",
+    "replaced": "{count, plural, =0 {Category replaced} one {# transaction moved} other {# transactions moved}}"
   },
   "counterparties": {
     "title": "Counterparties",

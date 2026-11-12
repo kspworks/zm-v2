@@ -32,3 +32,15 @@ export const categoryUpdateSchema = Schema.Struct({
 }).check(kindRequired);
 
 export type CategoryInput = typeof categoryInputSchema.Type;
+
+/** "Delete and replace with": the source's rows move to the target */
+export const categoryReplaceSchema = Schema.Struct({
+  sourceId: idSchema,
+  targetId: idSchema,
+});
+
+/** Hides a category from the user's own pickers, or shows it again */
+export const categoryHiddenSchema = Schema.Struct({
+  id: idSchema,
+  hidden: Schema.Boolean,
+});

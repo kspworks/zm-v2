@@ -35,4 +35,32 @@ describe("categoryOptions", () => {
       categoryOptions(categories, "en", "expense").map((o) => o.id),
     ).not.toContain("3");
   });
+
+  it("keeps the hidden flag, so pickers can leave those out", () => {
+    const options = categoryOptions(
+      [
+        {
+          id: "1",
+          name: "Home",
+          parentId: null,
+          isExpense: true,
+          isIncome: false,
+          isHidden: true,
+        },
+        {
+          id: "3",
+          name: "Salary",
+          parentId: null,
+          isExpense: false,
+          isIncome: true,
+        },
+      ],
+      "en",
+    );
+
+    expect(options.map((o) => [o.id, o.isHidden ?? false])).toEqual([
+      ["1", true],
+      ["3", false],
+    ]);
+  });
 });

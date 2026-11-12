@@ -4,21 +4,25 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CornerDownRightIcon,
   EllipsisVerticalIcon,
+  EyeIcon,
+  EyeOffIcon,
   FolderPlusIcon,
   FolderTreeIcon,
   PencilIcon,
   PlusIcon,
+  ReplaceIcon,
   Share2Icon,
   Trash2Icon,
   UsersIcon,
 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { AfterHydration } from "~/components/app/after-hydration";
 import { ConfirmDialog } from "~/components/app/confirm-dialog";
 import { PageHeader } from "~/components/app/page-header";
+import { ResponsiveDialog } from "~/components/app/responsive-dialog";
 import { CategoriesPageSkeleton } from "~/components/app/route-skeletons";
 import { ShareDialog } from "~/components/app/share-dialog";
 import {
@@ -43,6 +47,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "~/components/ui/empty";
+import { Field, FieldLabel } from "~/components/ui/field";
 import {
   Item,
   ItemActions,
@@ -51,7 +56,16 @@ import {
   ItemGroup,
   ItemTitle,
 } from "~/components/ui/item";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import { Spinner } from "~/components/ui/spinner";
 import { useToastError } from "~/hooks/use-toast-error";
+import { categoryOptions } from "~/lib/category-options";
 import { categoryColorOrder, SERIES_SLOTS, seriesColor } from "~/lib/report";
 import { cn } from "~/lib/utils";
 import { useTRPC } from "~/trpc/react";
@@ -70,6 +84,7 @@ export function CategoriesView() {
 function Categories() {
   const t = useTranslations("categories");
   const tc = useTranslations("common");
+  const locale = useLocale();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const toastError = useToastError();
@@ -80,6 +95,8 @@ function Categories() {
   const [presetParentId, setPresetParentId] = useState<string | null>(null);
   const [sharing, setSharing] = useState<Category | null>(null);
   const [deleting, setDeleting] = useState<Category | null>(null);
+  const [replacing, setReplacing] = useState<Category | null>(null);
+  const [targetId, setTargetId] = useState("");
 
   const remove = useMutation(
     trpc.categories.delete.mutationOptions({
@@ -88,6 +105,35 @@ function Categories() {
         setDeleting(null);
         await queryClient.invalidateQueries(trpc.categories.pathFilter());
       },
+      onError: toastError,
+    }),
+  );
+
+  const replace = useMutation(
+    trpc.categories.replace.mutationOptions({
+      onSuccess: async ({ moved }) => {
+        toast.success(t("replaced", { count: moved }));
+        setReplacing(null);
+        // the moved rows show under the target everywhere
+        await Promise.all(
+          [
+            trpc.categories,
+            trpc.transactions,
+            trpc.budgets,
+            trpc.reports,
+            trpc.dashboard,
+            trpc.planned,
+          ].map((router) => queryClient.invalidateQueries(router.pathFilter())),
+        );
+      },
+      onError: toastError,
+    }),
+  );
+
+  const setHidden = useMutation(
+    trpc.categories.setHidden.mutationOptions({
+      onSuccess: () =>
+        queryClient.invalidateQueries(trpc.categories.pathFilter()),
       onError: toastError,
     }),
   );
@@ -106,6 +152,20 @@ function Categories() {
 
     return seriesColor(id, index < 0 ? undefined : (index % SERIES_SLOTS) + 1);
   };
+
+  // a target shares a kind with the source; the server checks the rows
+  const replaceTargets = replacing
+    ? categoryOptions(
+        rows.filter(
+          (row) =>
+            row.canWrite &&
+            row.id !== replacing.id &&
+            ((replacing.isExpense && row.isExpense) ||
+              (replacing.isIncome && row.isIncome)),
+        ),
+        locale,
+      )
+    : [];
 
   return (
     <>
@@ -149,6 +209,7 @@ function Categories() {
                 className={cn(
                   "rounded-none border-x-0 border-t-0 py-1.5",
                   category.parentId && "pl-9 sm:pl-11",
+                  category.isHidden && "opacity-60",
                 )}
               >
                 <ItemContent className="min-w-40">
@@ -165,6 +226,12 @@ function Categories() {
                       )}
                       <span className="truncate">{category.name}</span>
                     </span>
+                    {category.isHidden ? (
+                      <Badge variant="outline">
+                        <EyeOffIcon />
+                        {t("hidden")}
+                      </Badge>
+                    ) : null}
                     {category.isShared ? (
                       <Badge variant="secondary">
                         <UsersIcon />
@@ -190,52 +257,87 @@ function Categories() {
                       {t("isIncome")}
                     </Badge>
                   ) : null}
-                  {category.canWrite ? (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={tc("actions")}
-                        >
-                          <EllipsisVerticalIcon />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onSelect={() => openForm(category, null)}
-                        >
-                          <PencilIcon />
-                          {tc("edit")}
-                        </DropdownMenuItem>
-                        {category.parentId === null ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={tc("actions")}
+                      >
+                        <EllipsisVerticalIcon />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {category.canWrite ? (
+                        <>
                           <DropdownMenuItem
-                            onSelect={() => openForm(null, category.id)}
+                            onSelect={() => openForm(category, null)}
                           >
-                            <FolderPlusIcon />
-                            {t("addChild")}
+                            <PencilIcon />
+                            {tc("edit")}
                           </DropdownMenuItem>
-                        ) : null}
-                        <DropdownMenuItem onSelect={() => setSharing(category)}>
-                          <Share2Icon />
-                          {tc("share")}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          variant="destructive"
-                          onSelect={() => setDeleting(category)}
-                        >
-                          <Trash2Icon />
-                          {tc("delete")}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ) : null}
+                          {category.parentId === null ? (
+                            <DropdownMenuItem
+                              onSelect={() => openForm(null, category.id)}
+                            >
+                              <FolderPlusIcon />
+                              {t("addChild")}
+                            </DropdownMenuItem>
+                          ) : null}
+                          <DropdownMenuItem
+                            onSelect={() => setSharing(category)}
+                          >
+                            <Share2Icon />
+                            {tc("share")}
+                          </DropdownMenuItem>
+                        </>
+                      ) : null}
+                      <DropdownMenuItem
+                        onSelect={() =>
+                          setHidden.mutate({
+                            id: category.id,
+                            hidden: !category.isHidden,
+                          })
+                        }
+                      >
+                        {category.isHidden ? <EyeIcon /> : <EyeOffIcon />}
+                        {category.isHidden ? t("show") : t("hide")}
+                      </DropdownMenuItem>
+                      {category.canWrite ? (
+                        <>
+                          <DropdownMenuSeparator />
+                          {category.childCount === 0 ? (
+                            <DropdownMenuItem
+                              onSelect={() => {
+                                setTargetId("");
+                                setReplacing(category);
+                              }}
+                            >
+                              <ReplaceIcon />
+                              {t("replace")}
+                            </DropdownMenuItem>
+                          ) : null}
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onSelect={() => setDeleting(category)}
+                          >
+                            <Trash2Icon />
+                            {tc("delete")}
+                          </DropdownMenuItem>
+                        </>
+                      ) : null}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </ItemActions>
               </Item>
             ))}
           </ItemGroup>
         )}
+        {rows.some((row) => row.isHidden) ? (
+          <p className="text-muted-foreground mt-3 text-sm">
+            {t("hiddenHint")}
+          </p>
+        ) : null}
       </div>
 
       <CategoryFormDialog
@@ -250,6 +352,47 @@ function Categories() {
         target={sharing ? { id: sharing.id, name: sharing.displayName } : null}
         onOpenChange={(open) => !open && setSharing(null)}
       />
+      <ResponsiveDialog
+        open={replacing !== null}
+        onOpenChange={(open) => !open && setReplacing(null)}
+        title={t("replaceTitle", { name: replacing?.displayName ?? "" })}
+        description={t("replaceDescription", {
+          name: replacing?.displayName ?? "",
+        })}
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setReplacing(null)}>
+              {tc("cancel")}
+            </Button>
+            <Button
+              disabled={replace.isPending || !targetId}
+              onClick={() =>
+                replacing &&
+                replace.mutate({ sourceId: replacing.id, targetId })
+              }
+            >
+              {replace.isPending ? <Spinner /> : null}
+              {t("replaceSubmit")}
+            </Button>
+          </>
+        }
+      >
+        <Field>
+          <FieldLabel htmlFor="replace-target">{t("replaceTarget")}</FieldLabel>
+          <Select value={targetId} onValueChange={setTargetId}>
+            <SelectTrigger id="replace-target" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {replaceTargets.map((option) => (
+                <SelectItem key={option.id} value={option.id}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+      </ResponsiveDialog>
       <ConfirmDialog
         open={deleting !== null}
         onOpenChange={(open) => !open && setDeleting(null)}

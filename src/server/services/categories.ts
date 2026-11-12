@@ -4,11 +4,20 @@ import { Effect } from "effect";
 
 import type { Locale } from "~/i18n/config";
 import type { CategoryInput } from "~/lib/validators/categories";
+import type { DbOrTx } from "~/server/db";
 import { query, transaction } from "~/server/db/database";
-import { categories, categoryMembers, users } from "~/server/db/schema";
+import {
+  accountMembers,
+  budgets,
+  categories,
+  categoryMembers,
+  plannedTransactions,
+  transactions,
+  users,
+} from "~/server/db/schema";
 import { audit } from "~/server/lib/audit";
 import { now } from "~/server/lib/clock";
-import { badRequest } from "~/server/lib/errors";
+import { badRequest, forbidden } from "~/server/lib/errors";
 import {
   categoryAccess,
   requireWritableCategory,
@@ -85,6 +94,7 @@ export const listCategories = Effect.fn("categories.list")(function* (
         createdBy: categories.createdBy,
         ownerName: users.name,
         canWrite: categoryMembers.canWrite,
+        isHidden: categoryMembers.isHidden,
         memberCount: sql<number>`(${db
           .select({ count: count() })
           .from(members)
@@ -239,21 +249,8 @@ export const updateCategory = Effect.fn("categories.update")(function* (
   return updated;
 }, transaction);
 
-/**
- * Soft delete. A parent with live children can't go; transactions keep
- * pointing at a deleted category and show it as "Deleted category".
- */
-export const deleteCategory = Effect.fn("categories.delete")(function* (
-  userId: string,
-  id: string,
-) {
-  yield* lockCategories([id]);
-  yield* requireWritableCategory(userId, id);
-
-  if (yield* hasLiveChildren(id)) {
-    return yield* badRequest("category_has_children");
-  }
-
+/** Soft-deletes a category and every member row of it */
+const softDelete = Effect.fnUntraced(function* (id: string) {
   const at = yield* now;
 
   yield* query((db) =>
@@ -270,6 +267,24 @@ export const deleteCategory = Effect.fn("categories.delete")(function* (
         ),
       ),
   );
+});
+
+/**
+ * Soft delete. A parent with live children can't go; transactions keep
+ * pointing at a deleted category and show it as "Deleted category".
+ */
+export const deleteCategory = Effect.fn("categories.delete")(function* (
+  userId: string,
+  id: string,
+) {
+  yield* lockCategories([id]);
+  yield* requireWritableCategory(userId, id);
+
+  if (yield* hasLiveChildren(id)) {
+    return yield* badRequest("category_has_children");
+  }
+
+  yield* softDelete(id);
 
   yield* audit({
     entityType: "category",
@@ -277,5 +292,236 @@ export const deleteCategory = Effect.fn("categories.delete")(function* (
     action: "delete",
     userId,
     payload: { id },
+  });
+}, transaction);
+
+/**
+ * "Delete and replace with": the source's transactions (deleted ones too,
+ * so a restore lands on a live category) and schedules move to the target,
+ * the user's own budgets follow, then the source is deleted. Only rows on
+ * accounts the user can write move, the same rights an edit needs; on a
+ * shared category, other members' rows stay as a plain delete leaves them.
+ */
+export const replaceCategory = Effect.fn("categories.replace")(function* (
+  userId: string,
+  input: { sourceId: string; targetId: string },
+) {
+  const { sourceId, targetId } = input;
+
+  if (sourceId === targetId) {
+    return yield* badRequest("category_replace_self");
+  }
+
+  yield* lockCategories([sourceId, targetId]);
+  yield* requireWritableCategory(userId, sourceId);
+  const target = yield* requireWritableCategory(userId, targetId);
+
+  if (yield* hasLiveChildren(sourceId)) {
+    return yield* badRequest("category_has_children");
+  }
+
+  // accounts the user can write: an edit of a row there is theirs to make
+  const writableAccounts = (db: DbOrTx) =>
+    db
+      .select({ id: accountMembers.accountId })
+      .from(accountMembers)
+      .where(
+        and(
+          eq(accountMembers.userId, userId),
+          eq(accountMembers.canWrite, true),
+          isNull(accountMembers.deletedAt),
+        ),
+      );
+  const movingTransactions = (db: DbOrTx) =>
+    and(
+      eq(transactions.categoryId, sourceId),
+      inArray(transactions.accountId, writableAccounts(db)),
+    );
+  const movingSchedules = (db: DbOrTx) =>
+    and(
+      eq(plannedTransactions.categoryId, sourceId),
+      inArray(plannedTransactions.accountId, writableAccounts(db)),
+    );
+
+  const kinds = yield* query((db) =>
+    db
+      .selectDistinct({ kind: transactions.kind })
+      .from(transactions)
+      .where(movingTransactions(db))
+      .union(
+        db
+          .selectDistinct({ kind: plannedTransactions.kind })
+          .from(plannedTransactions)
+          .where(movingSchedules(db)),
+      ),
+  );
+
+  if (
+    kinds.some(
+      ({ kind }) =>
+        (kind === "expense" && !target.isExpense) ||
+        (kind === "income" && !target.isIncome),
+    )
+  ) {
+    return yield* badRequest("category_replace_kind_mismatch");
+  }
+
+  const moved = yield* query((db) =>
+    db
+      .update(transactions)
+      .set({ categoryId: targetId })
+      .where(movingTransactions(db))
+      .returning({ id: transactions.id }),
+  );
+  const schedules = yield* query((db) =>
+    db
+      .update(plannedTransactions)
+      .set({ categoryId: targetId })
+      .where(movingSchedules(db))
+      .returning({ id: plannedTransactions.id }),
+  );
+
+  yield* moveBudgets(userId, sourceId, target);
+  yield* softDelete(sourceId);
+
+  yield* audit({
+    entityType: "category",
+    entityId: sourceId,
+    action: "delete",
+    userId,
+    payload: {
+      replacedBy: targetId,
+      transactions: moved.length,
+      schedules: schedules.length,
+    },
+  });
+
+  return { moved: moved.length };
+}, transaction);
+
+/**
+ * The user's budgets on the source move to the target: a limit the target
+ * already has in that currency grows by the source's, and a target that is
+ * not an expense category can't have budgets, so they go.
+ */
+const moveBudgets = Effect.fnUntraced(function* (
+  userId: string,
+  sourceId: string,
+  target: { id: string; isExpense: boolean },
+) {
+  const at = yield* now;
+  const removed = yield* query((db) =>
+    db
+      .update(budgets)
+      .set({ deletedAt: at })
+      .where(
+        and(
+          eq(budgets.userId, userId),
+          eq(budgets.categoryId, sourceId),
+          isNull(budgets.deletedAt),
+        ),
+      )
+      .returning({
+        id: budgets.id,
+        currencyId: budgets.currencyId,
+        amount: budgets.amount,
+      }),
+  );
+
+  for (const source of removed) {
+    yield* audit({
+      entityType: "budget",
+      entityId: source.id,
+      action: "delete",
+      userId,
+      payload: { id: source.id, replacedBy: target.id },
+    });
+
+    if (!target.isExpense) {
+      continue;
+    }
+
+    const [existing] = yield* query((db) =>
+      db
+        .select({ id: budgets.id })
+        .from(budgets)
+        .where(
+          and(
+            eq(budgets.userId, userId),
+            eq(budgets.categoryId, target.id),
+            eq(budgets.currencyId, source.currencyId),
+            isNull(budgets.deletedAt),
+          ),
+        ),
+    );
+    const [saved] = yield* query((db) =>
+      db
+        .insert(budgets)
+        .values({
+          userId,
+          categoryId: target.id,
+          currencyId: source.currencyId,
+          amount: source.amount,
+        })
+        .onConflictDoUpdate({
+          target: [budgets.userId, budgets.categoryId, budgets.currencyId],
+          targetWhere: isNull(budgets.deletedAt),
+          set: { amount: sql`${budgets.amount} + excluded.amount` },
+        })
+        .returning({ id: budgets.id, amount: budgets.amount }),
+    );
+
+    if (!saved) {
+      return yield* Effect.die("the upsert returns its row");
+    }
+
+    yield* audit({
+      entityType: "budget",
+      entityId: saved.id,
+      action: existing ? "update" : "create",
+      userId,
+      payload: {
+        categoryId: target.id,
+        currencyId: source.currencyId,
+        amount: saved.amount,
+      },
+    });
+  }
+});
+
+/**
+ * Hides a category from this user's pickers, or shows it again. A personal
+ * choice kept on the user's own member row, so read access is enough and
+ * other members are not affected.
+ */
+export const setCategoryHidden = Effect.fn("categories.setHidden")(function* (
+  userId: string,
+  input: { id: string; hidden: boolean },
+) {
+  const access = (yield* categoryAccess(userId, [input.id])).get(input.id);
+
+  if (!access?.canRead) {
+    return yield* forbidden();
+  }
+
+  yield* query((db) =>
+    db
+      .update(categoryMembers)
+      .set({ isHidden: input.hidden })
+      .where(
+        and(
+          eq(categoryMembers.categoryId, input.id),
+          eq(categoryMembers.userId, userId),
+          isNull(categoryMembers.deletedAt),
+        ),
+      ),
+  );
+
+  yield* audit({
+    entityType: "category",
+    entityId: input.id,
+    action: "update",
+    userId,
+    payload: input,
   });
 }, transaction);

@@ -327,6 +327,7 @@ export const categoryMembers = pgTable(
       .references(() => users.id, restrict),
     canRead: boolean().notNull().default(true),
     canWrite: boolean().notNull().default(false),
+    isHidden: boolean().notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     deletedAt: tz(),

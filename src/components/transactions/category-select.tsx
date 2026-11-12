@@ -51,7 +51,8 @@ export const focusNeighbour = (from: HTMLElement | null, step: 1 | -1) => {
 /**
  * Single-select category combobox. Search is keyboard-layout-agnostic, and
  * Tab / Shift+Tab leave the open list for the neighbouring fields. With
- * `createKind`, a search that names no category offers to create it.
+ * `createKind`, a search that names no category offers to create it. Hidden
+ * categories are listed only while searching (or when already chosen).
  */
 export function CategorySelect({
   id,
@@ -84,6 +85,9 @@ export function CategorySelect({
   );
 
   const name = search.trim();
+  const listed = options.filter(
+    (option) => !option.isHidden || name !== "" || option.id === value,
+  );
   const canCreate =
     !!createKind &&
     name !== "" &&
@@ -215,7 +219,7 @@ export function CategorySelect({
                 />
                 <span className="text-muted-foreground">{t("noCategory")}</span>
               </CommandItem>
-              {options.map((option) => (
+              {listed.map((option) => (
                 <CommandItem
                   key={option.id}
                   value={option.id}

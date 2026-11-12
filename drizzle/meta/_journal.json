@@ -36,6 +36,13 @@
       "when": 1794090895806,
       "tag": "0004_budgets_and_history_index",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794437127538,
+      "tag": "0005_category_member_hidden",
+      "breakpoints": true
     }
   ]
 }

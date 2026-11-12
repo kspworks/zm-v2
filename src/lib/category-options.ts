@@ -5,6 +5,8 @@ export type CategoryLike = {
   parentName?: string | null;
   isExpense: boolean;
   isIncome: boolean;
+  /** The user hid it from pickers; it still turns up in a search */
+  isHidden?: boolean;
 };
 
 export type CategoryOption = CategoryLike & { label: string };
