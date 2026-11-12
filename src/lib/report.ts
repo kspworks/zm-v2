@@ -166,6 +166,58 @@ export const buildReport = (
     .sort((a, b) => b.total - a.total);
 };
 
+/** How much of a tile still counts once some transactions are left out */
+export type TileCount = {
+  value: number;
+  /** "all": every transaction is left out; "some": part of them */
+  excluded: "none" | "some" | "all";
+};
+
+export type ChartCount = {
+  /** The chart's total without the left-out transactions */
+  total: number;
+  excludedTotal: number;
+  tiles: Map<string, TileCount>;
+};
+
+/**
+ * A chart's totals with some transactions left out. The chart itself is
+ * untouched, so the layout keeps its shape while transactions are toggled;
+ * ids that are not in the chart are ignored.
+ */
+export const countChart = (
+  chart: ReportChart,
+  excluded: ReadonlySet<string>,
+): ChartCount => {
+  const tiles = new Map<string, TileCount>();
+  let excludedTotal = 0;
+
+  for (const tile of chart.tiles) {
+    let left = 0;
+    let leftCount = 0;
+
+    for (const leaf of tile.children) {
+      if (excluded.has(leaf.id)) {
+        left += leaf.value;
+        leftCount += 1;
+      }
+    }
+
+    excludedTotal += left;
+    tiles.set(tile.key, {
+      value: tile.value - left,
+      excluded:
+        leftCount === 0
+          ? "none"
+          : leftCount === tile.children.length
+            ? "all"
+            : "some",
+    });
+  }
+
+  return { total: chart.total - excludedTotal, excludedTotal, tiles };
+};
+
 /** FNV-1a: small, and the same everywhere */
 const hashOf = (key: string) => {
   let hash = 2166136261;

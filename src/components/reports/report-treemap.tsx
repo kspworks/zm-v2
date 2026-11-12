@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { type PointerEvent, useEffect, useRef, useState } from "react";
 
@@ -8,6 +7,7 @@ import { formatDisplayDate } from "~/lib/dates";
 import { formatMoney } from "~/lib/money";
 import type { ReportChart } from "~/lib/report";
 import { type LeafRect, layoutReport } from "~/lib/treemap-layout";
+import { cn } from "~/lib/utils";
 
 const HEIGHT = 360;
 const BAND = 26;
@@ -18,8 +18,21 @@ const NAMED_LEAF = 150;
 
 type Hover = { leaf: LeafRect; x: number; y: number };
 
-function LeafTooltip({ leaf, sign }: { leaf: LeafRect; sign: string }) {
+function LeafTooltip({
+  leaf,
+  sign,
+  excluded,
+}: {
+  leaf: LeafRect;
+  sign: string;
+  excluded: boolean;
+}) {
   const t = useTranslations("reports");
+  const hint = (
+    <p className="text-muted-foreground border-t pt-1">
+      {excluded ? t("includeHint") : t("excludeHint")}
+    </p>
+  );
 
   if (leaf.leaves.length > 1) {
     const rest = leaf.leaves.length - GROUP_ROWS;
@@ -50,6 +63,7 @@ function LeafTooltip({ leaf, sign }: { leaf: LeafRect; sign: string }) {
             {formatMoney(leaf.value, sign)}
           </span>
         </div>
+        {hint}
       </div>
     );
   }
@@ -79,6 +93,7 @@ function LeafTooltip({ leaf, sign }: { leaf: LeafRect; sign: string }) {
       {item.comment ? (
         <p className="text-muted-foreground max-w-60">{item.comment}</p>
       ) : null}
+      {hint}
     </div>
   );
 }
@@ -88,24 +103,29 @@ function LeafTooltip({ leaf, sign }: { leaf: LeafRect; sign: string }) {
  * slivers sit in a band along the tile's bottom (see `layoutReport`). Tiles
  * carry a direct label on a surface chip, so identity never depends on color,
  * and are separated by a 2px surface gap.
+ *
+ * Clicking a leaf leaves its transactions out of the total, or counts them
+ * again: a left-out leaf fades but keeps its place, so the layout never jumps.
  */
 export function ReportTreemap({
   chart,
   colorOf,
-  hrefOf,
+  excluded,
+  onToggle,
 }: {
   chart: ReportChart;
   colorOf: (key: string) => string;
-  /** Where a tile's rows are listed, if anywhere */
-  hrefOf: (key: string) => string | null;
+  /** Ids of the transactions left out of the total */
+  excluded: ReadonlySet<string>;
+  /** Leaves these transactions out, or counts them again if all are out */
+  onToggle: (ids: string[]) => void;
 }) {
   const t = useTranslations("reports");
-  const router = useRouter();
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   const [hover, setHover] = useState<Hover | null>(null);
   // a finger has no hover: the first tap on a leaf shows its details, the
-  // second one follows the link
+  // second one toggles it
   const touch = useRef(false);
   const tapped = useRef<string | null>(null);
 
@@ -130,6 +150,11 @@ export function ReportTreemap({
     { band: BAND },
   );
   const sign = chart.currencySign;
+  const isExcluded = (leaf: LeafRect) =>
+    leaf.leaves.length > 0 &&
+    leaf.leaves.every((item) => excluded.has(item.id));
+  const toggle = (leaf: LeafRect) =>
+    onToggle(leaf.leaves.map((item) => item.id));
 
   const describeLeaf = (leaf: LeafRect) =>
     leaf.leaves.length > 1
@@ -166,18 +191,18 @@ export function ReportTreemap({
                   : amount;
             const inBand = leaf.height <= BAND;
             const showLabel = leaf.width > 58 && leaf.height >= BAND - 2;
-            const href = hrefOf(leaf.tileKey);
+            const out = isExcluded(leaf);
+            const hovered = hover?.leaf.key === leaf.key;
 
             return (
-              // biome-ignore lint/a11y/noStaticElementInteractions: hover and focus reveal the tooltip; with a target it acts as a link
+              // biome-ignore lint/a11y/useSemanticElements: an SVG group can't be a <button>; role and keys make it one
               <g
                 key={leaf.key}
                 tabIndex={0}
-                role={href ? "link" : undefined}
+                role="button"
+                aria-pressed={out}
                 aria-label={describeLeaf(leaf)}
-                className={
-                  href ? "cursor-pointer outline-none" : "outline-none"
-                }
+                className="cursor-pointer outline-none"
                 onPointerDown={(event) => {
                   touch.current = event.pointerType !== "mouse";
                 }}
@@ -188,13 +213,12 @@ export function ReportTreemap({
                     return;
                   }
 
-                  if (href) {
-                    router.push(href);
-                  }
+                  toggle(leaf);
                 }}
                 onKeyDown={(event) => {
-                  if (href && event.key === "Enter") {
-                    router.push(href);
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    toggle(leaf);
                   }
                 }}
                 onPointerEnter={(event) => pointAt(leaf, event)}
@@ -225,15 +249,21 @@ export function ReportTreemap({
                   height={leaf.height}
                   fill={colorOf(leaf.tileKey)}
                   fillOpacity={
-                    hover?.leaf.key === leaf.key
-                      ? 1
-                      : leaf.leaves.length > 1
-                        ? 0.6
-                        : 0.9
+                    out
+                      ? hovered
+                        ? 0.35
+                        : 0.2
+                      : hovered
+                        ? 1
+                        : leaf.leaves.length > 1
+                          ? 0.6
+                          : 0.9
                   }
                   stroke="var(--background)"
                   strokeWidth={1}
-                  strokeDasharray={leaf.leaves.length > 1 ? "3 2" : undefined}
+                  strokeDasharray={
+                    out || leaf.leaves.length > 1 ? "3 2" : undefined
+                  }
                 />
                 {showLabel ? (
                   <foreignObject
@@ -243,7 +273,12 @@ export function ReportTreemap({
                     height={20}
                     pointerEvents="none"
                   >
-                    <span className="bg-background/70 text-foreground inline-block max-w-full truncate rounded px-1 text-[11px] leading-4">
+                    <span
+                      className={cn(
+                        "bg-background/70 text-foreground inline-block max-w-full truncate rounded px-1 text-[11px] leading-4",
+                        out && "text-muted-foreground line-through",
+                      )}
+                    >
                       {label}
                     </span>
                   </foreignObject>
@@ -293,7 +328,11 @@ export function ReportTreemap({
             transform: `translate(${hover.x > width / 2 ? "calc(-100% - 12px)" : "12px"}, ${hover.y > HEIGHT / 2 ? "calc(-100% - 12px)" : "12px"})`,
           }}
         >
-          <LeafTooltip leaf={hover.leaf} sign={sign} />
+          <LeafTooltip
+            leaf={hover.leaf}
+            sign={sign}
+            excluded={isExcluded(hover.leaf)}
+          />
         </div>
       ) : null}
     </div>

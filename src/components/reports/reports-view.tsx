@@ -2,10 +2,10 @@
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Schema } from "effect";
-import { AlertTriangleIcon, ChartPieIcon } from "lucide-react";
+import { AlertTriangleIcon, ChartPieIcon, RotateCcwIcon } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import { AfterHydration } from "~/components/app/after-hydration";
 import { Money } from "~/components/app/money";
@@ -19,6 +19,7 @@ import { useToday } from "~/components/transactions/transaction-groups";
 import { useDebtLabelText } from "~/components/transactions/transaction-item";
 import { useTransactionFilter } from "~/components/transactions/use-filter";
 import { Alert, AlertDescription } from "~/components/ui/alert";
+import { Button } from "~/components/ui/button";
 import {
   Card,
   CardContent,
@@ -26,6 +27,7 @@ import {
   CardHeader,
   CardTitle,
 } from "~/components/ui/card";
+import { Checkbox } from "~/components/ui/checkbox";
 import {
   Empty,
   EmptyDescription,
@@ -56,6 +58,7 @@ import {
   buildReport,
   categoryColorOrder,
   colorSlots,
+  countChart,
   DEBTS_KEY,
   NONE_KEY,
   type ReportGroupBy,
@@ -65,6 +68,7 @@ import {
   seriesColor,
 } from "~/lib/report";
 import { filteredHref } from "~/lib/transaction-links";
+import { cn } from "~/lib/utils";
 import { NO_CATEGORY } from "~/lib/validators/transactions";
 import { useTRPC } from "~/trpc/react";
 
@@ -113,6 +117,42 @@ function Reports() {
     reportGroupBySchema,
     "category",
   );
+  // transactions left out of the totals, for this visit only;
+  // ids outside the current report are simply ignored
+  const [excluded, setExcluded] = useState<ReadonlySet<string>>(new Set());
+
+  /** Leaves these out, or counts them again when all of them are out */
+  const toggle = (ids: string[]) =>
+    setExcluded((current) => {
+      const next = new Set(current);
+      const allOut = ids.every((id) => current.has(id));
+
+      for (const id of ids) {
+        if (allOut) {
+          next.delete(id);
+        } else {
+          next.add(id);
+        }
+      }
+
+      return next;
+    });
+
+  /** Counts these again (true) or leaves them all out (false) */
+  const setCounted = (ids: string[], counted: boolean) =>
+    setExcluded((current) => {
+      const next = new Set(current);
+
+      for (const id of ids) {
+        if (counted) {
+          next.delete(id);
+        } else {
+          next.add(id);
+        }
+      }
+
+      return next;
+    });
 
   // the range is required: without a valid one in the URL, this calendar
   // month, the same one the dashboard and the comparison open on
@@ -300,71 +340,125 @@ function Reports() {
             </EmptyHeader>
           </Empty>
         ) : (
-          charts.map((chart) => (
-            <Card key={chart.currencyCode}>
-              <CardHeader>
-                {charts.length > 1 ? (
-                  <CardDescription>{chart.currencyCode}</CardDescription>
-                ) : null}
-                <CardTitle className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-lg">
-                  <span>
-                    {t("total", {
-                      amount: formatMoney(chart.total, chart.currencySign),
-                    })}
-                  </span>
-                  <span className="text-muted-foreground text-sm font-normal">
-                    {dateRangeText}
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-3">
-                <ReportTreemap
-                  chart={chart}
-                  colorOf={colorOf}
-                  hrefOf={hrefOf}
-                />
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t(groupBy)}</TableHead>
-                      <TableHead className="text-right">
-                        {t("amount")}
-                      </TableHead>
-                      <TableHead className="text-right">{t("share")}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {chart.tiles.map((tile) => (
-                      <TableRow key={tile.key}>
-                        {/* the name gives way, so numbers are never cut off */}
-                        <TableCell className="w-full max-w-0">
-                          <span className="flex min-w-0 items-center gap-2">
-                            <span
-                              className="size-2.5 shrink-0 rounded-sm"
-                              style={{ background: colorOf(tile.key) }}
-                            />
-                            <TileName
-                              name={tile.name}
-                              href={hrefOf(tile.key)}
-                            />
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Money
-                            amount={tile.value}
-                            sign={chart.currencySign}
-                          />
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-right tabular-nums">
-                          {((tile.value / chart.total) * 100).toFixed(1)}%
-                        </TableCell>
+          charts.map((chart) => {
+            const count = countChart(chart, excluded);
+
+            return (
+              <Card key={chart.currencyCode}>
+                <CardHeader>
+                  {charts.length > 1 ? (
+                    <CardDescription>{chart.currencyCode}</CardDescription>
+                  ) : null}
+                  <CardTitle className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-lg">
+                    <span>
+                      {t("total", {
+                        amount: formatMoney(count.total, chart.currencySign),
+                      })}
+                    </span>
+                    <span className="text-muted-foreground text-sm font-normal">
+                      {dateRangeText}
+                    </span>
+                  </CardTitle>
+                  {count.excludedTotal > 0 ? (
+                    <CardDescription className="flex flex-wrap items-center gap-x-2">
+                      <span className="tabular-nums">
+                        {t("leftOut", {
+                          total: formatMoney(chart.total, chart.currencySign),
+                          left: formatMoney(
+                            count.excludedTotal,
+                            chart.currencySign,
+                          ),
+                        })}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        onClick={() => setExcluded(new Set())}
+                      >
+                        <RotateCcwIcon />
+                        {t("includeAll")}
+                      </Button>
+                    </CardDescription>
+                  ) : null}
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3">
+                  <ReportTreemap
+                    chart={chart}
+                    colorOf={colorOf}
+                    excluded={excluded}
+                    onToggle={toggle}
+                  />
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-8">
+                          <span className="sr-only">{t("counted")}</span>
+                        </TableHead>
+                        <TableHead>{t(groupBy)}</TableHead>
+                        <TableHead className="text-right">
+                          {t("amount")}
+                        </TableHead>
+                        <TableHead className="text-right">
+                          {t("share")}
+                        </TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          ))
+                    </TableHeader>
+                    <TableBody>
+                      {chart.tiles.map((tile) => {
+                        const tileCount = count.tiles.get(tile.key);
+                        const allOut = tileCount?.excluded === "all";
+                        const value = tileCount?.value ?? tile.value;
+
+                        return (
+                          <TableRow
+                            key={tile.key}
+                            className={cn(allOut && "text-muted-foreground")}
+                          >
+                            <TableCell className="w-8">
+                              <Checkbox
+                                checked={!allOut}
+                                aria-label={t("countTile", { name: tile.name })}
+                                onCheckedChange={(checked) =>
+                                  setCounted(
+                                    tile.children.map((leaf) => leaf.id),
+                                    checked === true,
+                                  )
+                                }
+                              />
+                            </TableCell>
+                            {/* the name gives way, so numbers are never cut off */}
+                            <TableCell className="w-full max-w-0">
+                              <span className="flex min-w-0 items-center gap-2">
+                                <span
+                                  className={cn(
+                                    "size-2.5 shrink-0 rounded-sm",
+                                    allOut && "opacity-30",
+                                  )}
+                                  style={{ background: colorOf(tile.key) }}
+                                />
+                                <TileName
+                                  name={tile.name}
+                                  href={hrefOf(tile.key)}
+                                />
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Money amount={value} sign={chart.currencySign} />
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-right tabular-nums">
+                              {allOut || count.total <= 0
+                                ? "—"
+                                : `${((value / count.total) * 100).toFixed(1)}%`}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            );
+          })
         )}
       </div>
     </>

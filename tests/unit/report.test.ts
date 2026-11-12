@@ -6,6 +6,7 @@ import {
   type ComparisonInput,
   categoryColorOrder,
   colorSlots,
+  countChart,
   DEBTS_KEY,
   deltaOf,
   NONE_KEY,
@@ -438,5 +439,63 @@ describe("category colors", () => {
     expect(seriesColor("food", 3)).toBe("var(--series-3)");
     expect(seriesColor(DEBTS_KEY, 3)).toBe("var(--series-debts)");
     expect(seriesColor(NONE_KEY, undefined)).toBe("var(--series-other)");
+  });
+});
+
+describe("countChart", () => {
+  const leaf = (id: string, value: number) => ({
+    id,
+    name: id,
+    value,
+    date: "2026-03-01",
+    category: "",
+    comment: null,
+  });
+  const chart: ReportChart = {
+    currencyCode: "UAH",
+    currencySign: "₴",
+    total: 1000,
+    tiles: [
+      {
+        key: "food",
+        name: "Food",
+        value: 700,
+        children: [leaf("a", 500), leaf("b", 200)],
+      },
+      { key: "car", name: "Car", value: 300, children: [leaf("c", 300)] },
+    ],
+  };
+
+  it("counts everything when nothing is left out", () => {
+    const count = countChart(chart, new Set());
+
+    expect(count.total).toBe(1000);
+    expect(count.excludedTotal).toBe(0);
+    expect(count.tiles.get("food")).toEqual({ value: 700, excluded: "none" });
+  });
+
+  it("takes one transaction out of its tile and the total", () => {
+    const count = countChart(chart, new Set(["b"]));
+
+    expect(count.total).toBe(800);
+    expect(count.excludedTotal).toBe(200);
+    expect(count.tiles.get("food")).toEqual({ value: 500, excluded: "some" });
+    expect(count.tiles.get("car")).toEqual({ value: 300, excluded: "none" });
+  });
+
+  it("marks a tile whose every transaction is left out", () => {
+    const count = countChart(chart, new Set(["c", "a"]));
+
+    expect(count.total).toBe(200);
+    expect(count.excludedTotal).toBe(800);
+    expect(count.tiles.get("car")).toEqual({ value: 0, excluded: "all" });
+    expect(count.tiles.get("food")).toEqual({ value: 200, excluded: "some" });
+  });
+
+  it("ignores ids that are not in the chart", () => {
+    const count = countChart(chart, new Set(["elsewhere"]));
+
+    expect(count.total).toBe(1000);
+    expect(count.excludedTotal).toBe(0);
   });
 });

@@ -639,7 +639,13 @@
     "collapse": "Hide subcategories",
     "sameDays": "Same days only",
     "sameDaysHint": "This period is still running, so both are cut to its first {days, plural, one {# day} other {# days}}.",
-    "fullPeriodsHint": "Comparing whole periods, although one is still running."
+    "fullPeriodsHint": "Comparing whole periods, although one is still running.",
+    "excludeHint": "Click to leave out of the total",
+    "includeHint": "Left out. Click to count it again",
+    "leftOut": "{total} − {left} left out",
+    "includeAll": "Include all",
+    "counted": "Counted",
+    "countTile": "Count {name} in the total"
   },
   "users": {
     "title": "Users",
