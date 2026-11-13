@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { and, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, lt, or } from "drizzle-orm";
 import { Effect } from "effect";
 
 import { occurrenceDates } from "~/lib/schedule";
@@ -25,50 +25,56 @@ type Schedule = typeof plannedTransactions.$inferSelect;
 export const occurrenceHash = (date: string, primaryScheduleId: string) =>
   createHash("md5").update(`${date}${primaryScheduleId}`).digest("hex");
 
-const lockSchedule = (primaryScheduleId: string) =>
-  query((db) =>
-    db.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtext(${`schedule:${primaryScheduleId}`}))`,
-    ),
-  );
-
-/** A schedule's live legs, found by either leg's id, locked */
-const loadScheduleBatch = Effect.fnUntraced(function* (id: string) {
-  const [row] = yield* query((db) =>
+/**
+ * A schedule's live legs, found by either leg's id. With `lock`, the whole
+ * batch is locked in one statement in id order, whichever leg was named, so
+ * two callers (an edit, the nightly generation) queue on the same rows in
+ * the same order and can't deadlock.
+ */
+const loadScheduleBatch = Effect.fnUntraced(function* (
+  id: string,
+  { lock }: { lock: boolean },
+) {
+  const [target] = yield* query((db) =>
     db
-      .select()
+      .select({ batchId: plannedTransactions.batchId })
       .from(plannedTransactions)
       .where(
         and(
           eq(plannedTransactions.id, id),
           isNull(plannedTransactions.deletedAt),
         ),
-      )
-      .for("update"),
+      ),
   );
 
-  if (!row) {
+  if (!target) {
     return yield* notFound();
   }
 
-  const batchId = row.batchId;
-
-  if (!batchId) {
-    return [row];
-  }
-
-  return yield* query((db) =>
-    db
+  const { batchId } = target;
+  const rows = yield* query((db) => {
+    const select = db
       .select()
       .from(plannedTransactions)
       .where(
         and(
-          eq(plannedTransactions.batchId, batchId),
+          batchId
+            ? eq(plannedTransactions.batchId, batchId)
+            : eq(plannedTransactions.id, id),
           isNull(plannedTransactions.deletedAt),
         ),
       )
-      .for("update"),
-  );
+      .orderBy(asc(plannedTransactions.id));
+
+    return lock ? select.for("update") : select;
+  });
+
+  // deleted while this waited for the lock
+  if (!rows.some((row) => row.id === id)) {
+    return yield* notFound();
+  }
+
+  return rows;
 });
 
 /** The primary leg drives generation: no batch, or the negative leg */
@@ -78,17 +84,16 @@ const primaryOf = (rows: Schedule[]): Schedule | undefined =>
 /**
  * Idempotently inserts the missing occurrences of a schedule up to
  * min(endDate, today + 1 year). Hashes of occurrences that were submitted or
- * deleted count as present, so those never come back. An advisory lock keeps
- * concurrent runs (two cron processes, a save racing the cron) from
- * inserting the same occurrence twice. Runs inside the caller's transaction.
+ * deleted count as present, so those never come back. The row lock on the
+ * schedule's legs keeps concurrent runs (two cron processes, a save racing
+ * the cron) from inserting the same occurrence twice: the second run waits,
+ * then sees the first one's rows. Runs inside the caller's transaction.
  */
 export const generateOccurrences = Effect.fn("planned.generateOccurrences")(
   function* (primaryScheduleId: string, todayOverride?: string) {
     const today = todayOverride ?? (yield* todayInAppZone);
 
-    yield* lockSchedule(primaryScheduleId);
-
-    const legs = yield* loadScheduleBatch(primaryScheduleId);
+    const legs = yield* loadScheduleBatch(primaryScheduleId, { lock: true });
     const primary = primaryOf(legs);
 
     if (!primary || primary.id !== primaryScheduleId) {
@@ -253,13 +258,26 @@ export const regenerateAll = Effect.fn("planned.regenerateAll")(function* (
   );
 
   let occurrences = 0;
+  let failed = 0;
 
   for (const { id } of primaries) {
-    // one transaction per schedule: a bad schedule can't block the rest
-    occurrences += yield* transaction(generateOccurrences(id, today));
+    // one transaction per schedule, and a failure is logged and skipped, so a
+    // bad schedule can't block the rest
+    occurrences += yield* transaction(generateOccurrences(id, today)).pipe(
+      // deleted since the list above was read: nothing to generate
+      Effect.catchTag("NotFound", () => Effect.succeed(0)),
+      Effect.catch((error) =>
+        Effect.gen(function* () {
+          failed += 1;
+          yield* Effect.logError(`schedule ${id} failed`, error);
+
+          return 0;
+        }),
+      ),
+    );
   }
 
-  return { schedules: primaries.length, occurrences };
+  return { schedules: primaries.length, occurrences, failed };
 });
 
 /** The live occurrence row and its pair, locked */
@@ -316,7 +334,9 @@ export const deleteAllPlanned = Effect.fn("planned.deleteAll")(function* (
 
   yield* requireDeletable(userId, pair);
 
-  const scheduleLegs = yield* loadScheduleBatch(row.plannedTransactionId);
+  const scheduleLegs = yield* loadScheduleBatch(row.plannedTransactionId, {
+    lock: true,
+  });
   const scheduleIds = scheduleLegs.map((leg) => leg.id);
   const at = yield* now;
 
@@ -367,15 +387,12 @@ export const deleteAllPlanned = Effect.fn("planned.deleteAll")(function* (
   return { schedules: scheduleIds.length, occurrences: removed.length };
 }, transaction);
 
-/**
- * A schedule by either leg's id, for the edit-schedule form. The rights are
- * checked while the legs are still locked.
- */
+/** A schedule by either leg's id, for the edit-schedule form; a plain read */
 export const getSchedule = Effect.fn("planned.getSchedule")(function* (
   userId: string,
   id: string,
 ) {
-  const legs = yield* loadScheduleBatch(id);
+  const legs = yield* loadScheduleBatch(id, { lock: false });
 
   yield* requireDeletable(userId, legs);
 
@@ -394,7 +411,7 @@ export const getSchedule = Effect.fn("planned.getSchedule")(function* (
     repeatInterval: primary.repeatInterval,
     repeatWeekdays: primary.repeatWeekdays,
   };
-}, transaction);
+});
 
 /**
  * Edits a schedule: both legs change, every un-submitted occurrence dated
@@ -413,14 +430,12 @@ export const updateSchedule = Effect.fn("planned.updateSchedule")(function* (
   todayOverride?: string,
 ) {
   const today = todayOverride ?? (yield* todayInAppZone);
-  const existing = yield* loadScheduleBatch(input.scheduleId);
+  const existing = yield* loadScheduleBatch(input.scheduleId, { lock: true });
   const primary = primaryOf(existing);
 
   if (!primary) {
     return yield* notFound();
   }
-
-  yield* lockSchedule(primary.id);
 
   if (primary.kind !== input.data.kind) {
     return yield* badRequest("type_change_not_supported");

@@ -1,10 +1,12 @@
+import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import { GET } from "~/app/api/cron/daily-0000/route";
 import { isCronAuthorized } from "~/server/cron";
 import { db } from "~/server/db";
-import { rateLimits } from "~/server/db/schema";
+import { rateLimits, transactions } from "~/server/db/schema";
 import { callerFor } from "../helpers/caller";
+import { REFUSED_COMMENT, refusingComment } from "../helpers/faults";
 import { createUser, makeAccount } from "../helpers/fixtures";
 
 const SECRET = process.env.CRON_SECRET ?? "";
@@ -79,5 +81,37 @@ describe("daily-0000", () => {
     expect((await db.select().from(rateLimits)).map((r) => r.key)).toEqual([
       "fresh",
     ]);
+  });
+
+  it("still sweeps when a schedule fails, then answers 500", async () => {
+    const user = await createUser();
+    const account = await makeAccount(user);
+    // its occurrences are removed, so the nightly run inserts them again
+    await callerFor(user).planned.create({
+      data: {
+        kind: "expense",
+        date: "2026-03-20",
+        amount: 1,
+        accountId: account.id,
+        comment: REFUSED_COMMENT,
+      },
+      schedule: { repeatType: "daily", repeatInterval: 1, endDate: null },
+    });
+    await db
+      .delete(transactions)
+      .where(eq(transactions.comment, REFUSED_COMMENT));
+    await db.insert(rateLimits).values({
+      key: "old",
+      count: 1,
+      windowStart: new Date(Date.now() - 48 * 3600_000),
+    });
+
+    const response = await refusingComment(() => call(`Bearer ${SECRET}`));
+    const text = await response.text();
+
+    expect(response.status).toBe(500);
+    expect(text).toContain("planned: 1 schedules failed");
+    expect(text).toContain("swept 1 app");
+    expect(await db.select().from(rateLimits)).toEqual([]);
   });
 });

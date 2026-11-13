@@ -3,7 +3,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { Effect } from "effect";
 
 import { decryptValue, totpMatches } from "~/server/auth/two-factor";
-import { query, transaction } from "~/server/db/database";
+import { query } from "~/server/db/database";
 import { authAccounts, twoFactors, users } from "~/server/db/schema";
 import { AppConfig } from "~/server/effect/app-config";
 import { Mailer } from "~/server/effect/mailer";
@@ -48,7 +48,11 @@ export const translateTotpCode = Effect.fn("authHooks.translateTotpCode")(
   },
 );
 
-/** v1 passwords are bcrypt: after a correct one, store scrypt instead */
+/**
+ * v1 passwords are bcrypt: after a correct one, store scrypt instead. No
+ * transaction: the write is one statement, and two sign-ins racing here both
+ * store a valid hash of the same password.
+ */
 export const rehashLegacyPassword = Effect.fn("authHooks.rehashLegacyPassword")(
   function* (email: string, password: string) {
     const [credential] = yield* query((db) =>
@@ -77,7 +81,6 @@ export const rehashLegacyPassword = Effect.fn("authHooks.rehashLegacyPassword")(
         .where(eq(authAccounts.id, credential.id)),
     );
   },
-  transaction,
 );
 
 /** Sessions are only created for users that are not soft-deleted */

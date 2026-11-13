@@ -6,7 +6,7 @@ import {
   startPendingEnrolment,
 } from "~/server/auth/pending-enrolment";
 import { issueSignInTicket } from "~/server/auth/sign-in-ticket";
-import { enrolTwoFactor } from "~/server/auth/two-factor";
+import { enrolTwoFactor, hashPassword } from "~/server/auth/two-factor";
 import { query, transaction } from "~/server/db/database";
 import { recoveryLinks, users } from "~/server/db/schema";
 import { AppConfig } from "~/server/effect/app-config";
@@ -26,7 +26,10 @@ import {
 } from "~/server/lib/rate-limit";
 import { sha256 } from "~/server/lib/tokens";
 import { revokeSessions } from "~/server/services/admin";
-import { requirePassword, setPassword } from "~/server/services/credentials";
+import {
+  requirePassword,
+  storePasswordHash,
+} from "~/server/services/credentials";
 
 export type RecoveryScope = "password" | "twoFactor" | "both";
 
@@ -42,11 +45,13 @@ export const createRecoveryLink = Effect.fn("recovery.createLink")(function* (
   adminId: string,
   input: { userId: string; scope: RecoveryScope },
 ) {
+  // locked, so two links created at once can't both stay live
   const [user] = yield* query((db) =>
     db
       .select({ id: users.id })
       .from(users)
-      .where(and(eq(users.id, input.userId), isNull(users.deletedAt))),
+      .where(and(eq(users.id, input.userId), isNull(users.deletedAt)))
+      .for("update"),
   );
 
   if (!user) {
@@ -207,6 +212,7 @@ type CompletionInput = {
 
 const applyRecovery = Effect.fn("recovery.apply")(function* (
   input: CompletionInput,
+  newHash: string | null,
 ) {
   const { link } = yield* findLink(input.token, true);
   const coversPassword = link.scope !== "twoFactor";
@@ -236,8 +242,8 @@ const applyRecovery = Effect.fn("recovery.apply")(function* (
     backupCodes = yield* enrolTwoFactor(link.userId, secret);
   }
 
-  if (coversPassword && input.newPassword) {
-    yield* setPassword(link.userId, input.newPassword);
+  if (coversPassword && newHash) {
+    yield* storePasswordHash(link.userId, newHash);
   }
 
   const at = yield* now;
@@ -283,5 +289,11 @@ export const completeRecovery = Effect.fn("recovery.complete")(function* (
     return yield* tooManyRequests("otp_attempts_exceeded");
   }
 
-  return yield* applyRecovery(input);
+  // hashed before the transaction, so scrypt never runs under its locks
+  const newHash =
+    peek.scope !== "twoFactor" && input.newPassword
+      ? yield* hashPassword(input.newPassword)
+      : null;
+
+  return yield* applyRecovery(input, newHash);
 });

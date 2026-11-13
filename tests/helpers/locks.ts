@@ -13,17 +13,17 @@ export const signal = () => {
 };
 
 /**
- * Resolves once another session of this database is blocked on a row lock,
- * so a test can commit the holder only after the other side is waiting.
+ * Resolves once `minWaiting` other sessions of this database are blocked on a
+ * lock, so a test can commit the holder only after the other side is waiting.
  */
-export const untilBlockedOnLock = async () => {
+export const untilBlockedOnLock = async (minWaiting = 1) => {
   for (let attempt = 0; attempt < 500; attempt += 1) {
     const [row] = await db.execute<{ waiting: number }>(sql`
       SELECT count(*)::int AS waiting FROM pg_stat_activity
       WHERE datname = current_database() AND wait_event_type = 'Lock'
     `);
 
-    if (row && row.waiting > 0) {
+    if (row && row.waiting >= minWaiting) {
       return;
     }
 

@@ -68,20 +68,22 @@ const requireCode = Effect.fnUntraced(function* (
   }
 });
 
-export const setPassword = Effect.fn("credentials.setPassword")(function* (
-  userId: string,
-  newPassword: string,
-) {
-  const credential = yield* credentialOf(userId);
-  const password = yield* hashPassword(newPassword);
+/**
+ * Stores an already computed password hash. Callers hash before opening
+ * their transaction, so the slow scrypt never runs while the row is locked.
+ */
+export const storePasswordHash = Effect.fn("credentials.storePasswordHash")(
+  function* (userId: string, password: string) {
+    const credential = yield* credentialOf(userId);
 
-  yield* query((db) =>
-    db
-      .update(authAccounts)
-      .set({ password })
-      .where(eq(authAccounts.id, credential.id)),
-  );
-});
+    yield* query((db) =>
+      db
+        .update(authAccounts)
+        .set({ password })
+        .where(eq(authAccounts.id, credential.id)),
+    );
+  },
+);
 
 const userEmail = Effect.fnUntraced(function* (userId: string) {
   const [row] = yield* query((db) =>
@@ -98,14 +100,21 @@ const userEmail = Effect.fnUntraced(function* (userId: string) {
   return row.email;
 });
 
-export const changePassword = Effect.fn("credentials.changePassword")(
+type PasswordChange = {
+  currentPassword: string;
+  newPassword: string;
+  code: string;
+};
+
+const applyPasswordChange = Effect.fn("credentials.applyPasswordChange")(
   function* (
     user: { id: string; sessionId: string | null },
-    input: { currentPassword: string; newPassword: string; code: string },
+    input: PasswordChange,
+    newHash: string,
   ) {
     yield* requirePassword(user.id, input.currentPassword);
     yield* requireCode(user.id, input.code, false);
-    yield* setPassword(user.id, input.newPassword);
+    yield* storePasswordHash(user.id, newHash);
     yield* revokeSessions(user.id, user.sessionId);
     yield* audit({
       entityType: "user",
@@ -116,6 +125,18 @@ export const changePassword = Effect.fn("credentials.changePassword")(
     });
   },
   transaction,
+);
+
+/** The new password is hashed first, outside the transaction */
+export const changePassword = Effect.fn("credentials.changePassword")(
+  function* (
+    user: { id: string; sessionId: string | null },
+    input: PasswordChange,
+  ) {
+    const newHash = yield* hashPassword(input.newPassword);
+
+    yield* applyPasswordChange(user, input, newHash);
+  },
 );
 
 const reenrolKey = (userId: string) => `zm-reenrol:${userId}`;

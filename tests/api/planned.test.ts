@@ -6,6 +6,7 @@ import { plannedTransactions, transactions } from "~/server/db/schema";
 import { occurrenceHash, regenerateAll } from "~/server/services/planned";
 import { callerFor } from "../helpers/caller";
 import { expectTRPCError } from "../helpers/errors";
+import { REFUSED_COMMENT, refusingComment } from "../helpers/faults";
 import {
   createUser,
   grant,
@@ -13,6 +14,7 @@ import {
   makeCategory,
   type TestUser,
 } from "../helpers/fixtures";
+import { signal, untilBlockedOnLock } from "../helpers/locks";
 import { run } from "../helpers/run";
 
 // "today" is 2026-03-15 in APP_TIMEZONE for every test here
@@ -304,6 +306,65 @@ describe("generation", () => {
     expect(await plannedDates()).toEqual(["2026-05-20", "2026-06-20"]);
   });
 
+  it("skips a schedule that fails and still generates the others", async () => {
+    const user = await createUser();
+    const account = await makeAccount(user);
+    await monthlyExpense(user, account.id, { endDate: null });
+    const failing = await callerFor(user).planned.create({
+      data: {
+        kind: "expense",
+        date: "2026-03-21",
+        amount: 500,
+        accountId: account.id,
+        comment: REFUSED_COMMENT,
+      },
+      schedule: { repeatType: "monthly", repeatInterval: 1, endDate: null },
+    });
+    const before = (await plannedDates()).length;
+
+    vi.setSystemTime(new Date("2026-04-25T09:00:00Z"));
+    const result = await refusingComment(() => run(regenerateAll()));
+
+    expect(result).toMatchObject({ schedules: 2, occurrences: 2, failed: 1 });
+    expect(await plannedDates()).toHaveLength(before + 2);
+    expect(
+      (await liveRows()).filter(
+        (row) => row.plannedTransactionId === failing.scheduleId,
+      ),
+    ).toHaveLength(12);
+  });
+
+  it("counts a schedule deleted while it waited as nothing to generate", async () => {
+    const user = await createUser();
+    const account = await makeAccount(user);
+    const result = await monthlyExpense(user, account.id);
+    const scheduleId = result.scheduleId ?? "";
+
+    // the delete holds the schedule row when the nightly run reaches it
+    const held = signal();
+    const commit = signal();
+    const deleting = db.transaction(async (tx) => {
+      await tx
+        .update(plannedTransactions)
+        .set({ deletedAt: new Date() })
+        .where(eq(plannedTransactions.id, scheduleId));
+      held.resolve();
+      await commit.promise;
+    });
+    await held.promise;
+
+    const generating = run(regenerateAll());
+    await untilBlockedOnLock();
+    commit.resolve();
+    await deleting;
+
+    expect(await generating).toEqual({
+      schedules: 1,
+      occurrences: 0,
+      failed: 0,
+    });
+  });
+
   it("rolls the one-year window forward as days pass", async () => {
     const user = await createUser();
     const account = await makeAccount(user);
@@ -551,6 +612,19 @@ describe("planned.updateSchedule", () => {
       }),
       "BAD_REQUEST",
       "type_change_not_supported",
+    );
+  });
+
+  it("refuses the edit form to someone who can't write the schedule", async () => {
+    const owner = await createUser();
+    const reader = await createUser();
+    const account = await makeAccount(owner);
+    await grant("account", account.id, reader, { canWrite: false });
+    const result = await monthlyExpense(owner, account.id);
+
+    await expectTRPCError(
+      callerFor(reader).planned.schedule({ id: result.scheduleId ?? "" }),
+      "FORBIDDEN",
     );
   });
 

@@ -12,6 +12,7 @@ import {
   createUser,
   createUserWithCredentials,
 } from "../helpers/fixtures";
+import { signal, untilBlockedOnLock } from "../helpers/locks";
 
 type Caller = ReturnType<typeof callerFor>;
 
@@ -205,6 +206,38 @@ describe("users", () => {
       "BAD_REQUEST",
       "email_not_unique",
     );
+  });
+
+  it("refuses a restore when the email is taken while it runs", async () => {
+    const admin = await createAdmin();
+    const user = await createUser({ email: "race@example.com" });
+    await callerFor(admin).admin.deleteUser({ userId: user.id });
+
+    // a registration of the address has inserted but not committed: the
+    // restore's check can't see it, and its write waits on the unique index
+    const inserted = signal();
+    const commit = signal();
+    const registering = db.transaction(async (tx) => {
+      await tx.insert(users).values({
+        name: "Newcomer",
+        email: "race@example.com",
+        role: "user",
+        locale: "en",
+      });
+      inserted.resolve();
+      await commit.promise;
+    });
+    await inserted.promise;
+
+    const restoring = expectTRPCError(
+      callerFor(admin).admin.restoreUser({ userId: user.id }),
+      "BAD_REQUEST",
+      "email_not_unique",
+    );
+    await untilBlockedOnLock();
+    commit.resolve();
+    await registering;
+    await restoring;
   });
 
   it("never bans or deletes the last active admin", async () => {

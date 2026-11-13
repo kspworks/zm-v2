@@ -99,8 +99,8 @@ account, the audit row) run in **one DB transaction**: the entry point passes
 calls runs on that handle through `query`. A typed failure, defect or
 interruption rolls back and propagates unchanged; a nested `transaction` is a
 SAVEPOINT, so services compose. Helpers that need the caller's transaction
-(`getOrCreateDebtAccount`, `generateOccurrences`: their advisory locks are
-transaction-scoped) don't open one. Every create, update, delete or restore of
+(`getOrCreateDebtAccount`, `generateOccurrences`: their advisory and row
+locks are transaction-scoped) don't open one. Every create, update, delete or restore of
 an account, category, transaction or schedule writes a `history_logs` row in
 that same transaction (`audit` in `~/server/lib/audit`).
 
@@ -203,9 +203,11 @@ Per entity, through the member tables, with `canRead` / `canWrite`:
   hashes are inserted. Hashes of occurrences that were already submitted or
   deleted count as present, so those never come back.
 - Only the **primary schedule** (no batch, or the negative leg) drives
-  generation, and both legs carry `plannedTransactionId`. An advisory lock keeps
-  concurrent runs (two cron processes, a save racing the cron) from
-  double-inserting.
+  generation, and both legs carry `plannedTransactionId`. A row lock on the
+  schedule's legs, taken in id order in one statement, keeps concurrent runs
+  (two cron processes, a save racing the cron) from double-inserting. The
+  nightly run gives each schedule its own transaction and skips one that
+  fails, logging it.
 - Weekly emits, for each step, every selected weekday within the Monday-started
   week of that step, bounded by both `startDate` and the horizon.
 - The planned list's `nextOnly` keeps the first live planned occurrence of

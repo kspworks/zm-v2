@@ -2,7 +2,7 @@ import { and, asc, count, desc, eq, isNull, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { Effect } from "effect";
 
-import { query, transaction } from "~/server/db/database";
+import { catchUniqueViolation, query, transaction } from "~/server/db/database";
 import { invites, sessions, users } from "~/server/db/schema";
 import { audit } from "~/server/lib/audit";
 import { now } from "~/server/lib/clock";
@@ -257,44 +257,48 @@ export const deleteUser = Effect.fn("admin.deleteUser")(function* (
   });
 }, transaction);
 
-export const restoreUser = Effect.fn("admin.restoreUser")(function* (
-  adminId: string,
-  userId: string,
-) {
-  const user = yield* lockUser(userId);
+export const restoreUser = Effect.fn("admin.restoreUser")(
+  function* (adminId: string, userId: string) {
+    const user = yield* lockUser(userId);
 
-  if (!user.deletedAt) {
-    return;
-  }
+    if (!user.deletedAt) {
+      return;
+    }
 
-  const email = user.deletedEmail ?? user.email;
-  const [taken] = yield* query((db) =>
-    db
-      .select({ id: users.id })
-      .from(users)
-      .where(
-        and(
-          sql`lower(${users.email}) = lower(${email})`,
-          isNull(users.deletedAt),
+    const email = user.deletedEmail ?? user.email;
+    const [taken] = yield* query((db) =>
+      db
+        .select({ id: users.id })
+        .from(users)
+        .where(
+          and(
+            sql`lower(${users.email}) = lower(${email})`,
+            isNull(users.deletedAt),
+          ),
         ),
-      ),
-  );
+    );
 
-  if (taken) {
-    return yield* badRequest("email_not_unique");
-  }
+    if (taken) {
+      return yield* badRequest("email_not_unique");
+    }
 
-  yield* query((db) =>
-    db
-      .update(users)
-      .set({ deletedAt: null, deletedEmail: null, email })
-      .where(eq(users.id, user.id)),
-  );
-  yield* audit({
-    entityType: "user",
-    entityId: user.id,
-    action: "restore",
-    userId: adminId,
-    payload: {},
-  });
-}, transaction);
+    yield* query((db) =>
+      db
+        .update(users)
+        .set({ deletedAt: null, deletedEmail: null, email })
+        .where(eq(users.id, user.id)),
+    );
+    yield* audit({
+      entityType: "user",
+      entityId: user.id,
+      action: "restore",
+      userId: adminId,
+      payload: {},
+    });
+  },
+  transaction,
+  // a user registered with the address after the check above
+  catchUniqueViolation("users_email_live_uq", () =>
+    badRequest("email_not_unique"),
+  ),
+);
