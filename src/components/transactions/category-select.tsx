@@ -19,6 +19,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "~/components/ui/popover";
+import { useIdempotencyKey } from "~/hooks/use-idempotency-key";
 import { useToastError } from "~/hooks/use-toast-error";
 import type { CategoryOption } from "~/lib/category-options";
 import { lastInputWasPointer } from "~/lib/input-modality";
@@ -83,6 +84,7 @@ export function CategorySelect({
   const create = useMutation(
     trpc.categories.create.mutationOptions({ onError: toastError }),
   );
+  const idempotency = useIdempotencyKey();
 
   const name = search.trim();
   const listed = options.filter(
@@ -102,9 +104,11 @@ export function CategorySelect({
         parentId: null,
         isExpense: createKind === "expense",
         isIncome: createKind === "income",
+        idempotencyKey: idempotency.key,
       },
       {
         onSuccess: async (category) => {
+          idempotency.renew();
           // the select must know the new option before it is chosen
           await queryClient.invalidateQueries(trpc.categories.pathFilter());
           onChange(category.id);

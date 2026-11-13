@@ -3,6 +3,7 @@ import { Schema } from "effect";
 import { REPEAT_TYPES } from "~/lib/schedule";
 import {
   calendarDateSchema,
+  idempotencyKeyField,
   idSchema,
   maxLength,
   message,
@@ -66,6 +67,7 @@ const checkSchedule = Schema.makeFilter(({ data, schedule }: ScheduleInput) => {
 export const plannedCreateSchema = Schema.Struct({
   data: transactionInputSchema,
   schedule: scheduleFieldsSchema,
+  ...idempotencyKeyField,
 }).check(checkSchedule);
 
 export const scheduleUpdateSchema = Schema.Struct({

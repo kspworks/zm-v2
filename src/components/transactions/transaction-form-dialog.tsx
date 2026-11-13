@@ -13,6 +13,7 @@ import {
 import type { TransactionRowData } from "~/components/transactions/transaction-item";
 import { Button } from "~/components/ui/button";
 import { Spinner } from "~/components/ui/spinner";
+import { useIdempotencyKey } from "~/hooks/use-idempotency-key";
 import { useTRPC } from "~/trpc/react";
 
 export type TransactionDialogState =
@@ -37,6 +38,12 @@ export function TransactionFormDialog({
 
   const create = useMutation(trpc.transactions.create.mutationOptions());
   const update = useMutation(trpc.transactions.update.mutationOptions());
+  // the create form stays open for the next entry, so each save gets a key
+  const idempotency = useIdempotencyKey();
+  const close = () => {
+    idempotency.renew();
+    onClose();
+  };
 
   const row = state && state.mode !== "create" ? state.row : null;
   const title =
@@ -49,7 +56,7 @@ export function TransactionFormDialog({
   return (
     <ResponsiveDialog
       open={state !== null}
-      onOpenChange={(open) => !open && onClose()}
+      onOpenChange={(open) => !open && close()}
       title={title}
     >
       {state ? (
@@ -65,11 +72,18 @@ export function TransactionFormDialog({
           }
           kindLocked={row !== null}
           onDirtyChange={setDirty}
-          onDone={onClose}
+          onDone={close}
           onSubmit={async (input) => {
             const result = row
               ? await update.mutateAsync({ id: row.id, data: input })
-              : await create.mutateAsync(input);
+              : await create.mutateAsync({
+                  ...input,
+                  idempotencyKey: idempotency.key,
+                });
+
+            if (!row) {
+              idempotency.renew();
+            }
 
             await invalidate();
 
@@ -77,7 +91,7 @@ export function TransactionFormDialog({
           }}
           footer={({ pending }) => (
             <div className="mt-6 flex justify-end gap-2 max-md:*:flex-1">
-              <Button type="button" variant="outline" onClick={onClose}>
+              <Button type="button" variant="outline" onClick={close}>
                 {dirty ? tc("cancel") : tc("close")}
               </Button>
               <Button type="submit" disabled={pending}>

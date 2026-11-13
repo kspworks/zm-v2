@@ -2,6 +2,7 @@ import { Schema } from "effect";
 
 import { MAX_UPLOAD_BYTES } from "~/lib/import-limits";
 import {
+  idempotencyKeyField,
   idSchema,
   maxLength,
   message,
@@ -13,6 +14,7 @@ import {
   validate,
 } from "~/server/api/trpc";
 import { runForTrpc } from "~/server/effect/runtime";
+import { idempotent } from "~/server/lib/idempotency";
 import {
   listImports,
   undoImport,
@@ -34,11 +36,23 @@ export const importsRouter = createTRPCRouter({
             Schema.isBase64(message("import_invalid")),
             maxLength(Math.ceil((MAX_UPLOAD_BYTES * 4) / 3) + 4),
           ),
+          ...idempotencyKeyField,
         }),
       ),
     )
-    .mutation(({ ctx, input, signal }) =>
-      runForTrpc(uploadImport(ctx.user.id, input), signal),
+    .mutation(({ ctx, input: { idempotencyKey, ...input }, signal }) =>
+      runForTrpc(
+        idempotent(
+          {
+            userId: ctx.user.id,
+            procedure: "imports.upload",
+            key: idempotencyKey,
+            request: input,
+          },
+          uploadImport(ctx.user.id, input),
+        ),
+        signal,
+      ),
     ),
 
   undo: protectedProcedure

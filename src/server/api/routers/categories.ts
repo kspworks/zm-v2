@@ -1,8 +1,8 @@
 import { Schema } from "effect";
 
 import {
+  categoryCreateSchema,
   categoryHiddenSchema,
-  categoryInputSchema,
   categoryReplaceSchema,
   categoryUpdateSchema,
 } from "~/lib/validators/categories";
@@ -13,6 +13,7 @@ import {
   validate,
 } from "~/server/api/trpc";
 import { runForTrpc } from "~/server/effect/runtime";
+import { idempotent } from "~/server/lib/idempotency";
 import {
   createCategory,
   deleteCategory,
@@ -28,9 +29,20 @@ export const categoriesRouter = createTRPCRouter({
   ),
 
   create: protectedProcedure
-    .input(validate(categoryInputSchema))
-    .mutation(({ ctx, input, signal }) =>
-      runForTrpc(createCategory(ctx.user.id, input), signal),
+    .input(validate(categoryCreateSchema))
+    .mutation(({ ctx, input: { idempotencyKey, ...input }, signal }) =>
+      runForTrpc(
+        idempotent(
+          {
+            userId: ctx.user.id,
+            procedure: "categories.create",
+            key: idempotencyKey,
+            request: input,
+          },
+          createCategory(ctx.user.id, input),
+        ),
+        signal,
+      ),
     ),
 
   update: protectedProcedure

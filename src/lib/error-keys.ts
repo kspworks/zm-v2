@@ -55,6 +55,7 @@ export const ERROR_KEYS = [
   "not_planned",
   "not_recurring",
   "adjust_balance_changed",
+  "idempotency_key_reused",
   // validation messages carried by the Effect Schema checks
   "name_too_short",
   "password_too_short",

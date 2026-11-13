@@ -1,6 +1,7 @@
 import { Schema } from "effect";
 
 import {
+  idempotencyKeyField,
   idSchema,
   message,
   nullable,
@@ -25,6 +26,12 @@ const kindRequired = Schema.makeFilter(
 
 export const categoryInputSchema =
   Schema.Struct(categoryFields).check(kindRequired);
+
+/** `categories.create`: the fields plus an optional idempotency key */
+export const categoryCreateSchema = Schema.Struct({
+  ...categoryFields,
+  ...idempotencyKeyField,
+}).check(kindRequired);
 
 export const categoryUpdateSchema = Schema.Struct({
   ...categoryFields,

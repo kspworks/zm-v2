@@ -4,10 +4,14 @@ import { Effect } from "effect";
 import { query } from "~/server/db/database";
 import { authRateLimits } from "~/server/db/schema";
 import { now, today } from "~/server/lib/clock";
+import { sweepIdempotencyKeys } from "~/server/lib/idempotency";
 import { sweepRateLimits } from "~/server/lib/rate-limit";
 import { regenerateAll } from "~/server/services/planned";
 
-/** Midnight: roll the one-year planned window forward, sweep old limits */
+/**
+ * Midnight: roll the one-year planned window forward, sweep old limits and
+ * idempotency keys
+ */
 export const dailyMidnight = Effect.fn("jobs.dailyMidnight")(function* () {
   const day = yield* today;
   const generated = yield* regenerateAll(day);
@@ -31,7 +35,10 @@ export const dailyMidnight = Effect.fn("jobs.dailyMidnight")(function* () {
     `rate limits: swept ${swept} app and ${sweptAuth.length} auth windows`,
   );
 
-  // the sweep above still ran; failing now turns the cron answer into a 500
+  const sweptKeys = yield* sweepIdempotencyKeys();
+  yield* Effect.log(`idempotency: swept ${sweptKeys} keys`);
+
+  // the sweeps above still ran; failing now turns the cron answer into a 500
   if (generated.failed > 0) {
     return yield* Effect.fail(
       new Error(`${generated.failed} planned schedules failed to generate`),

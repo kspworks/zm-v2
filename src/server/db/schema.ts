@@ -11,6 +11,7 @@ import {
   type PgColumn,
   pgEnum,
   pgTable,
+  primaryKey,
   smallint,
   text,
   timestamp,
@@ -489,6 +490,31 @@ export const rateLimits = pgTable("rate_limits", {
   count: integer().notNull(),
   windowStart: tz().notNull(),
 });
+
+/**
+ * One row per keyed create call, written in the call's own transaction, so a
+ * retry with the same key gets the stored response instead of a second write.
+ * Swept after a day by the midnight job.
+ */
+export const idempotencyKeys = pgTable(
+  "idempotency_keys",
+  {
+    userId: text()
+      .notNull()
+      .references(() => users.id, cascade),
+    key: text().notNull(),
+    procedure: text().notNull(),
+    /** sha256 of the request without its key */
+    requestHash: text().notNull(),
+    /** The superjson-serialized result; null until the call finishes */
+    response: jsonb(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.key] }),
+    index("idempotency_keys_created_at_idx").on(t.createdAt),
+  ],
+);
 
 export const budgets = pgTable(
   "budgets",

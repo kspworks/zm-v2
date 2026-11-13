@@ -47,6 +47,7 @@ import {
   TableRow,
 } from "~/components/ui/table";
 import { useDateTime } from "~/hooks/use-date-time";
+import { useIdempotencyKey } from "~/hooks/use-idempotency-key";
 import { useToastError } from "~/hooks/use-toast-error";
 import { isErrorKey } from "~/lib/error-keys";
 import { MAX_IMPORT_BYTES } from "~/lib/import-limits";
@@ -104,9 +105,13 @@ export function ImportCard() {
 
   const invalidateAll = () => queryClient.invalidateQueries();
 
+  // a lost response retried with the same file replays the first import;
+  // renewed once one succeeds, so undo-then-import-again writes afresh
+  const idempotency = useIdempotencyKey();
   const upload = useMutation(
     trpc.imports.upload.mutationOptions({
       onSuccess: async (summary) => {
+        idempotency.renew();
         toast.success(t("done", { count: summary.transactions }));
         await invalidateAll();
         router.push("/transactions");
@@ -146,7 +151,11 @@ export function ImportCard() {
       return;
     }
 
-    upload.mutate({ fileName: file.name, content: await gzipBase64(file) });
+    upload.mutate({
+      fileName: file.name,
+      content: await gzipBase64(file),
+      idempotencyKey: idempotency.key,
+    });
 
     if (inputRef.current) {
       inputRef.current.value = "";

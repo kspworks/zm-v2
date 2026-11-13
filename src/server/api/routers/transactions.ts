@@ -2,6 +2,7 @@ import { Schema } from "effect";
 
 import {
   calendarDateSchema,
+  idempotencyKeyField,
   idSchema,
   magnitudeSchema,
   maxLength,
@@ -13,6 +14,7 @@ import {
 } from "~/lib/validators/common";
 import {
   listInputSchema,
+  transactionCreateSchema,
   transactionFilterSchema,
   transactionInputSchema,
   transactionUpdateSchema,
@@ -23,6 +25,7 @@ import {
   validate,
 } from "~/server/api/trpc";
 import { runForTrpc } from "~/server/effect/runtime";
+import { idempotent } from "~/server/lib/idempotency";
 import { adjustBalance, bulkCreate } from "~/server/services/bulk";
 import {
   filteredTotals,
@@ -96,9 +99,20 @@ export const transactionsRouter = createTRPCRouter({
     ),
 
   create: protectedProcedure
-    .input(validate(transactionInputSchema))
-    .mutation(({ ctx, input, signal }) =>
-      runForTrpc(createTransaction(ctx.user.id, input), signal),
+    .input(validate(transactionCreateSchema))
+    .mutation(({ ctx, input: { idempotencyKey, ...input }, signal }) =>
+      runForTrpc(
+        idempotent(
+          {
+            userId: ctx.user.id,
+            procedure: "transactions.create",
+            key: idempotencyKey,
+            request: input,
+          },
+          createTransaction(ctx.user.id, input),
+        ),
+        signal,
+      ),
     ),
 
   update: protectedProcedure
@@ -142,11 +156,23 @@ export const transactionsRouter = createTRPCRouter({
           items: Schema.Array(transactionInputSchema).check(
             Schema.isBetweenLength(1, 100, message("invalid_value")),
           ),
+          ...idempotencyKeyField,
         }),
       ),
     )
-    .mutation(({ ctx, input, signal }) =>
-      runForTrpc(bulkCreate(ctx.user.id, input.items), signal),
+    .mutation(({ ctx, input: { idempotencyKey, items }, signal }) =>
+      runForTrpc(
+        idempotent(
+          {
+            userId: ctx.user.id,
+            procedure: "transactions.bulkCreate",
+            key: idempotencyKey,
+            request: items,
+          },
+          bulkCreate(ctx.user.id, items),
+        ),
+        signal,
+      ),
     ),
 
   /** Records the difference between the actual and the derived balance */

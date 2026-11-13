@@ -208,6 +208,7 @@
     "amount_sign": "The amount has the wrong sign",
     "not_planned": "This transaction is not planned",
     "adjust_balance_changed": "The balance has changed since you opened the form, check the amounts and try again",
+    "idempotency_key_reused": "This entry was already saved with other values. Check the list before saving again",
     "not_recurring": "This transaction doesn't repeat",
     "name_too_short": "At least 3 characters",
     "password_too_short": "At least 10 characters",

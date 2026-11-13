@@ -1,9 +1,10 @@
-import { Schema } from "effect";
+import { Schema, Tuple } from "effect";
 
 import { amountFilterRange } from "~/lib/money";
 import {
   calendarDateSchema,
   commentSchema,
+  idempotencyKeyField,
   idSchema,
   magnitudeSchema,
   maxLength,
@@ -72,6 +73,11 @@ export const transactionInputSchema = Schema.Union([
   transferInputSchema,
   debtInputSchema,
 ]);
+
+/** `transactions.create`: the input plus an optional idempotency key */
+export const transactionCreateSchema = transactionInputSchema.mapMembers(
+  Tuple.map(Schema.fieldsAssign(idempotencyKeyField)),
+);
 
 /** The parsed shape the services work with */
 export type TransactionInput = typeof transactionInputSchema.Type;

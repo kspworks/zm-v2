@@ -104,6 +104,26 @@ locks are transaction-scoped) don't open one. Every create, update, delete or re
 an account, category, transaction or schedule writes a `history_logs` row in
 that same transaction (`audit` in `~/server/lib/audit`).
 
+## Idempotency
+
+A create call whose repeat would write a second copy takes an optional
+`idempotencyKey` (`idempotencyKeyField` in `~/lib/validators/common`):
+`transactions.create`, `transactions.bulkCreate`, `planned.create`,
+`categories.create` and `imports.upload`. The router strips the key and wraps
+the service in `idempotent(…)` (`~/server/lib/idempotency`), which opens the
+outer transaction and inserts the `idempotency_keys` row **first**: a
+concurrent duplicate blocks on its primary key, a retry replays the stored
+response, and a failure rolls the key back so the retry runs afresh. The same
+key with a different request is `idempotency_key_reused`. Keys are per user
+and swept after a day by the midnight job.
+
+- A new create mutation with that risk opts in the same way. Updates,
+  deletes, restores and upserts already give the same result on a repeat and
+  don't take a key.
+- The client makes one key per intent with `useIdempotencyKey`, reuses it
+  for every Save of that entry, and renews it after a success (a create form
+  that stays open for the next entry renews on each save).
+
 ## Errors
 
 A business-rule violation fails with one of the tagged errors in

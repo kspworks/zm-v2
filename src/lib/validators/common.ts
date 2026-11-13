@@ -63,6 +63,15 @@ export const withDefault =
 
 export const idSchema = trimmedString(64);
 
+/**
+ * The optional key a create call carries so that a retry of the same intent
+ * replays the first result instead of writing twice (`idempotent` in
+ * `~/server/lib/idempotency`). The client makes one per form open.
+ */
+export const idempotencyKeyField = {
+  idempotencyKey: Schema.optional(idSchema),
+};
+
 const MAX_MINOR = 10 ** (MAX_INTEGER_DIGITS + 2) - 1;
 
 /** A signed amount in minor units within the 9-integer-digit input range */

@@ -11,6 +11,7 @@ import {
   validate,
 } from "~/server/api/trpc";
 import { runForTrpc } from "~/server/effect/runtime";
+import { idempotent } from "~/server/lib/idempotency";
 import {
   createPlanned,
   deleteAllPlanned,
@@ -21,8 +22,19 @@ import {
 export const plannedRouter = createTRPCRouter({
   create: protectedProcedure
     .input(validate(plannedCreateSchema))
-    .mutation(({ ctx, input, signal }) =>
-      runForTrpc(createPlanned(ctx.user.id, input), signal),
+    .mutation(({ ctx, input: { idempotencyKey, ...input }, signal }) =>
+      runForTrpc(
+        idempotent(
+          {
+            userId: ctx.user.id,
+            procedure: "planned.create",
+            key: idempotencyKey,
+            request: input,
+          },
+          createPlanned(ctx.user.id, input),
+        ),
+        signal,
+      ),
     ),
 
   schedule: protectedProcedure

@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { Spinner } from "~/components/ui/spinner";
+import { useIdempotencyKey } from "~/hooks/use-idempotency-key";
 import { useToastError } from "~/hooks/use-toast-error";
 import { trimmedString } from "~/lib/validators/common";
 import { useTRPC } from "~/trpc/react";
@@ -71,6 +72,8 @@ export function CategoryFormDialog({
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const toastError = useToastError();
+  const idempotency = useIdempotencyKey();
+  const renewKey = idempotency.renew;
 
   const form = useForm<FormValues>({
     resolver: effectTsResolver(formSchema),
@@ -84,6 +87,8 @@ export function CategoryFormDialog({
 
   useEffect(() => {
     if (open) {
+      // each opening is a new entry
+      renewKey();
       form.reset({
         name: category?.name ?? "",
         parentId: category?.parentId ?? presetParentId ?? NO_PARENT,
@@ -91,7 +96,7 @@ export function CategoryFormDialog({
         isIncome: category?.isIncome ?? false,
       });
     }
-  }, [open, category, presetParentId, form]);
+  }, [open, category, presetParentId, form, renewKey]);
 
   // only top-level categories other than this one can be a parent
   const parentOptions = categories.filter(
@@ -123,7 +128,7 @@ export function CategoryFormDialog({
     if (category) {
       update.mutate({ id: category.id, ...payload });
     } else {
-      create.mutate(payload);
+      create.mutate({ ...payload, idempotencyKey: idempotency.key });
     }
   });
 

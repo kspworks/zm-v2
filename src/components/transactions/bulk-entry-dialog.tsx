@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { Spinner } from "~/components/ui/spinner";
+import { useIdempotencyKey } from "~/hooks/use-idempotency-key";
 import { useToastError } from "~/hooks/use-toast-error";
 import { categoryOptions } from "~/lib/category-options";
 import { evaluateAmount } from "~/lib/money";
@@ -124,9 +125,12 @@ export function BulkEntryDialog({
       .map((row) => row.key),
   );
 
+  // kept while the rows are (closing keeps them as a draft), renewed on save
+  const idempotency = useIdempotencyKey();
   const save = useMutation(
     trpc.transactions.bulkCreate.mutationOptions({
       onSuccess: async (result) => {
+        idempotency.renew();
         toast.success(t("saved", { count: result.created }));
 
         for (const balance of result.balances) {
@@ -164,6 +168,7 @@ export function BulkEntryDialog({
         categoryId: row.categoryId,
         comment: row.comment.trim() || null,
       })),
+      idempotencyKey: idempotency.key,
     });
   };
 

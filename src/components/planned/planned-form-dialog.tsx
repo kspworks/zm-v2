@@ -20,6 +20,7 @@ import { useToday } from "~/components/transactions/transaction-groups";
 import type { TransactionRowData } from "~/components/transactions/transaction-item";
 import { Button } from "~/components/ui/button";
 import { Spinner } from "~/components/ui/spinner";
+import { useIdempotencyKey } from "~/hooks/use-idempotency-key";
 import { formatDisplayDate } from "~/lib/dates";
 import { useTRPC } from "~/trpc/react";
 
@@ -81,6 +82,8 @@ function PlannedForm({
   }
 
   const create = useMutation(trpc.planned.create.mutationOptions());
+  // the create form stays open for the next entry, so each save gets a key
+  const idempotency = useIdempotencyKey();
   const update = useMutation(trpc.planned.updateSchedule.mutationOptions());
 
   if (row && !schedule.data) {
@@ -134,7 +137,12 @@ function PlannedForm({
             schedule: { ...repeat, repeatType: repeat.repeatType },
           });
         } else {
-          await create.mutateAsync({ data: input, schedule: repeat });
+          await create.mutateAsync({
+            data: input,
+            schedule: repeat,
+            idempotencyKey: idempotency.key,
+          });
+          idempotency.renew();
         }
 
         await invalidate();
