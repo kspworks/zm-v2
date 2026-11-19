@@ -67,6 +67,27 @@ const pt = alias(plannedTransactions, "pt");
 /** An earlier occurrence of the same series, for `nextOnly` */
 const earlier = alias(transactions, "earlier");
 
+/**
+ * `nextOnly`: keeps the first planned occurrence of each series, i.e. no live
+ * planned row of the same schedule is due earlier. Every occurrence, and both
+ * legs of a pair, carry the primary schedule's id; a one-off is its own
+ * series. The list and its totals share it, so they count the same rows.
+ */
+const firstOfSeries = (db: DbOrTx) =>
+  notExists(
+    db
+      .select({ one: sql`1` })
+      .from(earlier)
+      .where(
+        and(
+          eq(earlier.plannedTransactionId, p.plannedTransactionId),
+          eq(earlier.isPlanned, true),
+          isNull(earlier.deletedAt),
+          lt(earlier.date, p.date),
+        ),
+      ),
+  );
+
 const escapeLike = (value: string) => value.replace(/[\\%_]/g, (c) => `\\${c}`);
 
 /** The filter conditions, each matching either leg */
@@ -542,11 +563,7 @@ export const listTransactions = Effect.fn("transactionQueries.list")(function* (
     planned: Planned;
     limit: number;
     extra?: (SQL | undefined)[];
-    /**
-     * Keeps the first planned occurrence of each series: no live planned row
-     * of the same schedule is due earlier. Every occurrence, and both legs of
-     * a pair, carry the primary schedule's id; a one-off is its own series.
-     */
+    /** Keeps the first planned occurrence of each series (firstOfSeries) */
     nextOnly?: boolean;
   },
 ): Effect.fn.Return<
@@ -561,21 +578,7 @@ export const listTransactions = Effect.fn("transactionQueries.list")(function* (
   const raw = yield* query((db) =>
     listQuery(db, userId, planned, filter, [
       ...extra,
-      nextOnly
-        ? notExists(
-            db
-              .select({ one: sql`1` })
-              .from(earlier)
-              .where(
-                and(
-                  eq(earlier.plannedTransactionId, p.plannedTransactionId),
-                  eq(earlier.isPlanned, true),
-                  isNull(earlier.deletedAt),
-                  lt(earlier.date, p.date),
-                ),
-              ),
-          )
-        : undefined,
+      nextOnly ? firstOfSeries(db) : undefined,
       cursorCondition(cursor, newestFirst),
     ])
       .orderBy(direction(p.date), direction(p.createdAt), direction(p.id))
@@ -626,13 +629,15 @@ export type CurrencyTotal = {
  * Expenses, incomes and total per currency over the WHOLE filtered set of
  * submitted (or planned) rows. Transfers between two non-debt accounts net
  * to zero and are left out; for a debt pair the real-account leg is what
- * counts.
+ * counts. With `nextOnly` (planned rows only) each series counts once, by
+ * the occurrence the planned list shows.
  */
 export const filteredTotals = Effect.fn("transactionQueries.filteredTotals")(
   function* (
     userId: string,
     filter: Partial<TransactionFilter>,
     planned: Planned = "submitted",
+    { nextOnly = false }: { nextOnly?: boolean } = {},
   ): Effect.fn.Return<CurrencyTotal[], SqlError, Database> {
     const rows = yield* query((db) => {
       const x = pairsQuery(
@@ -651,7 +656,10 @@ export const filteredTotals = Effect.fn("transactionQueries.filteredTotals")(
         userId,
         planned,
         filter,
-        [notOwnTransfer],
+        [
+          notOwnTransfer,
+          nextOnly && planned === "planned" ? firstOfSeries(db) : undefined,
+        ],
       ).as("x");
 
       return db

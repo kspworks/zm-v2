@@ -110,7 +110,9 @@ function Planned() {
       }
     >
       <FilterSummary state={state} setState={setState} reset={reset} />
-      {filtering ? <TotalsBar filter={filter} planned /> : null}
+      {filtering && ready ? (
+        <TotalsBar filter={filter} planned nextOnly={nextOnly} />
+      ) : null}
       {dated ? null : (
         <Tabs
           value={view}

@@ -232,6 +232,7 @@ Per entity, through the member tables, with `canRead` / `canWrite`:
   week of that step, bounded by both `startDate` and the horizon.
 - The planned list's `nextOnly` keeps the first live planned occurrence of
   each schedule (a one-off is its own series); it is what the page opens on.
+  The totals above the list take the same flag, so they count the rows shown.
 - Editing a schedule soft-deletes un-submitted **future** occurrences and
   regenerates in one transaction, **clearing their hashes** so those dates come
   back under the new rules. Occurrences the user deleted one by one keep their

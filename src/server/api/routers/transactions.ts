@@ -77,13 +77,17 @@ export const transactionsRouter = createTRPCRouter({
       runForTrpc(listOverdue(ctx.user.id, input.filter), signal),
     ),
 
-  /** Totals over the whole filtered set: submitted rows, or planned ones */
+  /**
+   * Totals over the whole filtered set: submitted rows, or planned ones
+   * (with `nextOnly`, the same rows as the planned list's)
+   */
   totals: protectedProcedure
     .input(
       validate(
         Schema.Struct({
           filter: transactionFilterSchema,
           planned: Schema.Boolean.pipe(withDefault(false)),
+          nextOnly: Schema.Boolean.pipe(withDefault(false)),
         }),
       ),
     )
@@ -93,6 +97,7 @@ export const transactionsRouter = createTRPCRouter({
           ctx.user.id,
           input.filter,
           input.planned ? "planned" : "submitted",
+          { nextOnly: input.nextOnly },
         ),
         signal,
       ),

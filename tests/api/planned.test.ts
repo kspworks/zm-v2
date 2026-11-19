@@ -727,3 +727,344 @@ describe("transactions.planned nextOnly", () => {
     expect(next.items.map((item) => item.date)).toEqual(["2026-04-20"]);
   });
 });
+
+describe("transactions.totals nextOnly", () => {
+  type Filter = {
+    accounts: string[];
+    categories: string[];
+    counterparties: string[];
+    kinds?: ("expense" | "income" | "transfer" | "debt")[];
+    amount?: string;
+    comment?: string;
+  };
+
+  const only = (accountId: string): Filter => ({
+    accounts: [accountId],
+    categories: [],
+    counterparties: [],
+  });
+
+  const monthly = {
+    repeatType: "monthly" as const,
+    repeatInterval: 1,
+    endDate: "2026-06-30",
+  };
+
+  /** The planned totals as the Planned page asks for them */
+  const plannedTotals = (user: TestUser, filter: Filter, nextOnly: boolean) =>
+    callerFor(user).transactions.totals({ filter, planned: true, nextOnly });
+
+  /** Every page of the planned list */
+  const plannedList = async (
+    user: TestUser,
+    filter: Filter,
+    nextOnly: boolean,
+  ) => {
+    const c = callerFor(user);
+    const items = [];
+    let cursor = null;
+
+    do {
+      const page: Awaited<ReturnType<typeof c.transactions.planned>> =
+        await c.transactions.planned({ filter, nextOnly, cursor });
+      items.push(...page.items);
+      cursor = page.nextCursor;
+    } while (cursor);
+
+    return items;
+  };
+
+  it("counts one occurrence of each series, like the list (the reported bug)", async () => {
+    const user = await createUser();
+    const a = await makeAccount(user);
+    const b = await makeAccount(user);
+    const c = callerFor(user);
+
+    // 5.00 a month, four dates up to the end date
+    await c.planned.create({
+      data: {
+        kind: "expense",
+        date: "2026-03-20",
+        amount: 500,
+        accountId: a.id,
+      },
+      schedule: monthly,
+    });
+    await c.planned.create({
+      data: {
+        kind: "expense",
+        date: "2026-03-21",
+        amount: 700,
+        accountId: b.id,
+      },
+      schedule: monthly,
+    });
+
+    const shown = await plannedList(user, only(a.id), true);
+    expect(shown.map((row) => [row.date, row.amount])).toEqual([
+      ["2026-03-20", -500],
+    ]);
+
+    expect(await plannedTotals(user, only(a.id), true)).toEqual([
+      expect.objectContaining({ expenses: -500, incomes: 0, total: -500 }),
+    ]);
+    expect(await plannedTotals(user, only(a.id), false)).toEqual([
+      expect.objectContaining({ expenses: -2000, incomes: 0, total: -2000 }),
+    ]);
+  });
+
+  it("sums exactly the rows the list shows, across pages, without own transfers", async () => {
+    const user = await createUser();
+    const a = await makeAccount(user);
+    const b = await makeAccount(user);
+    const c = callerFor(user);
+
+    await c.planned.create({
+      data: {
+        kind: "expense",
+        date: "2026-03-20",
+        amount: 1000,
+        accountId: a.id,
+      },
+      schedule: monthly,
+    });
+    await c.planned.create({
+      data: {
+        kind: "income",
+        date: "2026-03-25",
+        amount: 3000,
+        accountId: a.id,
+      },
+      schedule: monthly,
+    });
+    await c.planned.create({
+      data: {
+        kind: "transfer",
+        date: "2026-03-18",
+        amount: 200,
+        accountId: a.id,
+        linkedAccountId: b.id,
+        linkedAmount: 200,
+      },
+      schedule: monthly,
+    });
+    await c.planned.create({
+      data: { kind: "income", date: "2026-05-01", amount: 50, accountId: a.id },
+      schedule: none,
+    });
+
+    // four rows: more than one page (the limit here is 3)
+    const shown = await plannedList(user, only(a.id), true);
+    expect(shown.map((row) => [row.kind, row.date])).toEqual([
+      ["transfer", "2026-03-18"],
+      ["expense", "2026-03-20"],
+      ["income", "2026-03-25"],
+      ["income", "2026-05-01"],
+    ]);
+
+    const counted = shown.filter((row) => row.kind !== "transfer");
+    const sum = (sign: 1 | -1) =>
+      counted
+        .map((row) => row.amount)
+        .filter((amount) => Math.sign(amount) === sign)
+        .reduce((total, amount) => total + amount, 0);
+
+    const [next] = await plannedTotals(user, only(a.id), true);
+    expect(next).toMatchObject({
+      expenses: sum(-1),
+      incomes: sum(1),
+      total: sum(-1) + sum(1),
+    });
+    expect(next).toMatchObject({ expenses: -1000, incomes: 3050, total: 2050 });
+
+    expect(await plannedTotals(user, only(a.id), false)).toEqual([
+      expect.objectContaining({
+        expenses: -4000,
+        incomes: 12_050,
+        total: 8050,
+      }),
+    ]);
+  });
+
+  it.each([
+    {
+      name: "kind",
+      filter: (): Partial<Filter> => ({ kinds: ["expense"] }),
+      next: { expenses: -1250, incomes: 0 },
+      all: { expenses: -5000, incomes: 0 },
+    },
+    {
+      name: "income kind",
+      filter: (): Partial<Filter> => ({ kinds: ["income"] }),
+      next: { expenses: 0, incomes: 3000 },
+      all: { expenses: 0, incomes: 12_000 },
+    },
+    {
+      name: "category",
+      filter: (categoryId: string): Partial<Filter> => ({
+        categories: [categoryId],
+      }),
+      next: { expenses: -1000, incomes: 0 },
+      all: { expenses: -4000, incomes: 0 },
+    },
+    {
+      name: "amount",
+      filter: (): Partial<Filter> => ({ amount: "10" }),
+      next: { expenses: -1000, incomes: 0 },
+      all: { expenses: -4000, incomes: 0 },
+    },
+    {
+      name: "comment",
+      filter: (): Partial<Filter> => ({ comment: "coff" }),
+      next: { expenses: -250, incomes: 0 },
+      all: { expenses: -1000, incomes: 0 },
+    },
+  ])("follows the $name filter", async ({ filter, next, all }) => {
+    const user = await createUser();
+    const account = await makeAccount(user);
+    const category = await makeCategory(user);
+    const c = callerFor(user);
+
+    await c.planned.create({
+      data: {
+        kind: "expense",
+        date: "2026-03-20",
+        amount: 1000,
+        accountId: account.id,
+        categoryId: category.id,
+        comment: "rent",
+      },
+      schedule: monthly,
+    });
+    await c.planned.create({
+      data: {
+        kind: "expense",
+        date: "2026-03-16",
+        amount: 250,
+        accountId: account.id,
+        comment: "coffee",
+      },
+      schedule: monthly,
+    });
+    await c.planned.create({
+      data: {
+        kind: "income",
+        date: "2026-03-25",
+        amount: 3000,
+        accountId: account.id,
+      },
+      schedule: monthly,
+    });
+
+    const filtered = { ...only(account.id), ...filter(category.id) };
+    const [nextTotals] = await plannedTotals(user, filtered, true);
+    const [allTotals] = await plannedTotals(user, filtered, false);
+
+    expect(nextTotals).toMatchObject(next);
+    expect(allTotals).toMatchObject(all);
+  });
+
+  it("counts a debt series once, by its real-account leg", async () => {
+    const user = await createUser();
+    const cash = await makeAccount(user);
+    const c = callerFor(user);
+
+    await c.planned.create({
+      data: {
+        kind: "debt",
+        date: "2026-03-20",
+        amount: 100,
+        accountId: cash.id,
+        direction: "gave",
+        counterparty: { name: "Alex" },
+      },
+      schedule: monthly,
+    });
+    await c.planned.create({
+      data: {
+        kind: "debt",
+        date: "2026-03-22",
+        amount: 300,
+        accountId: cash.id,
+        direction: "took",
+        counterparty: { name: "Bob" },
+      },
+      schedule: monthly,
+    });
+
+    const series = await plannedList(user, only(cash.id), true);
+    const filter: Filter = {
+      accounts: [],
+      categories: [],
+      counterparties: series.flatMap((row) =>
+        row.counterparty ? [row.counterparty.id] : [],
+      ),
+    };
+    expect(filter.counterparties).toHaveLength(2);
+
+    expect(await plannedTotals(user, filter, true)).toEqual([
+      expect.objectContaining({
+        currencyId: cash.currencyId,
+        expenses: -100,
+        incomes: 300,
+        debtExpenses: -100,
+        debtIncomes: 300,
+      }),
+    ]);
+    expect(await plannedTotals(user, filter, false)).toEqual([
+      expect.objectContaining({ expenses: -400, incomes: 1200 }),
+    ]);
+  });
+
+  it("moves on to the following date once the next one is paid", async () => {
+    const user = await createUser();
+    const account = await makeAccount(user);
+    const c = callerFor(user);
+
+    await monthlyExpense(user, account.id);
+
+    const [first] = await plannedList(user, only(account.id), true);
+    await c.transactions.submit({ id: first?.id ?? "" });
+
+    expect(await plannedTotals(user, only(account.id), true)).toEqual([
+      expect.objectContaining({ expenses: -1000 }),
+    ]);
+    expect(await plannedTotals(user, only(account.id), false)).toEqual([
+      expect.objectContaining({ expenses: -3000 }),
+    ]);
+  });
+
+  it("counts an overdue occurrence as the series' next one", async () => {
+    const user = await createUser();
+    const account = await makeAccount(user);
+
+    await monthlyExpense(user, account.id);
+    // March and April are now overdue and un-submitted
+    vi.setSystemTime(new Date("2026-04-25T09:00:00Z"));
+
+    const shown = await plannedList(user, only(account.id), true);
+    expect(shown.map((row) => row.date)).toEqual(["2026-03-20"]);
+    expect(await plannedTotals(user, only(account.id), true)).toEqual([
+      expect.objectContaining({ expenses: -1000 }),
+    ]);
+  });
+
+  it("is ignored for submitted totals", async () => {
+    const user = await createUser();
+    const account = await makeAccount(user);
+    const c = callerFor(user);
+
+    await monthlyExpense(user, account.id);
+
+    // pay April early while March is still planned: an earlier live
+    // occurrence of the same series exists
+    const april = (await plannedList(user, only(account.id), false)).find(
+      (row) => row.date === "2026-04-20",
+    );
+    await c.transactions.submit({ id: april?.id ?? "" });
+
+    expect(
+      await c.transactions.totals({ filter: only(account.id), nextOnly: true }),
+    ).toEqual([expect.objectContaining({ expenses: -1000 })]);
+  });
+});

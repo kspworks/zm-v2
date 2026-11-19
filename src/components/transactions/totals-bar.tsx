@@ -14,18 +14,23 @@ import {
 import type { TransactionFilter } from "~/lib/validators/transactions";
 import { useTRPC } from "~/trpc/react";
 
-/** Server-side totals over the whole filtered set, shown while filtering */
+/**
+ * Server-side totals over the whole filtered set, shown while filtering;
+ * `nextOnly` counts each planned series once, like the "Next" list view
+ */
 export function TotalsBar({
   filter,
   planned = false,
+  nextOnly = false,
 }: {
   filter: TransactionFilter;
   planned?: boolean;
+  nextOnly?: boolean;
 }) {
   const t = useTranslations("transactions.totals");
   const trpc = useTRPC();
   const totals = useQuery(
-    trpc.transactions.totals.queryOptions({ filter, planned }),
+    trpc.transactions.totals.queryOptions({ filter, planned, nextOnly }),
   );
 
   if (totals.isPending) {
