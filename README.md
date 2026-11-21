@@ -70,6 +70,10 @@ or a phone — where it can be added to the home screen like an app.
 | ---------------------------------------- | ---------------------------------------- |
 | ![Planned](docs/screenshots/planned.png) | ![Reports](docs/screenshots/reports.png) |
 
+| Accounts                                   | Categories                                     |
+| ------------------------------------------ | ---------------------------------------------- |
+| ![Accounts](docs/screenshots/accounts.png) | ![Categories](docs/screenshots/categories.png) |
+
 <p>
   <img src="docs/screenshots/mobile-dashboard.png" alt="Dashboard on a phone" width="270">
   &nbsp;

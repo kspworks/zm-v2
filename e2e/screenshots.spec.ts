@@ -14,6 +14,8 @@ const PAGES = [
   ["Transactions", "/transactions", "transactions"],
   ["Planned", "/planned", "planned"],
   ["Reports", "/reports/map", "reports"],
+  ["Accounts", "/accounts", "accounts"],
+  ["Categories", "/categories", "categories"],
 ] as const;
 
 test.use({ colorScheme: "dark" });
