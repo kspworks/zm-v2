@@ -1,6 +1,6 @@
 "use client";
 
-import { CoinsIcon } from "lucide-react";
+import { CoinsIcon, type LucideIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { type ReactNode, useState } from "react";
 
@@ -14,8 +14,10 @@ import {
 } from "~/components/ui/sheet";
 
 /**
- * Shell shared by the Transactions, Planned and Dashboard pages: the content on
- * the left, the balances sidebar on the right (a sheet on smaller screens).
+ * Shell shared by the Dashboard and the ledger pages (Transactions, Planned,
+ * Accounts, Categories): the content on the left, a sidebar on the right (a
+ * sheet on smaller screens). The sidebar is the balances unless the page
+ * names it otherwise.
  */
 export function LedgerLayout({
   title,
@@ -23,6 +25,8 @@ export function LedgerLayout({
   actions,
   sidebar,
   summary,
+  sidebarTitle,
+  sidebarIcon: SidebarIcon = CoinsIcon,
   children,
 }: {
   title: string;
@@ -31,10 +35,14 @@ export function LedgerLayout({
   sidebar: ReactNode;
   /** The headline shown when the sidebar is not; tapping it opens the sheet */
   summary?: ReactNode;
+  /** What the sidebar is called on its header button and sheet */
+  sidebarTitle?: string;
+  sidebarIcon?: LucideIcon;
   children: ReactNode;
 }) {
   const t = useTranslations("sidebar");
   const [sheetOpen, setSheetOpen] = useState(false);
+  const sheetTitle = sidebarTitle ?? t("title");
 
   return (
     <>
@@ -48,10 +56,10 @@ export function LedgerLayout({
                 variant="outline"
                 size="icon-sm"
                 className="lg:hidden"
-                aria-label={t("title")}
+                aria-label={sheetTitle}
                 onClick={() => setSheetOpen(true)}
               >
-                <CoinsIcon />
+                <SidebarIcon />
               </Button>
             )}
             {actions}
@@ -78,7 +86,7 @@ export function LedgerLayout({
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent side="right" className="w-80 overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>{t("title")}</SheetTitle>
+            <SheetTitle>{sheetTitle}</SheetTitle>
           </SheetHeader>
           <div className="px-4 pb-6">{sidebar}</div>
         </SheetContent>

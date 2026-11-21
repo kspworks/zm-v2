@@ -103,17 +103,33 @@ test("the bottom nav goes to the daily pages and adds from anywhere", async ({
 });
 
 test("controls are big enough to tap", async ({ page }) => {
-  await page.goto("/transactions");
-  await expect(page.getByRole("button", { name: "Filters" })).toBeVisible();
+  // pages whose rows are lists of small title buttons; categories always
+  // have rows, so the row rule below is always exercised
+  for (const path of ["/transactions", "/accounts", "/categories"]) {
+    await page.goto(path);
+    // measure what loaded, not the skeleton
+    await expect(page.locator("main h1")).toBeVisible();
+    await expect(page.locator('main [role="status"]')).toHaveCount(0);
 
-  const undersized = await page.evaluate(() =>
-    [...document.querySelectorAll("header button, main button, nav button")]
-      .map((element) => element.getBoundingClientRect())
-      .filter((box) => box.width > 0 && Math.min(box.width, box.height) < 44)
-      .map((box) => `${box.width}x${box.height}`),
-  );
+    const undersized = await page.evaluate(() =>
+      [...document.querySelectorAll("header button, main button, nav button")]
+        .map((element) => {
+          // a row opens from anywhere on it, so the row is what a finger
+          // hits for its title; the buttons in its menu slot count alone
+          const row = element.closest('[data-slot="ledger-row"]');
+          const target =
+            row && !element.closest('[data-slot="ledger-row-actions"]')
+              ? row
+              : element;
 
-  expect(undersized).toEqual([]);
+          return target.getBoundingClientRect();
+        })
+        .filter((box) => box.width > 0 && Math.min(box.width, box.height) < 44)
+        .map((box) => `${box.width}x${box.height}`),
+    );
+
+    expect(undersized, path).toEqual([]);
+  }
 });
 
 test("the dashboard leads with the balance and opens the full list", async ({
@@ -176,8 +192,11 @@ test("adds a subcategory and the indented row still fits", async ({
 
   // a long name on purpose: the indented row is the tightest case on a phone
   const parent = page
-    .locator('[data-slot="item"]')
+    .locator('[data-slot="ledger-row"]')
     .filter({ hasText: "Clothing, shoes, accessories" });
+  // one line tall while it has no subcategories to count
+  const oneLine = (await parent.boundingBox())?.height;
+  expect(oneLine).toBeDefined();
 
   await parent.getByRole("button", { name: "Actions" }).click();
   await page.getByRole("menuitem", { name: "Add subcategory" }).click();
@@ -188,7 +207,7 @@ test("adds a subcategory and the indented row still fits", async ({
   await expect(drawer).toBeHidden();
 
   const child = page
-    .locator('[data-slot="item"]')
+    .locator('[data-slot="ledger-row"]')
     .filter({ hasText: "Sneakers" });
   await expect(child).toBeVisible();
   await expectNoHorizontalScroll(page);
@@ -211,9 +230,8 @@ test("adds a subcategory and the indented row still fits", async ({
     expect(childBox.x + childBox.width).toBeLessThanOrEqual(
       parentBox.x + parentBox.width + 0.5,
     );
-    // the indent must not cost the row a second line: name, badge and menu
-    // only split apart once the name would be squeezed under its 10rem floor
-    expect(childBox.height).toBe(parentBox.height);
+    // the indent must not cost the row a second line
+    expect(childBox.height).toBe(oneLine);
   }
 
   await page.screenshot({

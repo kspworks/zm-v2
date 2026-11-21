@@ -119,14 +119,19 @@ function Person({
 /**
  * Available money, debts, and the accounts list. Clicking an account toggles it
  * in the account filter; without `onToggleAccount` it opens that account's
- * transactions.
+ * transactions. The Accounts page, which is that list, leaves it out and
+ * shows the net worth instead.
  */
 export function BalancesSidebar({
   selectedAccounts,
   onToggleAccount,
+  showAccounts = true,
+  showNetWorth = false,
 }: {
   selectedAccounts?: string[];
   onToggleAccount?: (id: string) => void;
+  showAccounts?: boolean;
+  showNetWorth?: boolean;
 }) {
   const t = useTranslations("sidebar");
   const trpc = useTRPC();
@@ -137,7 +142,7 @@ export function BalancesSidebar({
   if (accounts.isPending || debts.isPending) {
     return (
       <LoadingRegion>
-        <BalancesSkeleton />
+        <BalancesSkeleton accounts={showAccounts} />
       </LoadingRegion>
     );
   }
@@ -166,6 +171,23 @@ export function BalancesSidebar({
       })),
       primaryCode,
     );
+
+  // what the accounts hold, plus what others owe, minus what is owed
+  const netWorth = sumByCurrency(
+    [
+      ...active.map((a) => ({
+        code: a.currencyCode,
+        sign: a.currencySign,
+        value: a.balance,
+      })),
+      ...debtRows.map((r) => ({
+        code: r.currencyCode,
+        sign: r.currencySign,
+        value: r.sum,
+      })),
+    ],
+    primaryCode,
+  );
 
   const people = (rows: typeof debtRows) =>
     rows.length === 0 ? null : (
@@ -198,62 +220,80 @@ export function BalancesSidebar({
         </div>
       ) : null}
 
-      <Separator />
+      {showNetWorth && debtRows.length > 0 ? (
+        <Section title={t("netWorth")}>
+          <Totals rows={netWorth} />
+          <p className="text-muted-foreground text-xs">{t("netWorthHint")}</p>
+        </Section>
+      ) : null}
 
-      <Section title={t("accounts")}>
-        {active.length === 0 ? (
-          <p className="text-muted-foreground text-sm">{t("none")}</p>
-        ) : (
-          <ul className="-mx-2 flex flex-col">
-            {active.map((account) => {
-              const selected = selectedAccounts?.includes(account.id) ?? false;
-              const className = cn(
-                "touch:min-h-11 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm",
-                "hover:bg-accent transition-colors",
-                selected && "bg-accent font-medium",
-              );
-              const row = (
-                <>
-                  <span className="min-w-0 flex-1 truncate">
-                    {account.name}
-                  </span>
-                  <Money
-                    amount={account.balance}
-                    sign={account.currencySign}
-                    className={cn(account.balance < 0 && "text-destructive")}
-                  />
-                  {selected ? <XIcon className="size-3.5 shrink-0" /> : null}
-                </>
-              );
+      {showAccounts ? (
+        <>
+          <Separator />
 
-              return (
-                <li key={account.id}>
-                  {onToggleAccount ? (
-                    <button
-                      type="button"
-                      aria-pressed={selected}
-                      onClick={() => onToggleAccount(account.id)}
-                      className={className}
-                    >
-                      {row}
-                    </button>
-                  ) : (
-                    <Link
-                      href={filteredHref("/transactions", {
-                        accounts: [account.id],
-                      })}
-                      className={className}
-                    >
-                      {row}
-                    </Link>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Section>
+          <Section title={t("accounts")}>
+            {active.length === 0 ? (
+              <p className="text-muted-foreground text-sm">{t("none")}</p>
+            ) : (
+              <ul className="-mx-2 flex flex-col">
+                {active.map((account) => {
+                  const selected =
+                    selectedAccounts?.includes(account.id) ?? false;
+                  const className = cn(
+                    "touch:min-h-11 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm",
+                    "hover:bg-accent transition-colors",
+                    selected && "bg-accent font-medium",
+                  );
+                  const row = (
+                    <>
+                      <span className="min-w-0 flex-1 truncate">
+                        {account.name}
+                      </span>
+                      <Money
+                        amount={account.balance}
+                        sign={account.currencySign}
+                        className={cn(
+                          account.balance < 0 && "text-destructive",
+                        )}
+                      />
+                      {selected ? (
+                        <XIcon className="size-3.5 shrink-0" />
+                      ) : null}
+                    </>
+                  );
 
+                  return (
+                    <li key={account.id}>
+                      {onToggleAccount ? (
+                        <button
+                          type="button"
+                          aria-pressed={selected}
+                          onClick={() => onToggleAccount(account.id)}
+                          className={className}
+                        >
+                          {row}
+                        </button>
+                      ) : (
+                        <Link
+                          href={filteredHref("/transactions", {
+                            accounts: [account.id],
+                          })}
+                          className={className}
+                        >
+                          {row}
+                        </Link>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Section>
+        </>
+      ) : null}
+
+      {/* the accounts list, when shown, already set the people apart */}
+      {!showAccounts && debtRows.length > 0 ? <Separator /> : null}
       {oweMe.length > 0 ? (
         <Section title={t("oweMe")}>{people(oweMe)}</Section>
       ) : null}

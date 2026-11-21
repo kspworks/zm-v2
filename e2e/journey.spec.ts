@@ -90,7 +90,7 @@ test("records money on a new account, plans the next payment and reports it", as
     await page.goto("/accounts");
     // 1000 - 250 + 3000
     await expect(
-      page.locator("[data-slot='item']").filter({ hasText: ACCOUNT }),
+      page.locator("[data-slot='ledger-row']").filter({ hasText: ACCOUNT }),
     ).toContainText(/3[\s,.]?750/);
   });
 

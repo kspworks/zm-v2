@@ -1,7 +1,10 @@
 import { useTranslations } from "next-intl";
 
 import {
+  AccountListSkeleton,
+  BalancesSkeleton,
   BudgetListSkeleton,
+  CategoriesSidebarSkeleton,
   CategoryListSkeleton,
   DashboardSkeleton,
   HeaderButtonSkeleton,
@@ -94,12 +97,18 @@ export function AccountsPageSkeleton() {
   const t = useTranslations("accounts");
 
   return (
-    <NarrowPageSkeleton
+    <LedgerPageSkeleton
       title={t("title")}
-      actions={<HeaderButtonSkeleton wide />}
+      actions={
+        <>
+          <HeaderButtonSkeleton className="lg:hidden" />
+          <HeaderButtonSkeleton wide />
+        </>
+      }
+      sidebar={<BalancesSkeleton accounts={false} />}
     >
-      <ItemListSkeleton icon />
-    </NarrowPageSkeleton>
+      <AccountListSkeleton />
+    </LedgerPageSkeleton>
   );
 }
 
@@ -107,12 +116,19 @@ export function CategoriesPageSkeleton() {
   const t = useTranslations("categories");
 
   return (
-    <NarrowPageSkeleton
+    <LedgerPageSkeleton
       title={t("title")}
-      actions={<HeaderButtonSkeleton wide />}
+      actions={
+        <>
+          <HeaderButtonSkeleton className="lg:hidden" />
+          <HeaderButtonSkeleton wide />
+        </>
+      }
+      sidebar={<CategoriesSidebarSkeleton />}
     >
+      <TabsSkeleton />
       <CategoryListSkeleton />
-    </NarrowPageSkeleton>
+    </LedgerPageSkeleton>
   );
 }
 

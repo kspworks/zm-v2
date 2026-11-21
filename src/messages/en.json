@@ -253,7 +253,11 @@
       "credit": "Credit",
       "deposit": "Deposit",
       "debt": "Debts"
-    }
+    },
+    "showTransactions": "Show transactions",
+    "inactiveGroup": "Inactive",
+    "count": "{count, plural, one {# account} other {# accounts}}",
+    "readOnly": "Only {name} can edit this account. It's shared with you without edit rights."
   },
   "categories": {
     "title": "Categories",
@@ -280,7 +284,19 @@
     "replaceDescription": "All transactions, schedules and your budgets of \"{name}\" move to the category you pick, and \"{name}\" is deleted.",
     "replaceTarget": "Replace with",
     "replaceSubmit": "Replace",
-    "replaced": "{count, plural, =0 {Category replaced} one {# transaction moved} other {# transactions moved}}"
+    "replaced": "{count, plural, =0 {Category replaced} one {# transaction moved} other {# transactions moved}}",
+    "showTransactions": "Show transactions",
+    "view": "Kind",
+    "viewExpense": "Expenses",
+    "viewIncome": "Income",
+    "viewAll": "All",
+    "subcategories": "{count, plural, one {# subcategory} other {# subcategories}}",
+    "emptyView": "No categories of this kind",
+    "readOnly": "Only {name} can edit this category. It's shared with you without edit rights.",
+    "monthTitle": "This month",
+    "monthExpense": "Spent this month",
+    "monthIncome": "Earned this month",
+    "openReport": "Open in Reports"
   },
   "counterparties": {
     "title": "Counterparties",
@@ -419,7 +435,9 @@
     "oweMe": "Owe to me",
     "accounts": "Accounts",
     "unknown": "Unknown",
-    "none": "Nothing here yet"
+    "none": "Nothing here yet",
+    "netWorth": "Net worth",
+    "netWorthHint": "Accounts plus what you're owed, minus what you owe."
   },
   "form": {
     "createTitle": "New transaction",

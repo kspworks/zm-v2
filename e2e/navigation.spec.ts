@@ -175,16 +175,42 @@ test("a transaction row opens its form and a delete can be undone", async ({
   await expect(row).toBeVisible();
 });
 
-test("an account row opens its transactions", async ({ page }) => {
+test("an account row opens its form, its menu its transactions", async ({
+  page,
+}) => {
   await page.goto("/accounts");
-  await page
-    .locator("main")
-    .locator('[data-slot="item"]')
-    .first()
-    .getByRole("link")
-    .click();
+  const row = page.locator("main").locator('[data-slot="ledger-row"]').first();
 
+  await row.click();
+  const dialog = page.getByRole("dialog", { name: "Edit account" });
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+
+  await row.getByRole("button", { name: "Actions" }).click();
+  await page.getByRole("menuitem", { name: "Show transactions" }).click();
   await expect(page).toHaveURL(/\/transactions\?accounts=/);
+});
+
+test("a category row opens its form, its menu its transactions", async ({
+  page,
+}) => {
+  await page.goto("/categories");
+  const row = page
+    .locator("main")
+    .locator('[data-slot="ledger-row"]')
+    .filter({ hasText: "Groceries" })
+    .first();
+
+  await row.click();
+  const dialog = page.getByRole("dialog", { name: "Edit category" });
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+
+  await row.getByRole("button", { name: "Actions" }).click();
+  await page.getByRole("menuitem", { name: "Show transactions" }).click();
+  await expect(page).toHaveURL(/\/transactions\?categories=/);
 });
 
 test("search and date presets show as chips that clear one by one", async ({

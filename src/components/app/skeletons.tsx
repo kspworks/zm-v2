@@ -196,42 +196,156 @@ export function ItemListSkeleton({
   );
 }
 
-const CATEGORY_ROWS = [
-  { name: "w-28", child: false },
-  { name: "w-24", child: true },
-  { name: "w-36", child: true },
-  { name: "w-32", child: false },
-  { name: "w-20", child: false },
-  { name: "w-28", child: true },
-  { name: "w-40", child: false },
-] as const;
+type LedgerRowWidths = { title: string; meta?: string; amount?: boolean };
 
-/** Mirrors the categories tree: one card, a row per category */
-export function CategoryListSkeleton() {
+/** Mirrors a `LedgerRow`: title and meta (stacked on phones), amount, menu */
+function LedgerRowSkeleton({
+  row,
+  leading,
+  className,
+}: {
+  row: LedgerRowWidths;
+  leading?: ReactNode;
+  className?: string;
+}) {
   return (
     <div
-      className={cn("bg-card divide-y overflow-hidden rounded-lg border", TAIL)}
+      className={cn(
+        "flex gap-3 px-3 py-2.5 sm:px-4 md:py-1",
+        row.meta ? "items-start md:items-center" : "items-center",
+        className,
+      )}
     >
-      {CATEGORY_ROWS.map((row, index) => (
+      {leading ? (
+        <div className="flex h-5 shrink-0 items-center">{leading}</div>
+      ) : null}
+      <div className="min-w-0 flex-1 md:flex md:items-center md:gap-3">
+        <Line w={row.title} className="md:shrink-0" />
+        {row.meta ? (
+          <Line
+            size="xs"
+            w={row.meta}
+            className="max-md:mt-0.5 md:ml-auto md:shrink-0 md:justify-end"
+          />
+        ) : null}
+      </div>
+      {row.amount === false ? null : (
+        <Line w="w-20" className="shrink-0 justify-end md:min-w-28" />
+      )}
+      <div className={cn(MENU, "-mr-2")} />
+    </div>
+  );
+}
+
+const ACCOUNT_GROUPS: LedgerRowWidths[][] = [
+  [
+    { title: "w-28", meta: "w-32" },
+    { title: "w-20", meta: "w-28" },
+    { title: "w-32", meta: "w-36" },
+  ],
+  [{ title: "w-24", meta: "w-28" }],
+];
+
+/** Mirrors the accounts list: currency groups of account rows */
+export function AccountListSkeleton() {
+  return (
+    <div className="@container">
+      <div className={cn("flex flex-col @2xl:gap-1.5", TAIL)}>
+        {ACCOUNT_GROUPS.map((rows, group) => (
+          <div
+            // biome-ignore lint/suspicious/noArrayIndexKey: a fixed pattern
+            key={group}
+            className="@2xl:grid @2xl:grid-cols-[8.5rem_minmax(0,1fr)] @2xl:items-start @2xl:gap-x-3"
+          >
+            <div className="flex items-center gap-2 @max-2xl:px-3 @max-2xl:pt-4 @max-2xl:pb-1.5 @max-2xl:sm:px-4 @max-2xl:md:pt-2.5 @max-2xl:md:pb-1 @2xl:h-0 @2xl:flex-col @2xl:items-start @2xl:gap-0 @2xl:pt-1.5 @2xl:pl-1">
+              <Line w="w-10" />
+              <Line size="xs" w="w-20" />
+            </div>
+            <div className="bg-card divide-y overflow-hidden rounded-lg border">
+              {rows.map((row, index) => (
+                <LedgerRowSkeleton
+                  // biome-ignore lint/suspicious/noArrayIndexKey: a fixed pattern
+                  key={index}
+                  row={row}
+                  leading={<Skeleton className="size-4 rounded-sm" />}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Starts a subcategory's title 1rem in from its parent's, which sits past
+ * the parent's swatch (`size-2.5`) and the row's gap (`gap-3`)
+ */
+export const CHILD_INDENT = "pl-[3.125rem] sm:pl-[3.375rem]";
+
+const CATEGORY_CARDS: LedgerRowWidths[][] = [
+  [{ title: "w-28", meta: "w-24" }, { title: "w-24" }, { title: "w-36" }],
+  [{ title: "w-32" }],
+  [{ title: "w-20", meta: "w-24" }, { title: "w-28" }],
+  [{ title: "w-40", amount: false }],
+];
+
+/** Mirrors the categories list: a card per top-level category */
+export function CategoryListSkeleton() {
+  return (
+    <div className={cn("flex flex-col gap-2", TAIL)}>
+      {CATEGORY_CARDS.map((rows, card) => (
         <div
           // biome-ignore lint/suspicious/noArrayIndexKey: a fixed pattern
-          key={index}
-          className={cn(
-            "flex items-center gap-2.5 px-3 py-1.5",
-            row.child && "pl-9 sm:pl-11",
-          )}
+          key={card}
+          className="bg-card divide-y overflow-hidden rounded-lg border"
         >
-          <Skeleton
-            className={cn(
-              "shrink-0 rounded-sm",
-              row.child ? "size-3.5" : "size-2.5",
-            )}
-          />
-          <Line w={row.name} className="flex-1" />
-          <Skeleton className="h-5 w-16 shrink-0 rounded-full" />
-          <div className={MENU} />
+          {rows.map((row, index) =>
+            index === 0 ? (
+              <LedgerRowSkeleton
+                // biome-ignore lint/suspicious/noArrayIndexKey: a fixed pattern
+                key={index}
+                row={row}
+                leading={<Skeleton className="size-2.5 rounded-sm" />}
+              />
+            ) : (
+              <LedgerRowSkeleton
+                // biome-ignore lint/suspicious/noArrayIndexKey: a fixed pattern
+                key={index}
+                row={row}
+                className={CHILD_INDENT}
+              />
+            ),
+          )}
         </div>
       ))}
+    </div>
+  );
+}
+
+const MONTH_BARS = ["w-24", "w-20", "w-28", "w-16"] as const;
+
+/** Mirrors `CategoriesSidebar`: the month's total, then a bar per category */
+export function CategoriesSidebarSkeleton() {
+  return (
+    <div className="flex flex-col gap-5">
+      <section className="flex flex-col gap-1.5">
+        <Line size="xs" w="w-28" />
+        <Line size="lg" w="w-32" />
+      </section>
+      <div className={cn("flex flex-col gap-2.5", TAIL)}>
+        {MONTH_BARS.map((name, index) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: a fixed pattern
+          <div key={index} className="flex flex-col gap-1">
+            <div className="flex items-center justify-between gap-2">
+              <Line w={name} />
+              <Line w="w-14" />
+            </div>
+            <Skeleton className="h-1.5 w-full rounded-full" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -395,7 +509,7 @@ export function TotalsSkeleton() {
 const ACCOUNT_ROWS = ["w-24", "w-32", "w-20", "w-28"] as const;
 
 /** Mirrors `BalancesSidebar`: its headings are real, the money is not yet */
-export function BalancesSkeleton() {
+export function BalancesSkeleton({ accounts = true }: { accounts?: boolean }) {
   const t = useTranslations("sidebar");
   const heading =
     "text-muted-foreground text-xs font-medium tracking-wide uppercase";
@@ -406,22 +520,26 @@ export function BalancesSkeleton() {
         <h3 className={heading}>{t("available")}</h3>
         <Line size="lg" w="w-32" />
       </section>
-      <Separator />
-      <section className="flex flex-col gap-1.5">
-        <h3 className={heading}>{t("accounts")}</h3>
-        <div className={cn("flex flex-col", TAIL)}>
-          {ACCOUNT_ROWS.map((name, index) => (
-            <div
-              // biome-ignore lint/suspicious/noArrayIndexKey: a fixed pattern
-              key={index}
-              className="touch:min-h-11 flex items-center gap-2 py-1.5"
-            >
-              <Line w={name} className="flex-1" />
-              <Line w="w-16" className="shrink-0" />
+      {accounts ? (
+        <>
+          <Separator />
+          <section className="flex flex-col gap-1.5">
+            <h3 className={heading}>{t("accounts")}</h3>
+            <div className={cn("flex flex-col", TAIL)}>
+              {ACCOUNT_ROWS.map((name, index) => (
+                <div
+                  // biome-ignore lint/suspicious/noArrayIndexKey: a fixed pattern
+                  key={index}
+                  className="touch:min-h-11 flex items-center gap-2 py-1.5"
+                >
+                  <Line w={name} className="flex-1" />
+                  <Line w="w-16" className="shrink-0" />
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </section>
+          </section>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -562,6 +680,11 @@ type PageProps = {
   children: ReactNode;
 };
 
+type LedgerPageProps = PageProps & {
+  /** The sidebar's placeholder, when it is not the balances */
+  sidebar?: ReactNode;
+};
+
 /** The frame of the list pages: a narrow column under the header */
 export function NarrowPageSkeleton({ title, actions, children }: PageProps) {
   return (
@@ -586,17 +709,20 @@ export function WidePageSkeleton({ title, actions, children }: PageProps) {
   );
 }
 
-/** Mirrors `LedgerLayout`: the content, and the balances beside it from lg up */
-export function LedgerPageSkeleton({ title, actions, children }: PageProps) {
+/** Mirrors `LedgerLayout`: the content, and the sidebar beside it from lg up */
+export function LedgerPageSkeleton({
+  title,
+  actions,
+  sidebar,
+  children,
+}: LedgerPageProps) {
   return (
     <>
       <PageHeader title={title} actions={actions} />
       <LoadingRegion className="mx-auto grid w-full max-w-6xl gap-6 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="flex min-w-0 flex-col gap-4">{children}</div>
         <aside className="hidden lg:block">
-          <div className="sticky top-20">
-            <BalancesSkeleton />
-          </div>
+          <div className="sticky top-20">{sidebar ?? <BalancesSkeleton />}</div>
         </aside>
       </LoadingRegion>
     </>

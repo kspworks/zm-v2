@@ -190,6 +190,7 @@ export function TransactionItem({
     // biome-ignore lint/a11y/noStaticElementInteractions: a wider mouse and touch target for the title button, which is the keyboard and screen-reader path
     // biome-ignore lint/a11y/useKeyWithClickEvents: the title button handles the keyboard
     <div
+      data-slot="ledger-row"
       className={cn(
         "group flex items-start gap-3 px-3 py-2.5 sm:px-4 md:items-center md:py-1",
         onOpen && "hover:bg-accent/50 cursor-pointer transition-colors",
@@ -309,6 +310,7 @@ export function TransactionItem({
         // biome-ignore lint/a11y/noStaticElementInteractions: only keeps the menu's clicks from reaching the row
         // biome-ignore lint/a11y/useKeyWithClickEvents: nothing to do from the keyboard here
         <div
+          data-slot="ledger-row-actions"
           className="-mr-2 shrink-0"
           onClick={(event) => event.stopPropagation()}
         >
