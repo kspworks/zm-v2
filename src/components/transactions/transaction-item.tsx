@@ -12,6 +12,7 @@ import {
   TooltipTrigger,
 } from "~/components/ui/tooltip";
 import type { Locale } from "~/i18n/config";
+import { formatDisplayDate } from "~/lib/dates";
 import type { DebtLabel } from "~/lib/debt-label";
 import { describeSchedule } from "~/lib/describe-schedule";
 import { formatMoney } from "~/lib/money";
@@ -143,6 +144,37 @@ export const displayAmount = (row: TransactionRowData) => {
       : null;
 
   return { amount, sign, hideSign, secondLine };
+};
+
+/**
+ * A row as one line of text, "21.11.2026 · Food → Groceries · lunch ·
+ * -120.00 ₴ · Card", for a toast that has to say which row it is about.
+ * The schedule wording can stand in for the date.
+ */
+export const useRowSummary = () => {
+  const rowDescription = useRowDescription();
+  const accountName = useAccountName();
+
+  return (row: TransactionRowData, when = formatDisplayDate(row.date)) => {
+    const { amount, sign, hideSign } = displayAmount(row);
+    const accounts = row.linked
+      ? `${accountName(row.account)} → ${accountName(row.linked.account)}`
+      : accountName(row.account);
+    // the amount never breaks across lines, "-1 915.60 ₴" stays whole
+    const money = formatMoney(hideSign ? Math.abs(amount) : amount, sign, {
+      showPlus: !hideSign,
+    }).replace(/\s/g, " ");
+
+    return [
+      when,
+      rowDescription(row),
+      row.comment?.trim() || null,
+      money,
+      accounts,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  };
 };
 
 export function TransactionItem({

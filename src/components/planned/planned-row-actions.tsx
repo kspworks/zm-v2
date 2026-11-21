@@ -2,14 +2,18 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { CalendarCogIcon, CheckIcon, SendIcon, Trash2Icon } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { useRef } from "react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "~/components/app/confirm-dialog";
 import { RowMenu } from "~/components/transactions/row-menu";
 import { useInvalidateMoney } from "~/components/transactions/transaction-form";
 import { useToday } from "~/components/transactions/transaction-groups";
-import type { TransactionRowData } from "~/components/transactions/transaction-item";
+import {
+  type TransactionRowData,
+  useRowSummary,
+} from "~/components/transactions/transaction-item";
 import { AlertDialogAction } from "~/components/ui/alert-dialog";
 import { Button, buttonVariants } from "~/components/ui/button";
 import {
@@ -17,6 +21,8 @@ import {
   DropdownMenuSeparator,
 } from "~/components/ui/dropdown-menu";
 import { useToastError } from "~/hooks/use-toast-error";
+import type { Locale } from "~/i18n/config";
+import { describeSchedule } from "~/lib/describe-schedule";
 import { useTRPC } from "~/trpc/react";
 
 /** Long enough to notice a slip and reach the button */
@@ -25,18 +31,24 @@ const UNDO_MS = 10_000;
 export const isRecurring = (row: TransactionRowData) =>
   row.plannedTransactionId !== null && row.schedule !== null;
 
-/** Confirms the row exactly as planned, with Undo for a slip */
-function MarkPaidButton({ id }: { id: string }) {
+/**
+ * Confirms the row exactly as planned, with Undo for a slip. The toasts name
+ * the row, so the Undo of one of several stacked toasts is not a guess.
+ */
+function MarkPaidButton({ row }: { row: TransactionRowData }) {
   const t = useTranslations("transactions");
   const tc = useTranslations("common");
   const trpc = useTRPC();
   const toastError = useToastError();
   const invalidate = useInvalidateMoney();
+  const { id } = row;
+  // the button leaves with the paid row; its last callbacks keep this text
+  const description = useRowSummary()(row);
 
   const unsubmit = useMutation(
     trpc.transactions.unsubmit.mutationOptions({
       onSuccess: async () => {
-        toast.success(t("toast.backToPlanned"));
+        toast.success(t("toast.backToPlanned"), { description });
         await invalidate();
       },
       onError: toastError,
@@ -46,6 +58,7 @@ function MarkPaidButton({ id }: { id: string }) {
     trpc.transactions.submit.mutationOptions({
       onSuccess: async () => {
         toast.success(t("toast.paid"), {
+          description,
           duration: UNDO_MS,
           action: {
             label: tc("undo"),
@@ -93,7 +106,7 @@ export function PlannedRowMenu({
 
   return (
     <div className="flex items-center gap-1">
-      {row.date <= today ? <MarkPaidButton id={row.id} /> : null}
+      {row.date <= today ? <MarkPaidButton row={row} /> : null}
       <RowMenu>
         <DropdownMenuItem onSelect={onSubmit}>
           <SendIcon />
@@ -131,17 +144,19 @@ export function DeleteTransactionDialog({
   const trpc = useTRPC();
   const toastError = useToastError();
   const invalidate = useInvalidateMoney();
-
-  const onSuccess = async () => {
-    toast.success(t("toast.deleted"));
-    onClose();
-    await invalidate();
-  };
+  const locale = useLocale() as Locale;
+  const rowSummary = useRowSummary();
+  // the toasts name the row, since several deletes stack several toasts and
+  // each Undo must say which row it brings back. The text is taken on
+  // confirm, by id: the dialog's row is gone by the time Undo is clicked.
+  const summaries = useRef(new Map<string, string>());
 
   const restore = useMutation(
     trpc.transactions.restore.mutationOptions({
-      onSuccess: async () => {
-        toast.success(t("toast.restored"));
+      onSuccess: async (_result, { id }) => {
+        toast.success(t("toast.restored"), {
+          description: summaries.current.get(id),
+        });
         await invalidate();
       },
       onError: toastError,
@@ -151,6 +166,7 @@ export function DeleteTransactionDialog({
     trpc.transactions.delete.mutationOptions({
       onSuccess: async (_result, { id }) => {
         toast.success(t("toast.deleted"), {
+          description: summaries.current.get(id),
           duration: UNDO_MS,
           action: { label: tc("undo"), onClick: () => restore.mutate({ id }) },
         });
@@ -161,10 +177,35 @@ export function DeleteTransactionDialog({
     }),
   );
   const removeAll = useMutation(
-    trpc.planned.deleteAll.mutationOptions({ onSuccess, onError: toastError }),
+    trpc.planned.deleteAll.mutationOptions({
+      onSuccess: async (_result, { id }) => {
+        toast.success(t("toast.deleted"), {
+          description: summaries.current.get(id),
+        });
+        onClose();
+        await invalidate();
+      },
+      onError: toastError,
+    }),
   );
   const pending = removeOne.isPending || removeAll.isPending;
   const recurring = row?.isPlanned && isRecurring(row);
+
+  const deleteOne = (target: TransactionRowData) => {
+    summaries.current.set(target.id, rowSummary(target));
+    removeOne.mutate({ id: target.id });
+  };
+  // the whole series: the schedule stands in for the date
+  const deleteSeries = (target: TransactionRowData) => {
+    summaries.current.set(
+      target.id,
+      rowSummary(
+        target,
+        target.schedule ? describeSchedule(target.schedule, locale) : undefined,
+      ),
+    );
+    removeAll.mutate({ id: target.id });
+  };
 
   if (recurring) {
     return (
@@ -175,14 +216,14 @@ export function DeleteTransactionDialog({
         description={t("deleteRecurringDescription")}
         confirmLabel={t("deleteAllPlanned")}
         pending={pending}
-        onConfirm={() => removeAll.mutate({ id: row.id })}
+        onConfirm={() => deleteSeries(row)}
         extraActions={
           <AlertDialogAction
             className={buttonVariants({ variant: "outline" })}
             disabled={pending}
             onClick={(event) => {
               event.preventDefault();
-              removeOne.mutate({ id: row.id });
+              deleteOne(row);
             }}
           >
             {t("deleteOnlyThis")}
@@ -198,7 +239,7 @@ export function DeleteTransactionDialog({
       onOpenChange={(open) => !open && onClose()}
       title={t("deleteTitle")}
       pending={pending}
-      onConfirm={() => row && removeOne.mutate({ id: row.id })}
+      onConfirm={() => row && deleteOne(row)}
     />
   );
 }
